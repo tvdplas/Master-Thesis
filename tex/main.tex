@@ -35,14 +35,14 @@ Most research related to the scheduling of electric public transport vehicles up
   
   \node (tactical) [process, minimum height=4.5cm, below of=strategic, yshift=-2cm] {\textbf{Tactical planning}\\\textit{Medium-Long term}};
   \node at (tactical.base) (timetable) [subprocess, xshift=2.8cm, yshift=1.5cm] {Timetabling};
-  \node at (tactical.base) (vehicle) [subprocess, below of=timetable, yshift=1cm] {Vehicle scheduling};
-  \node at (tactical.base) (crew) [subprocess, below of=vehicle, yshift=1cm] {Crew scheduling};
+  \node at (tactical.base) (vehicle) [subprocess, below of=timetable, yshift=1cm] {Vehicle scheduling (VSP)};
+  \node at (tactical.base) (crew) [subprocess, below of=vehicle, yshift=1cm] {Crew scheduling (CSP)};
+  \node at (tactical.base) (vscp) [rounded corners, dashed, draw=gray, fit=(vehicle) (crew), align=left] {\hspace{-4em}VSCP};
   \node at (tactical.base) (rostering) [subprocess, below of=crew, yshift=1cm] {Crew rostering};
 
   \node (operational) [process, minimum height=1.3cm, below of=tactical, yshift=-1.5cm] {\textbf{Operational planning}\\\textit{Day of operations}};
   \node at (operational.base) (recovery) [subprocess, xshift=2.8cm, yshift=-0.1cm] {Recovery};
-
-
+  
   \draw [arrow] (infra) -- (line);
   \draw [arrow] (line) -- (timetable);
   \draw [arrow] (timetable) -- (vehicle);
@@ -50,7 +50,7 @@ Most research related to the scheduling of electric public transport vehicles up
   \draw [arrow] (crew) -- (rostering);
   \draw [arrow] (rostering) -- (recovery);
 \end{tikzpicture}
-\caption{A general overview of the public transport planning process, based on \cite{IBARRAROJAS201538}, \cite{PERUMAL2022395}.}
+\caption{A general overview of the public transport planning process, based on \cite{CEDER1986331, IBARRAROJAS201538, PERUMAL2022395}.}
 \label{fig:planning-overview}
 \end{figure}
 
