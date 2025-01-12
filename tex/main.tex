@@ -10,7 +10,12 @@
 
 \input{tikz-setup.tex}
 
+\title{Integrated Vehicle and Crew Planning of Electric Busses using Lagrangian Relaxation}
+\date{July 2025}
+\author{Thomas van der Plas, Han Hoogeveen, Philip de Bruijn}
 \begin{document}
+\maketitle
+
 \section{Introduction}
 Electrification  of public transport has become the norm over recent years. Many public transport poviders, such as the Dutch bus provider Qbuzz \cite{qbuzzQbuzz}, have been replacing traditional vehicles with electric vehicles (EVs) in their fleet with the aim of reducing their carbon footprint in order to match the stricter regulations set out by organizations such as the European Union \cite{europaRegulation20181999}. This electrification introduces new challenges in every step of the planning process, as can be seen in Figure \ref{fig:planning-overview}. The limits of both electric infrastructure and electric vehicles add new constraints to an already complex operation. Existing techniques that minimize operational costs therefore need to be revised in order to add consideration for these new constraints. \\\\
 In this work, we focus on two of the most costly steps of the planning process for busses: vehicle scheduling and crew scheduling. Crew scheduling in particular is of great importance, as this makes up a majority of the overall operational costs \cite{BODIN198363}. A recent estimate puts crew costs at circa $60\%$ of the total operational costs for bus companies in Northern Europe \cite{PERUMAL2019280}. \todo{uitbreiden} \\\\
@@ -60,15 +65,28 @@ In this section, we will discuss work related to our research into the E-VSCP.  
 \noindent \textbf{(E-)VSP} \\\\
 The Single Depot Vehicle Scheduling Problem (SDVSP) has long been known to be polynomially solvable, however the inclusion of multiple depots has been shown to make the problem NP-hard under the assumption that busses must return to the same depot from which they originated \cite{Bunte2009}. Additionally, the introduction of any resource constraints such as limited ranges within the vehicle scheduling problem has also been shown to be NP-hard by Bodin et al. \cite{BODIN198363}. As the E-VSP deals with the limited range associated with electric vehicles, it is quite closely related to the multiple depot vehicle scheduling problem with route time constraints (MDVSP-RTC) \cite{HAGHANI2002309}. The key difference between these two problems is that the E-VSP allows for (partial) recharging of a vehicle throughout the operating period, whereas the MDVSP-RTC assumes a fixed maximum travel time for the vehicle within the given period. The E-VSP specifically been shown to be NP-hard by Oulamara and Sassi \cite{Sassi2014}. \\\\
 \cite{HAGHANI2002309}
-\todo{meer info} van Kooten Niekerk et al. introduce a pair of models which aim to solve the E-VSP while taking into account time of use pricing, nonlinear charging times and battery degredation due to depth of decharge \cite{vanKootenNiekerk2017}. They do this by extending the graph underlying the traditional VSP using either continuous state of charge variables or discrete trip nodes modeling state of charge, and solve using Column Generation (CG). They test using data provided by Belgian company De Lijn, using a total of 543 trips. They show that the discretized model can be solved in a shorter timeframe with similar results to the continuous model. \\\\
-Jiang et al. use a Large Neighbourhood Search (LNS) approach to solve the E-VSP \cite{Jiang2021}. They consider time of use energy costs and opportunisitic charging. They use test data in Shenzhen, China with a total of 778 trips. \todo{meer info maar de paper is saai}.
+Li was one of the first to consider the E-VSP back in 2014 \cite{Li2014}. The model is based on an extension of the traditional network based approach to solving the VSP, with the additional constraint of total driving time. It additionally assumes that fast charging or battery swaps are possible, ensuring full charges in a fixed timespan. The model is solved using a column generation approach with branch-and-price, followed by a local search to find a local optimum. The proposed methods are tested on trips in the Bay Area, with a maximum instance size of 242 trips. These tests resulted in optimality gaps of <5\% for busses able to drive 150km, and between 7-15\% for a range of 120km depending on the instance.  \\\\
+\todo{meer info} van Kooten Niekerk et al. introduce a pair of models which aim to solve the E-VSP while taking into account time of use pricing, nonlinear charging times and battery degredation due to depth of decharge \cite{vanKootenNiekerk2017}. They do this by extending the graph underlying the traditional VSP using either continuous state of charge variables or discrete trip nodes modeling state of charge, and solve using column generation. In order to model nonlinear charging times, a select number of discrete scenarios is included. They test using data provided by Belgian company De Lijn, using a total of 543 trips. They show that the discretized model can be solved in a shorter timeframe with similar results to the continuous model. \\\\
 
+Jiang et al. use a Large Neighbourhood Search (LNS) approach to solve the E-VSP \cite{Jiang2021}. They consider time of use energy costs and opportunisitic charging. They use test data in Shenzhen, China with a total of 778 trips. \todo{meer info maar de paper is saai}.\\\\
 
-\noindent \textbf{(E-)VSCP} \todo{Deze kopjes erin houden? Of gwn weghalen.} \\
+De Vos et al. introduce an E-VSP solution method which deals with partial recharges and capacitated charging stations \cite{deVos2024}. They model this using discrete battery charge levels in a connection-based network of trips and charging actions, in which a primal network is created using pessemistic rounding. In order to solve, they apply CG with two seperate hueristics: branch-and-price and a diving hueristic. To overcome the limitations of dual bounds resulting from a discretized model, they incorporate ideas from Boland et al. resulting in a dual network with optimistic connections \cite{Boland2017}. This gives the same bounds as the ones found in the non-discretized model. Testing is performed on a bus concession south of Amsterdam with 816 trips, with subsets being used as smaller instances. Optimality gaps of 1.5-2.7\% are achieved across instances. They additionally note that the framework as provided can easily be extended for nonlinear charging functions and depth-of-discharge battery degredation. \\\\
 
-As far as we are aware, only four other works discuss the E-VSCP. Perumal et al. were the first to offer a solution to the E-VSCP in 2021 \cite{PERUMAL2021105268}. They introduced an Adaptive Large Neighbourhood Search (ALNS) which incorporates a Branch \& Price (B\&P) hueristic which has been previously used to solve the multi-depot VSP, E-VSP and VCSP \cite{Pepin2009, Haase1996, vanKootenNiekerk2017}. Additionally, they adapt an embedding of a B\&P hueristic into the ALNS as introduced by Pepin et al. \cite{Pepin2009}. They only consider full recharges with a fixed duration of 120 minutes, charging at the depot and fixed maximum ranges for vehicles. The authors tested using real life data from lines in Denmark and Sweden with a maximum instance size of 1109 trips, and report an improvement of $1.17-4.37\%$ across different instances when compared to a sequential approach. \\
-Sistig and Sauer also offered a ALNS based approach in 2023, which aimed to include partial recharges, opportunisitic charging at terminal stops of trips and non-fixed ranges for the vehicles \cite{SISTIG2023120915}. \todo{dit is niet interessant. This ALNS extends a previous LNS by Shaw which was aimed at the more general vehicle routing problem \cite{Shaw1997ANL, Shaw1998ANL}.} Tests were done using an instance of a city route in Germany, with a total of 282 trips. Different scenarios based on possible crew break and relief locations were considered in order to compare diesel and electric total cost of ownership. \\
-Wang et al. introduce a two layered model using particle swarms and a $\epsilon$-constraint based mechanism which allows for a mix of diesel and electric busses \cite{su14063627}. The model incorporates partial depot charging, as well as measures to ensure that crew is primarily assigned the same vehicle type. A circular bus route in China with 68 daily trips is used as a basis for testing, with a focus on electric versus diesel usage and driver satisfaction. \\
+Olsen and Kliewer introduce a solution to the E-VSP which aims to incorporate more accurate nonlinear charging times \cite{Olsen2020}. They focus on showing that a linear approximation for the second phase of vehicle charging (such as the one found in van Kooten Niekerk \cite{vanKootenNiekerk2017}) can misrepresent the SoC and required charging times, and therefore advocate for the use of an exponential function to model this phase instead. 
+
+Parmentier et al. consider a scalable approach to the E-VSP which is based on the concept of nondominated charging arcs with nonlinear charging \cite{Parmentier2023}. They use these in order to formulate a more computationally efficient version of the pricing problem given uniform charging infrastructure. Using column generation and branch-and-price techniques, they tested on the \textit{large} instances introduced by Wen et al. \cite{Wen2016} which included up to 8 depots, 16 charging stations and 500 trips. Here, they are able to find solutions that are only up to 0.06\% away from the optimum. 
+
+\todo{lezen of hier nog een nieuwe approach instaat} \cite{Sassi2014} \\\\
+\todo{Mogelijk bekijken} \cite{Parmentier2023}
+
+\noindent \textbf{(E-)VSCP}\\
+As far as we are aware, only four other works discuss the E-VSCP.\\
+Perumal et al. were the first to offer a solution to the E-VSCP in 2021 \cite{PERUMAL2021105268}. They introduced an Adaptive Large Neighbourhood Search (ALNS) which incorporates a Branch \& Price (B\&P) hueristic which has been previously used to solve the multi-depot VSP, E-VSP and VCSP \cite{Pepin2009, Haase1996, vanKootenNiekerk2017}. Additionally, they adapt an embedding of a B\&P hueristic into the ALNS as introduced by Pepin et al. \cite{Pepin2009}. They only consider full recharges with a fixed duration of 120 minutes, charging at the depot and fixed maximum ranges for vehicles. The authors tested using real life data from lines in Denmark and Sweden with a maximum instance size of 1109 trips, and report an improvement of $1.17-4.37\%$ across different instances when compared to a sequential approach. \\\\
+
+Sistig and Sauer also offered a ALNS based approach in 2023, which aimed to include partial recharges, opportunisitic charging at terminal stops of trips and non-fixed ranges for the vehicles \cite{SISTIG2023120915}. \todo{dit is niet interessant. This ALNS extends a previous LNS by Shaw which was aimed at the more general vehicle routing problem \cite{Shaw1997ANL, Shaw1998ANL}.} Tests were done using an instance of a city route in Germany, with a total of 282 trips. Different scenarios based on possible crew break and relief locations were considered in order to compare diesel and electric total cost of ownership. \\\\
+
+Wang et al. introduce a two layered model using particle swarms and a $\epsilon$-constraint based mechanism which allows for a mix of diesel and electric busses \cite{su14063627}. The model incorporates partial depot charging, as well as measures to ensure that crew is primarily assigned the same vehicle type. A circular bus route in China with 68 daily trips is used as a basis for testing, with a focus on electric versus diesel usage and driver satisfaction. \\\\
+
 Shen and Li provide a minimum-cost flow framework for the E-VSP which is integrated with a set partitioning based approach for the E-CSP \cite{SHEN2023}. They only provide full recharge capabilities at the depot, however focus on the inclusion of a distinction between driving and standstill time of vehicles in order to more accurately model real life traffic. A city line in China with 270 daily trips is used for testing, resulting in cost savings of up to 8.7\% when compared to a sequential approach.
 
 \begin{table}[h]
@@ -77,12 +95,16 @@ Shen and Li provide a minimum-cost flow framework for the E-VSP which is integra
       \toprule
       & Model & ToU & SoC & Partial charging & Charge location & Degredation \\
       \cmidrule(lr){2-7}
-      \cite{vanKootenNiekerk2017} & E-VSP & Yes & C/D & Yes & D/O & Yes \\
-      \cite{Jiang2021} & E-VSP & Yes & C & Yes & O & No \\ 
-      \cite{PERUMAL2021105268} & E-VSCP & No & C & No & D & No  \\
-      \cite{SISTIG2023120915} & E-VSCP & No & C & Yes & D/O & No \\
-      \cite{su14063627} & E-VSCP & Yes & C & Yes & D & No \\
-      \cite{SHEN2023} & E-VSCP & No & C & No & D/O & No \\
+      \cite{Li2014} (2014) & E-VSP & No & D & No & D & No \\
+      \cite{vanKootenNiekerk2017} (2017) & E-VSP & Yes & C/D & Yes & D/O & Yes \\
+      \cite{Olsen2020} (2020) & E-VSP & No & C & Yes & D/O & No \\ 
+      \cite{Jiang2021} (2021) & E-VSP & Yes & C & Yes & O & No \\ 
+      \cite{Parmentier2023} (2023) & E-VSP & No & C & Yes & D/O & No \\
+      \cite{deVos2024} (2024) & E-VSP & No & D & Yes & D/O & No \\ 
+      \cite{PERUMAL2021105268} (2021) & E-VSCP & No & C & No & D & No  \\
+      \cite{SISTIG2023120915} (2023) & E-VSCP & No & C & Yes & D/O & No \\
+      \cite{su14063627} (2022) & E-VSCP & Yes & C & Yes & D & No \\
+      \cite{SHEN2023} (2023) & E-VSCP & No & C & No & D/O & No \\
       \bottomrule
   \end{tabular}
   \caption{A brief overview of battery modeling in E-VSP and E-VSCP literature. ToU = time of use electricity prices, State of charge (SoC) is either modeled as a (D)iscrete or (C)ontinuous variable, Partial charging yes/no, charge location (D)epot, (O)pportunity, (I)n motion, Degredation in cost function}
