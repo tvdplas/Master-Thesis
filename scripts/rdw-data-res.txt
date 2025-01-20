@@ -1,0 +1,14 @@
+Data gathered: 20-jan-2025, 14:00
+Method: Fetch all license plate numbers that have the vehicle type "Bus", fetch fuel type 
+for each of the license plates. 
+
+Diesel: 8344
+Elektriciteit: 2341
+CNG: 476
+Waterstof: 25
+Benzine: 21
+LPG: 4
+LNG: 5
+--------------------
+Total: 11216
+% electric: ~20.9%
