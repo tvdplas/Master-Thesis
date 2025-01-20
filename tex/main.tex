@@ -26,11 +26,9 @@ European Union \cite{europaRegulation20181999}. This electrification introduces
 new challenges in every step of the planning process as laid out in Figure
 \ref{fig:planning-overview}. The limits of both electric infrastructure and
 electric vehicles add new constraints to an already complex operation. Existing
-techniques that minimize operational costs therefore need to be revised in
-order to add consideration for these new constraints. \\\\ In this work, we
-will focus on incorporating electric vehicle restrictions into two of the most
-costly steps of the planning process for busses: vehicle scheduling and crew
-scheduling. Crew scheduling in particular is of great importance, as this makes
+techniques that minimize operational costs are therefore being revised in order to take into account these operational constraints \todo{beter formuleren}. \\\\ In this work, we
+will focus on incorporating electric vehicle restrictions two of the highest operational cost steps in the planning process: vehicle scheduling and crew
+scheduling. Crew scheduling in particular is of great importance, as crew costs make
 up a majority of the overall operational costs. A recent estimate puts crew
 costs at circa $60\%$ of the total operational costs for bus companies in
 Northern Europe \cite{Perumal2019Crew}. The set of feasible crew schedules is
@@ -60,7 +58,7 @@ multi-depot variant of the problem on the other hand is known to be NP-hard
 vehicle ranges such as those found in EVs also make the problem NP-hard
 \cite{Bodin1983, Sassi2014}. We consider a general depot case with constrained
 vehicle ranges due to the inclusion of EVs, and will therefore refer to the VSP
-as being NP-Hard. \\ \todo{Extra info over hoe dit vaak wordt gerepresenteerd}
+as being NP-Hard. \\
 \\\\ The Crew Scheduling Problem (CSP) on the other hand aims to find a minimum
 cost assignment of crew members to vehicle tasks. Given a set of vehicle tasks
 and crew members, the goal is to find an assignment of crew members such that
@@ -69,27 +67,27 @@ as maximum working time on a day, driver breaks and handovers between different
 drivers on the same vehicle need to be considered. The primary goal for
 minimization here is the total amount of workers needed and hours worked. The
 CSP is also known to be an NP-hard problem \cite{Fischetti1989}.\\ \todo{Info
-  over oplossingen} \\\\ As can be seen, the VSP and CSP are closely related. The
+  over oplossingen} \\\\ 
+As can be seen, the VSP and CSP are closely related. The
 vehicle schedules that are selected in the VSP directly determine what crew
 assignments are possible within the CSP. It is therefore not always optimal to
 fully minimize costs in the vehicle scheduling process, as this might incur
-higher overall costs due to crew scheduling. This integrated approach is often
-refered to as the vehicle and crew scheduling problem, or VSCP. \\\\ A lot of
-work has already been for these three problems. Both the sequential and
+higher overall costs due to crew scheduling. We can therefore roughly split the solving of vehicle and crew assignments into two seperate approaches: sequential, in which the VSP and CSP are solved seperately, or integrated, in which the VSP and CSP are solved such that overall costs are minimized simultaniously. The integrated approach is often
+refered to as the vehicle and crew scheduling problem, or VSCP. The VSCP can also still be further subdivided into full and partial integration, partial integration adds some additional crew hueristics to the VSP and full integration actually minimizes costs of both. In this work, we will only focus on full integration. \todo{beter formuleren} \\\\ 
+A lot of work has already been done for the VSP, CSP and VSCP. Both the sequential and
 integrated approach have been extensively studied since the \todo{1980s?}, and
 we refer the reader to a recent survey in order to get a sense of the current
 state of the art \todo{citiation met survey}. The introduction of electric
 vehicles has however introduced new constraints. The most important constraint
-is the limited range of these vehicles, combined with charging times which are
-much greater than refeuling times found on traditional busses. This most
+is the limited range of electric vehicles, combined with charging times which are
+much greater than refeuling times found on traditional combustion based buses. This most
 directly effects the VSP, as charging periods now need to be added throughout
-the day in order to effectively use busses. This new version of the problem,
-refered to as the E-VSP has also been studied extensively in recent years. We
+the day in order to effectively use buses. This new version of the problem,
+refered to as the E-VSP, has also been studied extensively in recent years. We
 refer the reader to a survey by Perumal et al. for a detailed overview of
 recent progress \cite{Perumal2022LitRev}. \\\\ Most research related to the
 scheduling of electric public transport vehicles up until now has focused on
-the sequential approach. This leaves some room for improvement, as was
-previously pointed out. Limited literature does exist on the E-VSCP problem,
+the sequential approach. Limited literature does exist on the E-VSCP problem,
 however simplifying assumptions are made which might limit real world
 applicability or accurate modeling of costs. Most notably, assumptions are made
 about charging locations (such as only being able to charge at a bus depot) or
@@ -99,12 +97,9 @@ degredation due to usage patterns has not been included in any integrated
 models at the time of writing. The contribution of this work is therefore
 threefold:
 \begin{itemize}
-  \item Taking into account time based electricity prices while allowing partial
-        charging.
-  \item Including battery degredation into the objective function instead of only using
-        as constraints.
-  \item Using lagrangian relaxation instead of currently used methods as a basis for
-        the solution method.
+  \item Incorporating nonlinear battery charging times.
+  \item Including battery degredation due to usage patterns into the objective function.
+  \item Using Lagrangian relaxation in order to link the VSP and CSP instead of currently used methods.
 \end{itemize}
 This work is organised as follows. In Section 2, we will discuss work related to the E-VSCP and give an overview of common ways of modeling the problem. In Section 3, we give our formal problem definition. \todo{uitbreiden zodra je meer info hebt}.
 \begin{figure}[h]
@@ -172,7 +167,7 @@ has long been known to be polynomially solvable, however the inclusion of
 multiple depots has been shown to make the problem NP-hard under the assumption
 that busses must return to the same depot from which they originated
 \cite{Bunte2009}. Additionally, the introduction of any resource constraints
-such as limited ranges within the vehicle scheduling problem has also been
+such as limited ranges within the VSP has also been
 shown to be NP-hard by Bodin et al. \cite{Bodin1983}. As the E-VSP deals with
 the limited range associated with electric vehicles, it is quite closely
 related to the multiple depot vehicle scheduling problem with route time
@@ -180,25 +175,27 @@ constraints (MDVSP-RTC) \cite{Haghani2002}. The key difference between these
 two problems is that the E-VSP allows for (partial) recharging of a vehicle
 throughout the operating period, whereas the MDVSP-RTC assumes a fixed maximum
 travel time for the vehicle within the given period. The E-VSP specifically
-been shown to be NP-hard by Oulamara and Sassi \cite{Sassi2014}. \\
-\cite{Haghani2002} Li was one of the first to consider the E-VSP back in 2014
-\cite{Li2014}. The model is based on an extension of the traditional network
-based approach to solving the VSP, with the additional constraint of total
-driving time. It additionally assumes that fast charging or battery swaps are
-possible, ensuring full charges in a fixed timespan. The model is solved using
-a column generation approach with branch-and-price, followed by a local search
-to find a local optimum. The proposed methods are tested on trips in the Bay
-Area, with a maximum instance size of 242 trips. These tests resulted in
-optimality gaps of $<5\%$ for busses able to drive 150km, and between 7-15\%
-for a range of 120km depending on the instance. \\\\ \todo{meer info} van
+been shown to be NP-hard by Oulamara and Sassi \cite{Sassi2014}. \\\\
+
+Li was one of the first to consider the E-VSP back in 2014 \cite{Li2014}. The
+model is based on an extension of the traditional network based approach to
+solving the VSP, with the additional constraint of total driving time. It
+additionally assumes that fast charging or battery swaps are possible, ensuring
+full charges in a fixed timespan. The model is solved using a column generation
+approach with branch-and-price, followed by a local search to find a local
+optimum. The proposed methods are tested on trips in the San Fransisco Bay Area, with a
+maximum instance size of 242 trips. These tests resulted in optimality gaps of
+$<5\%$ for busses able to drive 150km, and between 7-15\% for a range of 120km
+depending on the instance. \\\\
+
+\todo{meer info} van
 Kooten Niekerk et al. introduce a pair of models which aim to solve the E-VSP
 while taking into account ToU energy prices, nonlinear charging times and
 battery degredation due to depth of discharge \cite{vanKootenNiekerk2017}. They
 do this by extending the graph underlying the traditional VSP using either
-continuous state of charge variables or discrete trip nodes modeling state of
-charge, and solve using CG. In order to model nonlinear charging times, a
-select number of discrete scenarios is included. They test using data provided
-by Belgian company De Lijn, using a total of 543 trips. They show that the
+continuous or discrete state of charge variables for the trip nodes,
+and solve using CG. They test using data provided
+by Belgian bus company De Lijn in the city Leuven, using a total of 543 trips. They show that the
 discretized model can be solved in a shorter timeframe with similar results to
 the continuous model. \\\\
 
@@ -248,10 +245,26 @@ given trips $T$ is provided based on DP. Additionally, polynomial algorithms
 for determining maximum feasible charging capacity and minimum-cost flows based
 on LP are provided. No computational experiments are performed. \\\\
 
-\todo{Bekijken} multidepot multivehicle type esvp, multi-commodity flow, proximal bundle method https://epubs.siam.org/doi/10.1137/040603929 \todo{lezen}\cite{Borndörfer2024}
-\todo{https://www.sciencedirect.com/science/article/pii/S136655452100209X}
+Zhang et al. apply a similar method to the one found in van Kooten Niekerk
+\cite{Zhang2021}. They consider a single depot with charging infrastructure,
+where multiple round trip lines originating from the depot. They model
+nonlinear charging behavior, battery depreciation due to depth of discharge and
+capacitated charging infrastructure using discretized timesteps. They solve
+using a combination of CG and B\&P. Tests are done on both randomly generated
+instances as well as 6 not yet electrified lines with up to 160 and 197 trips
+respectively. Cost savings of 10.1–27.3\% in the real life line based on
+different battery capacities. \todo{waar de fuck vergelijken ze mee}
+\todo{Bekijken} multidepot multivehicle type esvp, multi-commodity flow,
+proximal bundle method https://epubs.siam.org/doi/10.1137/040603929
+\todo{lezen}\cite{Borndörfer2024}
+
+\todo{grafiek elektrificatie bussen in NL}
 
 \noindent \textbf{(E-)CSP}\\
+The CSP is often solved as a set partitioning (or set covering) problem. Here, the tasks described by the sequences of trips generated during the VSP must be covered by the individual schedules of crew members. Research into this subject is primarily done in the airline space; crew costs here are generally even higher than those found in the more general public transport sector \cite{Barnhart2003}. Additionally, strong labor unions and restrictive labor legislation due to safety concerns cause a large number of constraints to be applied to crew schedules, resulting in a non-trivial problem to solve. \\
+Results achieved in the aviation space quite easily generalize to other sectors, and we will therefore discuss some of note. For a more detailed overview, we refer the reader to a recent review by Deveci and Demirel \cite{Deveci2018}. \\\\
+\todo{https://www.sciencedirect.com/science/article/pii/S2352146517301643}
+  
 \todo{modeleer methode toevoegen}\\
 
 \noindent \textbf{(E-)VSCP}\\
@@ -297,11 +310,21 @@ time of vehicles in order to more accurately model real life traffic. A city
 line in China with 270 daily trips is used for testing, resulting in cost
 savings of up to 8.7\% when compared to a sequential approach. \\\\
 
-Cong et al. provide a hybrid MIP and SAA based approach to optimizing a mixed fleet of combustion and electric vehicles with ToU electricity pricing \cite{Cong2024}. In each SAA iteration, a collection of new E-VSP trip assignments are created using neighborhood operations, after which two MIP models are sequentially employed to solve for charging and crew schedules. The methods are tested on a collection of 3 bus routes originating from the same depot in Changchun City, China with a total of 520 trips across all routes. When compared to the sequential approach, the integrated vehicle schedule was able to reduce costs by 0.8\%. \todo{miss nog iets zeggen over hoe ze dit eerst hadden ingesteld} \\\\
+Cong et al. provide a hybrid MIP and SAA based approach to optimizing a mixed
+fleet of combustion and electric vehicles with ToU electricity pricing
+\cite{Cong2024}. In each SAA iteration, a collection of new E-VSP trip
+assignments are created using neighborhood operations, after which two MIP
+models are sequentially employed to solve for charging and crew schedules. The
+methods are tested on a collection of 3 bus routes originating from the same
+depot in Changchun City, China with a total of 520 trips across all routes.
+When compared to the sequential approach, the integrated vehicle schedule was
+able to reduce costs by 0.8\%. \todo{miss nog iets zeggen over hoe ze dit eerst
+  hadden ingesteld} \\\\
 
 \noindent \textbf{Other related fields}\\
 The VSP is also very closely related to the vehicle routing problem (VRP). The VRP with time windows is of particular interest, as this allows us to define the same precedence constraints as those naturally defined by trips. \todo{Uitbreiden met papers, betere beschrijving}
 \todo{Meer related werk: }
+\todo{E-VRPTWR}
 Research has also been done into integrating the E-VSP with timetable planning (E-TVSP). A recent example can be found in the work of Stadnichuk et al., who allowed results of the E-VSP to introduce optimality cuts into the MIP used for creating timetable plans as a way to reduce costs \cite{Stadnichuk2024}. This is achieved by transforming the E-VSP problem into one of bin packing with conflicts, after which three different hueristic methods are applied and compared. \todo{iets beter formuleren allemaal}. \\\\
 
 \begin{table}[h]
@@ -314,6 +337,7 @@ Research has also been done into integrating the E-VSP with timetable planning (
     \cite{vanKootenNiekerk2017} 2017 & E-VSP  & Yes & C/D & Yes           & Yes         & D/O          & Yes         \\
     \cite{Olsen2020} 2020            & E-VSP  & No  & C   & Yes           & Yes         & D/O          & No          \\
     \cite{Jiang2021} 2021            & E-VSP  & Yes & C   & No            & Yes         & O            & No          \\
+    \cite{Zhang2021} 2021                 & E-VSP  & No  & C/D & Yes           & Yes         & D            & Yes \\
     \cite{Parmentier2023} 2023       & E-VSP  & No  & C   & Yes           & Yes         & D/O          & No          \\
     \cite{deVos2024} 2024            & E-VSP  & No  & D   & Yes           & Yes         & D/O          & No          \\
     \cite{Pulyassary2024} 2024       & E-VSP  & No  & C/D & Yes           & Yes         & O            & No          \\
@@ -334,5 +358,11 @@ Research has also been done into integrating the E-VSP with timetable planning (
 \section{Problem definition}
 \label{sec:problem_def}
 Let $T$ be a set of trips that needs to be run.
+
+
+\todo{csp bus variant}
+\todo{E-VRPTWRC}
+\todo{Inkorten wat niet interessant is}
+\todo{onderzoeksgat}
 \printbibliography
 \end{document}
