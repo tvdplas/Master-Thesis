@@ -1,4 +1,4 @@
-\documentclass[ht]{article}
+\documentclass[]{article}
 \usepackage[a4paper, total={6in, 8in}]{geometry}
 \usepackage{booktabs}
 \usepackage{multicol}
@@ -17,51 +17,41 @@
 \maketitle
 
 \section{Introduction}
-Electrification of public transport has become the norm over recent years. In
-The Netherlands around 21\% of all registered buses are already electric
+Electric vehicles are beginning to make up large portions of the fleet for public transport providers. In
+The Netherlands for instance, around 21\% of all registered buses are already electric
 according to the RDW \cite{RDW}. However, in order to meet European climate and
 sustainablity legislation, individual line operators such as Qbuzz are slowly
-replacing more of their old combustion based fleet with electric buses
-\cite{europaRegulation20181999,qbuzzQbuzz}. It is therefore likely that this
-share will only increase in coming years. This electrification introduces new
-challenges in every step of the planning process as laid out in Figure
-\ref{fig:planning-overview}. The limits of both electric infrastructure and
-electric vehicles add new constraints to an already complex operation. Existing
-techniques that minimize operational costs are therefore being revised in order
-to take into account these operational constraints \todo{beter formuleren}.
+replacing even more of their old combustion based fleet with electric vehicles
+\cite{europaRegulation20181999, qbuzzQbuzz}. It is therefore all but sure that this
+share will only increase in coming years. \\
+This electrification introduces new challenges in the planning process traditionally used in public transport, as illustrated in Figure \ref{fig:planning-overview}. The limits of both electric infrastructure and vehicles add new capacity constraints to an operation which was previously already complex. Existing techniques that minimize costs are therefore being revised in order
+to take into account these new constraints.
 \\\\ In this work, we will focus on incorporating electric vehicle restrictions
-two of the highest operational cost steps in the planning process: vehicle
+into the two steps in the planning process which have the highest influence on day-to-day costs: vehicle
 scheduling and crew scheduling. Crew scheduling in particular is of great
-importance, as crew costs make up a majority of the overall operational costs.
-A recent estimate puts crew costs at circa $60\%$ of the total operational
+importance, as crew costs make up a majority of the operational costs;
+a recent estimate puts them at around $60\%$ of the total operational
 costs for bus companies in Northern Europe \cite{Perumal2019Crew}. The set of
 feasible crew schedules is however directly influenced by the routes that are
-determined while planning vehicles. It has therefore long been known that
-integrating the vehicle and crew planning operations can lead to significant
-reductions in costs, as routes can be better tailored to suit crew planning
-needs \cite{Bodin1983}. \\\\ We will now give an informal overview of the
-problems at hand. A more formal overview can be found in Section
+determined while planning vehicles. In order to optimally minimize costs, we therefore also need to consider (electric) vehicle scheduling. 
+\\\\ We will now give an informal overview of the
+problems at hand. A more formal definition can be found in Section
 \ref{sec:problem_def}. The Vehicle Scheduling Problem (VSP) aims to find a set
 of minimum cost vehicle tasks such that all trips that need to be driven
 throughout a timeperiod are covered. In this, a trip is defined as full or
 partial travel of a vehicle along a predetermined route, and a vehicle task is
-defined as a set of sequential operations that a vehicle will perform. Note
-that for the same route, multiple trips might be present on a single day if
-that route is scheduled multiple times. \\ Given a set of these trips, a set of
-depots and a set of vehicles, the goal is to find a vehicle task (or schedule)
-for each of the vehicles throughout the day. In this, a task for an individual
+defined as a set of sequential operations that a vehicle will perform. A task for a
 vehicle must start at a depot, perform a number of compatible trips (that is,
 trips which can be performed sequentially while respecting driving times
 between trips), before finally returning to its original depot. In order to
-minimize operational costs, both the number of vehicles and the overall driven
-distance between trips (also called deadheads) need to be minimized. \\ The VSP
+minimize operational costs, both the number of used vehicles and the overall driven
+distance between trips need to be minimized. \\ The VSP
 with a single depot and unconstrained vehicle ranges can be solved in
 polynomial time \cite{Freling2003SDVSP}. The multi-depot variant of the problem
-on the other hand is known to be NP-hard \cite{Bodin1983, Bertossi1987,
-  Even1975}, and the addition of constrained vehicle ranges such as those found
-in EVs also make the problem NP-hard \cite{Bodin1983, Sassi2014}. We consider a
+on the other hand is known to be NP-hard, and the addition of constrained vehicle ranges such as those found
+in EVs also make the problem NP-hard \cite{Bodin1983}. We will consider a
 general depot case with constrained vehicle ranges due to the inclusion of EVs,
-and will therefore refer to the VSP as being NP-Hard. \\ \\\\ The Crew
+and will therefore refer to the VSP as being NP-Hard. \\\\ The Crew
 Scheduling Problem (CSP) on the other hand aims to find a minimum cost
 assignment of crew members to vehicle tasks. Given a set of vehicle tasks and
 crew members, the goal is to find an assignment of crew members such that each
@@ -371,7 +361,6 @@ Research has also been done into integrating the E-VSP with timetable planning (
 Let $T$ be a set of trips that needs to be run.
 
 \todo{csp bus variant}
-\todo{E-VRPTWRC}
 \todo{Inkorten wat niet interessant is}
 \todo{onderzoeksgat}
 \printbibliography
