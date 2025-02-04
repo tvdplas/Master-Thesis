@@ -1,4 +1,4 @@
-\documentclass[]{article}
+\documentclass[]{book}
 \usepackage[a4paper, total={6in, 8in}]{geometry}
 \usepackage{booktabs}
 \usepackage{multicol}
@@ -12,26 +12,12 @@
 
 \title{Integrated Vehicle and Crew Scheduling for Electric Buses using Lagrangian Relaxation}
 \date{July 2025}
-\author{Thomas van der Plas, Han Hoogeveen, Philip de Bruijn}
+\author{Thomas van der Plas, Han Hoogeveen, Philip de Bruin}
 \begin{document}
 \maketitle
 
 \section{Introduction}
-Electric vehicles are beginning to make up large portions of the fleet for
-public transport providers. In The Netherlands for instance, around 21\% of all
-registered buses are already electric according to the RDW \cite{RDW}. However,
-in order to meet European climate and sustainability legislation, individual
-line operators such as Qbuzz are slowly replacing even more of their old
-combustion based fleet with electric vehicles \cite{europaRegulation20181999,
-  qbuzzQbuzz}. It is therefore all but sure that this share will only increase in
-coming years across different countries. \\ This electrification introduces new
-challenges in the planning process traditionally used in public transport, as
-illustrated in Figure \ref{fig:planning-overview}. The limits of both electric
-infrastructure and vehicles add new capacity constraints to an operation which
-was previously already complex. Existing techniques that minimize costs are
-therefore being revised in order to take into account these new constraints.
-\\\\
-\begin{figure}[h]
+\begin{figure}
   \centering
   \begin{tikzpicture}[node distance=2cm]
     \node (strategic) [process, minimum height=2.3cm] {\textbf{Strategic planning}\\\textit{Long term}};
@@ -42,7 +28,7 @@ therefore being revised in order to take into account these new constraints.
     \node at (tactical.base) (timetable) [subprocess, xshift=2.8cm, yshift=1.5cm] {Timetabling};
     \node at (tactical.base) (vehicle) [subprocess, below of=timetable, yshift=1cm] {Vehicle scheduling (VSP)};
     \node at (tactical.base) (crew) [subprocess, below of=vehicle, yshift=1cm] {Crew scheduling (CSP)};
-    \node at (tactical.base) (VCSP) [rounded corners, dashed, draw=gray, fit=(vehicle) (crew), align=left] {\hspace{-4em}VCSP};
+    \node at (tactical.base) (VCSP) [rounded corners, draw=black, fit=(vehicle) (crew), align=left] {\hspace{-4em}VCSP};
     \node at (tactical.base) (rostering) [subprocess, below of=crew, yshift=1cm] {Crew rostering};
 
     \node (operational) [process, minimum height=1.3cm, below of=tactical, yshift=-1.5cm] {\textbf{Operational planning}\\\textit{Day of operations}};
@@ -58,15 +44,62 @@ therefore being revised in order to take into account these new constraints.
   \caption{A general overview of the public transport planning process, based on \cite{Ceder1986, Ibarra-Rojas2015, Perumal2022LitRev}.}
   \label{fig:planning-overview}
 \end{figure}
-In this work, we will focus on incorporating electric vehicle restrictions
-into the two steps in the planning process which have the highest influence on day-to-day costs: vehicle
-scheduling and crew scheduling. Crew scheduling in particular is of great
+Electric vehicles are beginning to make up large portions of the fleet for
+public transport providers. In The Netherlands for instance, around 21\% of all
+registered buses are already electric according to the RDW \cite{RDW}. However,
+in order to meet European climate and sustainability legislation, individual
+line operators such as the Dutch Qbuzz are slowly replacing even more of their old
+combustion based fleet with electric vehicles \cite{europaRegulation20181999, qbuzzQbuzz}. It is therefore almost certain that this share will only grow in
+coming years across different countries. \\
+This shift in energy source has introduced new challenges to the methods currently in use to keep our public transport moving. Of primary concern are charging infrastructure and vehicle ranges, both of which are more limited than their traditional combustion based counterparts. The planning process which has traditionally been used, as outlined in Figure \ref{fig:planning-overview}, therefore requires additional research into each of its steps in order to incorporate these newly relevant constraints.\\
+\noindent In this work, we will focus on incorporating electric vehicle restrictions into two of these steps: vehicle scheduling and crew scheduling. Specifically, we will consider the scheduling of electric buses and their drivers, as these two steps make up a majority of day-to-day costs within the sector \cite{Perumal2019Crew}. \\
+The goal of vehicle scheduling (also referred to as the vehicle scheduling problem or VSP) is to find a minimum cost schedule for vehicles throughout the day in order to cover a set of predetermined trips. In the case of buses our trips are given by a timetable for each individual route, which is the result of the previous step of the planning process. Using the trips defined in such a timetable, our goal is therefore to assign sequences of compatible trips to buses such that each individual trip is driven. \\
+In order to do this, a collection of vehicle tasks must be generated. A vehicle task can be seen as the individual schedule that a bus will follow throughout the day: it may start at a depot, then perform one or more trips, before finally returning to the depot. The driving actions performed between between a depot and a trip, as well as those between trips themselves are called deadheads. The costs of driven deadheads along with the total number of buses used are the main focus for minimization, as the costs incurred for driving the trips themselves is fixed. \\
+Once vehicle schedules are known, we can move on to the crew scheduling problem (CSP). Here, our goal is to find minimum cost assignment of crew members to vehicles. Continuing within the context of bus planning, we now need to match drivers with our previously planned buses. Driving time for a single driver is often limited in a single day, and for longer shifts breaks might be mandatory as well; it is therefore not always possible to create a one to one matching between crew and vehicle tasks. A crew task can therefore consist of a sequence of compatible partial vehicle tasks. As before with the trips, the vehicle tasks themselves are now fixed; in order to minimize costs, we must find a covering set of crew tasks which minimizes the number of required crew members and unused paid hours. \\ 
+Crew scheduling is of greatest influence to day-to-day costs; a recent estimate by Perumal et al. puts it at around 60\% of the overall operational costs for bus transit providers in Northern Europe \cite{Perumal2019Crew}. However as can be seen, the VSP and CSP are very closely related. The vehicle schedules that are selected in the VSP directly determine what crew
+assignments are possible within the CSP. It is therefore not always optimal to
+fully minimize costs in the vehicle scheduling process, as this might incur
+higher overall costs due to crew scheduling. We can therefore roughly split the
+solving of vehicle and crew assignments into two separate approaches:
+sequential, in which the VSP and CSP are solved separately, or integrated, in
+which the VSP and CSP are solved such that overall costs are minimized
+simultaneously. The integrated approach is often referred to as the vehicle and
+crew scheduling problem, or VCSP. \\
+A lot of work has already been done for the VSP, CSP and VCSP.
+Both the sequential and integrated approach have been extensively studied since the 1980s \cite{Bodin1983}. The
+introduction of electric vehicles has however introduced new constraints on the charging infrastructure and vehicle ranges, invalidating previous assumptions that a vehicle was able to drive an entire day without being refueled. This most directly effects the VSP, as
+charging periods now need to be added throughout the day in order to
+effectively use buses. This new version of the problem, referred to as the
+E-VSP, has been the focus of many studies in recent years. We refer the reader
+to a survey by Perumal et al. for a detailed overview of recent progress
+\cite{Perumal2022LitRev}. \\\\ Most research related to the scheduling of
+electric public transport vehicles up until now has focused on the sequential
+approach. Limited literature does exist on the integrated E-VCSP problem, however
+simplifying assumptions are made which might limit real world applicability or
+accurate modeling of costs. Most notably, assumptions are made about charging
+locations (such as only being able to charge at a bus depot) or charging
+behavior (such as modeling the process as being purely linear or only allowing
+full charges). Additionally, to the best of our knowledge battery degradation
+due to usage patterns has not been included in any integrated models at the
+time of writing. The contribution of this work is therefore threefold: \todo{Daadwerkelijk iets bijdragen aan de wetenschap, maar dat is deel 2 van de scriptie}
+\begin{itemize}
+  \item Including nonlinear battery charging times.
+  \item Including battery degradation due to usage patterns.
+  \item Using Lagrangian relaxation in order to link the E-VSP and CSP instead of
+        currently used methods.
+\end{itemize}
+This work is organized as follows. In Section 2, we will discuss work related to the E-VCSP and give an overview of common ways of modeling and solving the problem. In Section 3, we give our formal problem definition.\ \todo{Meer secties}.
+
+Crew scheduling in particular is of great
 importance, as crew costs make up a majority of the operational costs;
 a recent estimate puts them at around $60\%$ of the total operational
 costs for bus companies in Northern Europe \cite{Perumal2019Crew}. The set of
 feasible crew schedules is however directly influenced by the routes that are
 determined while planning vehicles. In order to optimally minimize costs, we therefore also need to consider (electric) vehicle scheduling.
-\\\\ We will now give an informal overview of the
+\\
+The process that we will consider therefore consists of two major steps: vehicle scheduling and crew scheduling. In particular, we will focus on a scheduling process which uses buses, however note that specific problem instances and solution methods that are discussed throughout this work are often generalizable to other vehicle types. \\
+Let us start by giving a
+We will now give an informal overview of the
 problems at hand. A more formal definition can be found in Section
 \ref{sec:problem_def} \todo{work in progress}. \\
 The Vehicle Scheduling Problem (VSP) aims to find a set
@@ -91,43 +124,8 @@ crew members, the goal is to find an assignment of crew members such that each
 vehicle is always driven by at least one driver. In this, constraints such as
 maximum working time on a day, driver breaks and handovers between different
 drivers on the same vehicle need to be considered. The primary goal for
-minimization here is the total amount of workers needed and hours worked. The
-CSP is also known to be an NP-hard problem \cite{Fischetti1989}.\\\\ As can be seen, the VSP and CSP are closely related. The
-vehicle schedules that are selected in the VSP directly determine what crew
-assignments are possible within the CSP. It is therefore not always optimal to
-fully minimize costs in the vehicle scheduling process, as this might incur
-higher overall costs due to crew scheduling. We can therefore roughly split the
-solving of vehicle and crew assignments into two separate approaches:
-sequential, in which the VSP and CSP are solved separately, or integrated, in
-which the VSP and CSP are solved such that overall costs are minimized
-simultaneously. The integrated approach is often referred to as the vehicle and
-crew scheduling problem, or VCSP. \\\\ A lot of work has already been done for the VSP, CSP and VCSP.
-Both the sequential and integrated approach have been extensively studied since the 1980s \cite{Bodin1983}. The
-introduction of electric vehicles has however introduced new constraints. The
-most important constraint is the limited range of electric vehicles, combined
-with charging times which are much greater than refueling times found on
-traditional combustion based buses. This most directly effects the VSP, as
-charging periods now need to be added throughout the day in order to
-effectively use buses. This new version of the problem, referred to as the
-E-VSP, has been the focus of many studies in recent years. We refer the reader
-to a survey by Perumal et al. for a detailed overview of recent progress
-\cite{Perumal2022LitRev}. \\\\ Most research related to the scheduling of
-electric public transport vehicles up until now has focused on the sequential
-approach. Limited literature does exist on the integrated E-VCSP problem, however
-simplifying assumptions are made which might limit real world applicability or
-accurate modeling of costs. Most notably, assumptions are made about charging
-locations (such as only being able to charge at a bus depot) or charging
-behavior (such as modeling the process as being purely linear or only allowing
-full charges). Additionally, to the best of our knowledge battery degradation
-due to usage patterns has not been included in any integrated models at the
-time of writing. The contribution of this work is therefore threefold: \todo{Daadwerkelijk iets bijdragen aan de wetenschap, maar dat is deel 2 van de scriptie}
-\begin{itemize}
-  \item Including nonlinear battery charging times.
-  \item Including battery degradation due to usage patterns.
-  \item Using Lagrangian relaxation in order to link the E-VSP and CSP instead of
-        currently used methods.
-\end{itemize}
-This work is organized as follows. In Section 2, we will discuss work related to the E-VCSP and give an overview of common ways of modeling the problem. In Section 3, we give our formal problem definition.\ \todo{Meer secties}.
+minimization here is the total number of workers needed and hours worked. The
+CSP is also known to be an NP-hard problem \cite{Fischetti1989}.\\\\ As can be seen, the VSP and CSP are closely related.  
 
 \begin{table}[h]
   \centering
@@ -155,13 +153,13 @@ This work is organized as follows. In Section 2, we will discuss work related to
     VSP                                       & Vehicle Scheduling Problem                            \\
     \bottomrule
   \end{tabular}
+  \label{tab:nomenclature}
   \caption{Nomenclature used in this work}
 \end{table}
 
 \section{Related work}
 In this section, we will discuss work related to our research into the E-VCSP.
-An overview of how batteries and charging behavior is modeled has been included
-in Table \ref{tab:eVCSP-lit}. \\\\
+An overview of the nomenclature used has been included in Table \ref{tab:nomenclature}, and an overview of how batteries and charging behavior is modeled in the discussed works has been included in Table \ref{tab:eVCSP-lit}. \\\\
 \begin{table}[]
   \centering
   \begin{tabular}{clllllll}
@@ -189,6 +187,7 @@ in Table \ref{tab:eVCSP-lit}. \\\\
   \caption{A brief overview of battery modeling in E-VCSP related literature. SoC modeled as (D)iscrete or (C)ontinuous variable, Charge locations at (D)epot or (T)erminal trip stops, Degradation of battery in cost function}
   \label{tab:eVCSP-lit}
 \end{table}
+\todo{uitleg van de SDVSP}
 \noindent \textbf{(E-)VSP} \\
 The SDVSP has long been known to be polynomially solvable, however the inclusion of
 multiple depots has been shown to make the problem NP-hard under the assumption
@@ -213,17 +212,15 @@ optimum. The proposed methods are tested on trips in the San Francisco Bay
 Area, with a maximum instance size of 242 trips. These tests resulted in
 optimality gaps of $<5\%$ for buses able to drive 150km, and between 7-15\%
 for a range of 120km depending on the instance. \\\\
-Van Kooten Niekerk et al.\ introduce a pair of models which aim to solve the single depot E-VSP
+Van Kooten Niekerk et al.\ introduce a two models which aim to solve the single depot E-VSP
 while taking into account ToU energy prices, nonlinear charging times and
-battery degradation due to depth of discharge \cite{vanKootenNiekerk2017}. The first model only allows for linear charging and no consideration for degradation or ToU, but uses continuous SoC variables. The second model does allow for the extra inclusions, at the cost of discretizing SoC and solving using using CG for a possibly non-optimal solution. They test using data provided
+battery degradation due to depth of discharge \cite{vanKootenNiekerk2017}. The first model only allows for linear charging and no consideration for degradation or ToU, but uses continuous SoC variables. The second model does allow for the extra inclusions, at the cost of discretizing SoC and solving using CG for a possibly non-optimal solution. They test using data provided
 by Belgian bus company De Lijn in the city Leuven, using a total of 543 trips. They show that the
 discretized model can be solved in a considerably shorter time frame for large instances with similar results to
 the continuous model. \\\\
-Olsen and Kliewer introduce a solution to the E-VSP which aims to incorporate
-more accurate nonlinear charging times \cite{Olsen2020}. They focus on showing
-that a linear approximation for the second phase of vehicle charging can
-misrepresent the SoC and required charging times, and therefore advocate for
-the use of an exponential function to model this phase instead. \\\\
+\todo{langer!}
+Olsen and Kliewer introduce a solution to the E-VSP which models the nonlinear phase of charging as an exponential function \cite{Olsen2020}. They focus on showing that a (piecewise) linear approximation for the second phase of charging can
+misrepresent the SoC and required charging times. \\\\
 Zhang et al. apply a similar method to the one found in van Kooten Niekerk
 \cite{Zhang2021}. They consider a single depot with capacitated charging infrastructure,
 with multiple round trip lines originating from the depot. They model
@@ -231,11 +228,10 @@ nonlinear charging behavior and battery depreciation due to depth of discharge u
 using a combination of CG and B\&P. Tests are done on both randomly generated
 instances as well as 6 not yet electrified lines with up to 160 and 197 trips
 respectively.\\\\
-Parmentier et al. consider a scalable approach to the E-VSP which is based on
-the concept of nondominated charging arcs with nonlinear charging
-\cite{Parmentier2023}. They use these in order to formulate a more
+\todo{beter formuleren}
+Parmentier et al. consider a scalable approach to the E-VSP with non-linear charging~\cite{Parmentier2023}. They introduce the concept of nondominated charging arcs, which are defined as a deadhead arc between two trips during which charging is allowed with lower or equal cost and higher or equal resulting charge than all others deadhead arcs between the trips. In order to solve, a combination of CG and B\&P techniques are used. The nondominated charging arcs are used in order to formulate a more
 computationally efficient version of the pricing problem given uniform charging
-infrastructure. Using CG and B\&P techniques, they test on the \textit{large}
+infrastructure. Testing is done on the \textit{large}
 instances introduced by Wen et al. \cite{Wen2016} which included up to 8
 depots, 16 charging stations and 500 trips. Here, they are able to find
 solutions that only have an 0.06\% optimality gap. \\\\
@@ -248,11 +244,11 @@ $O^*(|T|^6)$ algorithm for finding a set of vehicle schedules with lowest cost
 given trips $T$ is provided based on DP. Additionally, polynomial algorithms
 for determining maximum feasible charging capacity and minimum-cost flows based
 on LP are provided. No computational experiments are performed. \\\\
-De Vos et al. introduce an E-VSP solution method which deals with partial
-recharges and capacitated charging stations \cite{deVos2024}. They model this
-using discrete battery charge levels in a connection-based network of trips and
-charging actions, in which a primal network is created using pessimistic
-rounding. In order to solve, they apply CG with two separate heuristics:
+
+\todo{beter schrijven}
+De Vos et al. consider the E-VSP with partial recharges and capacitated charging stations \cite{deVos2024}. 
+They model this using discrete SoC levels for each trip, as well as discrete time and SoC nodes for charging spots within the traditional network. This discretization is similar to that of van Kooten Niekerk et al., however now with the inclusion of capacitated charging nodes. Using this, a primal network is created using pessimistic
+rounding. In order to solve, they apply CG with two separate approaches:
 branch-and-price and a diving heuristic. To overcome the limitations of dual
 bounds resulting from a discretized model, they incorporate ideas from Boland
 et al. resulting in a dual network with optimistic connections

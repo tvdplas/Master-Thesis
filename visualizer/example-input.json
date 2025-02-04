@@ -1,0 +1,87 @@
+{
+  "depots": [
+    {
+      "id": "d1", 
+      "name": "Westraven P+R"
+    }
+  ],
+  "trips": [
+    { 
+      "id": "t1",
+      "route": "34",
+      "startName": "Westraven P+R",
+      "startTime": "14:00", 
+      "endName": "Amersfoort CS",
+      "endTime": "15:15",
+      "charge": 30
+    },
+    { 
+      "id": "t2",
+      "route": "34",
+      "startName": "Amersfoort CS",
+      "startTime": "15:20", 
+      "endName": "Westraven P+R",
+      "endTime": "16:35",
+      "charge": 30
+    },
+    { 
+      "id": "t3",
+      "route": "12",
+      "startName": "Westraven P+R",
+      "startTime": "17:00", 
+      "endName": "Utrecht CS",
+      "endTime": "17:30",
+      "charge": 15
+    },
+    { 
+      "id": "t4",
+      "route": "12",
+      "startName": "Utrecht CS",
+      "startTime": "17:45", 
+      "endName": "Westraven P+R",
+      "endTime": "18:15",
+      "charge": 15
+    },
+    { 
+      "id": "t5",
+      "route": "45",
+      "startName": "Utrecht CS",
+      "startTime": "18:30", 
+      "endName": "Nieuwegein Centrum",
+      "endTime": "19:00",
+      "charge": 20
+    }
+  ],
+  "deadheads": [
+    { "fromId": "t1", "toId": "t2", "time": 60, "charge": 1 },
+    { "fromId": "t1", "toId": "t3", "time": 45, "charge": 2 },
+    { "fromId": "t1", "toId": "t4", "time": 50, "charge": 2 },
+    { "fromId": "t1", "toId": "t5", "time": 70, "charge": 3 },
+    { "fromId": "t2", "toId": "t1", "time": 60, "charge": 1 },
+    { "fromId": "t2", "toId": "t3", "time": 50, "charge": 2 },
+    { "fromId": "t2", "toId": "t4", "time": 55, "charge": 2 },
+    { "fromId": "t2", "toId": "t5", "time": 75, "charge": 3 },
+    { "fromId": "t3", "toId": "t1", "time": 45, "charge": 2 },
+    { "fromId": "t3", "toId": "t2", "time": 50, "charge": 2 },
+    { "fromId": "t3", "toId": "t4", "time": 15, "charge": 1 },
+    { "fromId": "t3", "toId": "t5", "time": 25, "charge": 1 },
+    { "fromId": "t4", "toId": "t1", "time": 45, "charge": 2 },
+    { "fromId": "t4", "toId": "t2", "time": 55, "charge": 2 },
+    { "fromId": "t4", "toId": "t3", "time": 15, "charge": 1 },
+    { "fromId": "t4", "toId": "t5", "time": 20, "charge": 2 },
+    { "fromId": "t5", "toId": "t1", "time": 70, "charge": 3 },
+    { "fromId": "t5", "toId": "t2", "time": 75, "charge": 3 },
+    { "fromId": "t5", "toId": "t3", "time": 25, "charge": 1 },
+    { "fromId": "t5", "toId": "t4", "time": 20, "charge": 2 },
+    { "fromId": "d1", "toId": "t1", "time": 5, "charge": 1 },
+    { "fromId": "d1", "toId": "t2", "time": 65, "charge": 2 },
+    { "fromId": "d1", "toId": "t3", "time": 5, "charge": 1 },
+    { "fromId": "d1", "toId": "t4", "time": 50, "charge": 2 },
+    { "fromId": "d1", "toId": "t5", "time": 60, "charge": 2 },
+    { "fromId": "t1", "toId": "d1", "time": 5, "charge": 1 },
+    { "fromId": "t2", "toId": "d1", "time": 65, "charge": 2 },
+    { "fromId": "t3", "toId": "d1", "time": 5, "charge": 1 },
+    { "fromId": "t4", "toId": "d1", "time": 50, "charge": 2 },
+    { "fromId": "t5", "toId": "d1", "time": 60, "charge": 2 }
+  ]
+}
