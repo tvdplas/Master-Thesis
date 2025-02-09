@@ -300,38 +300,62 @@ Research has also been done into integrating the E-VSP with the step before it i
 
 \section{Problem definition}
 \label{sec:problem_def}
-In this section, we will give a formal definition of the integrated electric vehicle and crew scheduling problem (E-VCSP). In order to do this, we will use a modified version of the SDVSP network model described in Section 2.1.
-
-$\sigma_{min}$ = min charge
-$\sigma_{max}$ = max charge
-
-
-Let us start by formally defining a feasible vehicle task $v$. A vehicle task, as mentioned before, must start at a depot, then perform a sequence of compatible trips without going under $\sigma_{min}$, before finally returning to the same depot. A vehicle task therefore has the form of $\{ l_0, l_1, \dots, l_n, l_{n+1}\}$, where $l_0$ and $l_{n+1}$ are both the same depot locations, and the rest are trips.
-Let us start by formally defining time feasibility. That is $e(l_i) + d(l_i, l_{i+1}) \leq s(l_{i+1})$ 
+In this section, we will give a formal definition of the integrated electric vehicle and crew scheduling problem (E-VCSP). We will begin with a model which does not consider capacitated charging stations. \\
+Let us start by formally defining a feasible vehicle task $v$ for a vehicle of type $\rho$. A vehicle task, as mentioned before, must start at a depot, then perform a sequence of compatible trips, before finally returning to the same depot. During this sequence, the SoC $\sigma$ of the vehicle must always satisfy $\sigma^\rho_{min} \leq \sigma \leq \sigma^\rho_{max}$, ensuring that the battery capacity for the vehicle type is not violated. A vehicle task can therefore be defined as a sequence of steps $S = \{ s_0, s_1, \dots, s_n, s_{n+1} \}$, where $s_0 = s_{n+1}$ represents a depot, and $s_i \forall i = 1, \dots, n$ are trips. \\
+We will now formalize our feasibility, consisting of three parts: type, time and charge.\\
+For type feasibility, all that needs to be considered is that $\rho$ is allowed to drive a trip $t$: 
 \begin{align}
-  \sum_{1 \leq i \leq |V|} x_{i}a^v_{it} &>= 1 && \forall t = 1,\:\dots,\:|T| \\
+  \rho &\in \rho(t_i) && \forall i = 1, \dots, n
 \end{align}
-
-$T$ = trips
-$V$ = vehicle tasks, $n = |V|$
-$a_it$ = trip t is part of vehicle task $i$ 
-$c^v_i$ = cost vehicle task i
-$x_i$ = use vehicle task $i$
-$C$ = crew tasks
-$c^c_j$ = cost crew task j
-$y_j$ = use crew task $j$
-
-
-Let $N$ be a set of locations. 
-Let $T$ be defined as the set of trips, where for each trip $t \in T$ the start and end location are defined as $a(t) \in N$ and $b(t) \in N$ respectively. 
-Let $s(t) \leq e(t)$ represent the start and end time of the trip $t$. 
-Additionally, let $d(t) = e(t) - s(t)$ and $c(t)$ represent the duration of and amount of charge used throughout the trip. 
-For a pair of trips $(t, t') \in T \times T$, let $d(t, t')$ represent the travel time of the deadhead between the end of $t$ to the start of $t'$, and $c(t, t')$ be the charge used during this deadhead. 
-If no such deadhead exists, let $d(t, t') = c(t, t') = \infty$. \\
-Next, let $C \subseteq T $
-
-We want to minimize the following: 
-\setcounter{equation}{0}
+In this, let $\rho(t)$ represents the set of allowed vehicles for a certain trip $t$. \\
+Next, for time feasibility, we want to ensure that there is always time to drive from one location to the next: 
+\begin{align}
+  e(s_i) + d(s_i, s_{i+1}) &\leq s(s_{i+1}) && \forall i = 0, \dots, n
+\end{align}
+In this, let $s(s)$ be the start time at step $s$, let $e(s)$ be the end time at $s$, and let $d(s, s')$ be equal to the driving time between step $s$ and $s'$. For trips, their start and end time is given by the trip schedule. For depots, their start and end time is any time within the considered time span. \\
+Lastly, we consider charge feasibility. Here we want to ensure that the battery capacity is always respected: 
+\begin{align}
+  \sigma_{min} \leq \sigma_{start} + \sum_{0 \leq j \leq i} (\delta_j \cdot u^\rho(s_{j-1}, s_{j}) - c^\rho(s_{j-1}, s_{j}) - c^\rho(s_j)) &\leq \sigma_{max} && \forall i = 1, \dots, n+1
+\end{align}
+In this, $u^\rho(s, s')$ be the maximum amount of charge that a vehicle of type $\rho$ can gain in the deadhead between $s$ and $s'$ and let $\delta$ be a factor between $0 \leq \delta \leq 1$ representing how much of this possible charging is done. Additionally, let $c^\rho(s, s')$ represent the amount of charge used by a vehicle of type $\rho$ when driving the deadhead between $s$ and $s'$, and similarly let $c^\rho(s)$ be the amount of charge used at step $s$ by a vehicle of type $\rho$. For trips, $c^\rho(s)$ is simply the amount of energy used while driving the trip. For depots, $c^\rho(s) = 0$. \\
+Let $cost(v)$ be defined as some function $\alpha_1 + \beta_1 \cdot (s(s_n+1) - e(s_0)) + $, where $\alpha_1$ and $\beta_1$ represent the fixed and variable costs for a vehicle. We will refer to the set of all feasible vehicle tasks as $V$. \\\\
+Next, let us consider crew tasks. A crew task $c$ may perform multiple segments of different vehicle tasks, and we will therefore also model our crew tasks on a trip basis. A crew task can therefore once again be defined as a sequence of steps throughout the day of the form $S = \{ s_1, \dots, s_n \}$. We will however now need to incorporate breaks, waiting and handovers as well; we will consider all of these to be steps in this sequence, and will differentiate between action types using $a(s) \in \{\text{ drive, break, wait, step-on, step-off }\}$. In order for a vehicle task to be feasible, the following conditions need to be met. We base our conditions on Dutch labor regulations, however similar regulations are present in other countries as well. \\ 
+First, overall time feasibility. A driver may have a duty length of at most 9 hours. \\
+\begin{align}
+  e(s_n) - s(s_1) \leq 9\text{hours}
+\end{align}
+Where $s(s)$ and $e(s)$ once again refer to the starting and ending time of a certain step respectively. \\
+Next, break time feasibility. For shifts shorter than 4 hours, no breaks are required. For shifts between 4 and 5.5 hours, one break of at least 15 minutes must be included. For shifts longer than 5.5 hours, at least 40 minutes of breaktime must be included, where each individual break must be at least 15 minutes and at least one of these breaks must be 20 minutes or more. Lastly, for shifts starting after 15:00, a break between 16:30 and 20:30 of at least 20 minutes must be included. 
+\begin{align}
+  &\text{if } 4 \text{ hours} \leq e(s_n) - s(s_1) \leq 5.5 \text{ hours}&\text{ then} && \exists l \in b(S) : d(s) \geq 15 \text{ min} \\
+  &\text{if } 5.5 \text{ hours} \leq e(s_n) - s(s_1 &\text{ then} && \forall s \in b(S) : d(s) \geq 15\text{ min } \land \\
+  &&&& \exists l \in b(S) : d(s) \geq 20 \text{ min } \land \\
+  &&&& \sum_{l \in b(S)}d(s) \geq 40 \text{ min} \\
+  &\text{if } s(s_1) \geq \text{15:00} &\text{ then} && \exists s \in b(S) : d(s) \geq 20 \text{ min } \land \\
+  &&&& \text{16:30} \leq s(s) \leq \text{20:30} - d(s)  \\
+\end{align}
+Where $b(S) = \{ s \mid s \in S, a(s) = break \}$ or all break steps within the schedule, and $d(s)$ refers to the duration of the break. \\
+Next, we must ensure feasibility regarding transfers between steps themselves. In general, for waiting, break and handover actions, the physical position of the driver does not change. For trips on the other hand, the starting position may differ from the ending position. In order to be feasible, each sequential pair of steps within the schedule must be reachable; additionally, the starting and ending position of the driver must be the same.
+\begin{align}
+  && g(s_n) = f(s_1) && \\
+  && g(s_{i-1}) = f(s_i) && \forall i = 2, \dots, n \\
+  \text{if } a(s_i) \neq \text{trip} \text{ then } && g(s_i) = f(s_i) && \forall i = 1, \dots, n
+\end{align}
+Where $f(s)$ and $g(s)$ refer to the position of the driver at the start and end of $s$ respectively. \\
+Handovers between drivers also need to be possible. Drivers may only enter and exit vehicles at certain locations, and doing so costs a specified amount of time at that location. If a driver is already in a vehicle, they may wait inside of that vehicle for the start of a new trip, however breaks cannot be taken in the vehicle itself.
+\begin{align}
+  &\text{if } a(s_i) = \text{ drive}&\text{ then} && a(s_{i-1}) \in \text{\{ wait, drive, step-on \}} & \land v(s_{i-1}) = v(s_{i}) \\
+  &\text{if } a(s_{i-1}) = \text{ drive}&\text{ then} && a(s_{i}) \in \text{\{ wait, drive, step-off \}} & \land v(s_{i-1}) = v(s_{i}) 
+\end{align}
+With both formulas $\forall i = 2, \dots, n$. Here, $v(s)$ is an identifier for a vehicle that is used in step $s$. Additionally, $p(t)$ specifies the amount of time it takes to get onto a vehicle at the starting location of trip $t$, and $q(t)$ is equal to the amount of time it takes to get off of a vehicle at the end of trip $t$. For steps where handovers are not possible, $p(t) = q(t) = \infty$. \\
+Lastly, the schedule must be continuous; the driver must always be performing one of the 5 specified actions, and must start with a step-on and end with a step-off. 
+\begin{align}
+  a(s_1) &= \text{step-on} && \\
+  a(s_n) &= \text{step-off} && \\
+  e(s_i-1) &= s(s_i) && \forall i = 2, \dots, n \\
+\end{align}
+Let $cost(c)$ be defined as some function $\alpha_2 + \beta_2 \cdot (e(s_n) - s(s_n))$, where $\alpha_2$ and $\beta_2$ represent the fixed and variable costs for a crew member respectively. Let the set of all feasible crew schedules be called $C$. \\\\
+Now having our definitions of $V$ and $C$, we can formulate our integrated problem. In this, let $x_i$ and $y_i$ indicate the usage of $v_i \in V$ and $c_j \in C$ respectively. Additionally, let $a_it$ indicate that $v_i$ covers trip $t \in T$, and likewise with $b_jt$ for $c_j$.
 \begin{align}
 \min \quad
 & \sum_{1 \leq t \leq |T|} (\sum_{1 \leq i \leq |V|} x_{it}c^v_i + \sum_{1 \leq j \leq |C|} y_{jt}c^c_j)  
@@ -343,16 +367,6 @@ Subject to:
 x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|V| \\
 y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
 \end{align}
-
-In this, our vehicle and crew schedules must do the following to be feasible: 
-vehicle: 
-bepaal alle deadheads
-kijk of deadhead charge feasible is 
-kijk of deadhead time feasible is
-herhaal YIPPIE!!!
-
-
-
 
 
 \begin{align}
