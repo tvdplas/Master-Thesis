@@ -299,7 +299,7 @@ Research has also been done into integrating the E-VSP with the step before it i
 
 \section{Problem definition}
 \label{sec:problem_def}
-\todo{Negeert de volgende constraints die wel bij Qbuzz aanwezig zijn: capaciteit van charge (plekken + totaal), batterijgebruik wachttijd bus, }
+\todo{Negeert de volgende constraints die wel bij Qbuzz aanwezig zijn: capaciteit van charge (plekken + totaal), batterijgebruik wachttijd bus, s}
 In this section, we will give a definition of the integrated electric vehicle and crew scheduling problem (E-VCSP). As mentioned in previous sections, our goal is to create minimum cost schedules for both vehicles and crew members; vehicle tasks must be constructed for individual vehicles such that each trip is covered, and crew tasks must be constructed such that the vehicle tasks can be driven. Before defining these tasks, we will first formally define the data which is given. A summary of the notation used has been provided in Table \ref{tab:notation}. \\
 Let $T$ be a set of trips that need to be driven, let $D$ be a set of depots that can be used, and let $L$ be a set of locations. A trip is defined as a travel between two locations in $L$; let $l_{t,start} \in L$ and $l_{t,end} \in L$ represent the starting and ending location of trip $t$ respectively, and let $l_d \in L$ represent the location of depot $d$. Next, let $p_{t,start}$ and $p_{t,end}$ refer to the planned starting and ending time of trip $t$, and let $d_t = p_{t,end} - p_{t,start}$ be the duration of the trip. Lastly, let $k_t$ be equal to the number of kilometers traveled during the trip. \\
 As multiple vehicles types may be in use, let $\Phi$ represent the set of all vehicle types. For each trip $t$, a subset of these vehicle types $\phi_t \subseteq \Phi$ may be used in order to drive the trip. Each depot $d$ also has a preallocated number of each vehicle type available; let this be represented by $g^\phi_{d} \in \mathbb{N}^+$. Different vehicles might have different battery capacities; let $\sigma^\phi_{min}$ and $\sigma^\phi_{max}$ represent the minimum and maximum allowable SoC of vehicle type $\phi$, both expressed in KWh. Additionally, let $\sigma^\phi_{start}$ represent the capacity that a vehicle starts with at the beginning of a day, and let $c^\phi_t$ represent the amount of charge a vehicle of type $\phi$ would use when traveling the trip, expressed in KWh. \\
@@ -338,65 +338,55 @@ For a feasible vehicle schedule $v$, let us define the following the following:
   k(v) &= k(s_0, s_1) + \sum^{n}_{i = 1}(k(s_i) + k(s_i, s_i + 1))  \\
   cost(v) &= \alpha_1 + \alpha_2 \cdot c(v) + \alpha_3 \cdot d(v) + \alpha_4 \cdot k(v) 
 \end{align}
-Where $c(v)$, $d(v)$ and $k(v)$ represent the total charge used, active time and distance traveled, with some set of scalar values $\alpha$. We will refer to the set of all feasible vehicle tasks as $V$. \\\\
-Next, let us consider crew tasks. Vehicle tasks can be split up into multiple segments, each of which must be performed continuously by a single crew member. In some cases, this can be a single trip; in other cases, it might not be possible for a driver to be replaced when arriving at the destination. Let $L_r \subseteq L$ be a subset of the locations at which the driver can be replaced; using these relief points, we are able to split up our available vehicle tasks into into a set of segments $W$. \\
-Similar to individual trips, let $l_w$
-A crew task can therefore once again be defined as a sequence of steps throughout the day of the form $S = \{ s_1, \dots, s_n \}$. We will however now need to incorporate breaks, waiting and handovers as well; we will consider all of these to be steps in this sequence, and will differentiate between action types using $a(s) \in \{\text{ drive, break, wait, step-on, step-off }\}$. In order for a vehicle task to be feasible, the following conditions need to be met. We base our conditions on Dutch labor regulations, however similar regulations are present in other countries as well. \\ 
+Where $c(v)$, $d(v)$ and $k(v)$ represent the total charge used, active time and distance traveled, with some set of scalar values $\alpha$. We will refer to the set of all feasible vehicle tasks as $V$. \\
+Vehicle tasks can be split up into multiple segments, each of which must be performed continuously by a single crew member. In some cases, this can be a single trip; in other cases, it might not be possible for a driver to be replaced when arriving at the destination. Let $L_r \subseteq L$ be a subset of the locations at which the driver can be replaced; using these relief points as splitting points, for each vehicle task $v \in V$, let its set of segments be defined as $w(v)$; our overall set of of segments $W$ can then be defined as $W = \bigcup_{v \in V}w(v)$. In this, $w \in W$ represents a single segment. \\\\
+Now, let us consider crew tasks. A crew task will be defined as an ordered sequence of subtasks $E = \{ e_1, \dots, e_n \}$. Each of these subtasks may be of one of 5 types: driving a segment, taking a break, entering a vehicle; leaving a vehicle, or waiting in a vehicle. In order to differentiate between subtasks types, let the action performed during subtask $e$ be defined as $a_e \in \{\text{ drive, break, step-on, step-off, wait }\}$. For every subtask $e$, let us define $q_e$ as an identifier of the vehicle associated with the action. If $a_e = break$, $q_e$ is undefined. Additionally, let us define $l_{e,start}$ and $l_{e,end}$ as the starting and ending location of a subtask, and let $p_{e,start}$, $p_{e,end}$ be the starting and ending time. Lastly, let $d_e = p_{e,end} - p_{e,start}$ be the duration of the subtask. In order to keep notation concise, we also define $b(E) = \{ e \mid e \in E, a_e = break \}$ or the set of all break subtasks within a sequence.\\
+In order for a sequence of subtasks to be a feasible crew task, the following conditions need to be met. We base our conditions on Dutch labor regulations, however similar regulations are present in other countries as well. \\ 
 First, overall time feasibility. A driver may have a duty length of at most 9 hours. \\
 \begin{align}
-  e(s_n) - s(s_1) \leq 9\text{hours}
+  p_{e_n,end} - p_{e_0,start} \leq 9\text{hours}
 \end{align}
-Where $s(s)$ and $e(s)$ once again refer to the starting and ending time of a certain step respectively. \\
-Next, break time feasibility. For shifts shorter than 4 hours, no breaks are required. For shifts between 4 and 5.5 hours, one break of at least 15 minutes must be included. For shifts longer than 5.5 hours, at least 40 minutes of breaktime must be included, where each individual break must be at least 15 minutes and at least one of these breaks must be 20 minutes or more. Lastly, for shifts starting after 15:00, a break between 16:30 and 20:30 of at least 20 minutes must be included. 
+Next, break time feasibility. For shifts shorter than 4 hours, no breaks are required. For shifts between 4 and 5.5 hours, one break of at least 15 minutes must be included. For shifts longer than 5.5 hours, at least 40 minutes of break time must be included, where each individual break must be at least 15 minutes and at least one of these breaks must be 20 minutes or more. Lastly, for shifts starting after 15:00, a break between 16:30 and 20:30 of at least 20 minutes must be included. 
 \begin{align}
-  &\text{if } 4 \text{ hours} \leq e(s_n) - s(s_1) \leq 5.5 \text{ hours}&\text{ then} && \exists l \in b(S) : d(s) \geq 15 \text{ min} \\
-  &\text{if } 5.5 \text{ hours} \leq e(s_n) - s(s_1 &\text{ then} && \forall s \in b(S) : d(s) \geq 15\text{ min } \land \\
-  &&&& \exists l \in b(S) : d(s) \geq 20 \text{ min } \land \\
-  &&&& \sum_{l \in b(S)}d(s) \geq 40 \text{ min} \\
-  &\text{if } s(s_1) \geq \text{15:00} &\text{ then} && \exists s \in b(S) : d(s) \geq 20 \text{ min } \land \\
-  &&&& \text{16:30} \leq s(s) \leq \text{20:30} - d(s)  \\
+  &\text{if } 4 \text{ hours} \leq p_{e_n,end} - p_{e_1,start} \leq 5.5 \text{ hours}&\text{ then} && \exists e \in b(E) : d_e \geq 15 \text{ min} \\
+  &\text{if } 5.5 \text{ hours} \leq p_{e_n,end} - p_{e_1,start} &\text{ then} && \forall e \in b(E) : d_e \geq 15\text{ min } \land \\
+  &&&& \exists e \in b(E) : d_e \geq 20 \text{ min } \land \\
+  &&&& \sum_{e \in b(E)}d_e \geq 40 \text{ min} \\
+  &\text{if } p_{e_1,start} \geq \text{15:00} &\text{ then} && \exists e \in b(E) : d_e \geq 20 \text{ min } \land \\
+  &&&& \text{16:30} \leq p_{e,start} \leq \text{20:30} - p_{e,end}  \\
 \end{align}
-Where $b(S) = \{ s \mid s \in S, a(s) = break \}$ or all break steps within the schedule, and $d(s)$ refers to the duration of the break. \\
-Next, we must ensure feasibility regarding transfers between steps themselves. In general, for waiting, break and handover actions, the physical position of the driver does not change. For trips on the other hand, the starting position may differ from the ending position. In order to be feasible, each sequential pair of steps within the schedule must be reachable; additionally, the starting and ending position of the driver must be the same.
+Next, we must ensure feasibility of transfers between subtasks themselves. In general, for waiting, break and handover related actions, the physical position of the driver does not change. For trips on the other hand, the starting position may differ from the ending position. In order to be feasible, each sequential pair of subtasks within the schedule must be reachable; additionally, the starting and ending location of the driver must be the same in order for the driver to return home at the end of the day.
 \begin{align}
-  && g(s_n) = f(s_1) && \\
-  && g(s_{i-1}) = f(s_i) && \forall i = 2, \dots, n \\
-  \text{if } a(s_i) \neq \text{trip} \text{ then } && g(s_i) = f(s_i) && \forall i = 1, \dots, n
+  && l_{e_n,end} = l_{e_1,start} && \\
+  && l_{e_{i-1},start} = l_{e_i,end} && \forall i = 2, \dots, n \\
+  \text{if } a_{e_i} \neq \text{trip} \text{ then } && l_{e_i,start} = l_{e_i,end} && \forall i = 1, \dots, n
 \end{align}
-Where $f(s)$ and $g(s)$ refer to the position of the driver at the start and end of $s$ respectively. \\
-Handovers between drivers also need to be possible. Drivers may only enter and exit vehicles at certain locations, and doing so costs a specified amount of time at that location. If a driver is already in a vehicle, they may wait inside of that vehicle for the start of a new trip, however breaks cannot be taken in the vehicle itself.
+Handovers between drivers also need to be possible. A step-on or step-off subtask must be present in order for a driver to enter or exit a vehicle; without being in a vehicle, the corresponding segments may not be performed. Waiting may also not be performed without being in (or associated with) a vehicle. Note that the construction of our segments implicitly models the fact that drivers may only get on and off at designated locations; step-ons, step-offs and breaks are therefore always possible at segment ends.
 \begin{align}
-  &\text{if } a(s_i) = \text{ drive}&\text{ then} && a(s_{i-1}) \in \text{\{ wait, drive, step-on \}} & \land v(s_{i-1}) = v(s_{i}) \\
-  &\text{if } a(s_{i-1}) = \text{ drive}&\text{ then} && a(s_{i}) \in \text{\{ wait, drive, step-off \}} & \land v(s_{i-1}) = v(s_{i}) 
+  \text{if } a_{e_i} &= \text{ drive}\text{ then} &&a_{e_{i-1}} \in \text{\{ wait, drive, step-on \}} \land q_{s_{i-1}} = q_{s_{i}} && \forall i = 2, \dots, n \\
+  \text{if } a_{s_{i-1}} &= \text{ drive}\text{ then} &&a_{e_{i}} \in \text{\{ wait, drive, step-off \}} \land q_{s_{i-1}} = q_{s_{i}} && \forall i = 2, \dots, n \\
+  \text{if } a_{s_{i}} &= \text{ wait}\text{ then} &&a_{e_{i-1}} \in \text{\{ drive, step-on \}} \land q_{s_{i-1}} = q_{s_{i}} && \forall i = 2, \dots, n
 \end{align}
-With both formulas $\forall i = 2, \dots, n$. Here, $v(s)$ is an identifier for a vehicle that is used in step $s$. Additionally, $p(t)$ specifies the amount of time it takes to get onto a vehicle at the starting location of trip $t$, and $q(t)$ is equal to the amount of time it takes to get off of a vehicle at the end of trip $t$. For steps where handovers are not possible, $p(t) = q(t) = \infty$. \\
-Lastly, the schedule must be continuous; the driver must always be performing one of the 5 specified actions, and must start with a step-on and end with a step-off. 
+Lastly, the schedule must be continuous; the driver must always be performing one of the 5 specified actions, and must start with a step-on and end with a step-off.
 \begin{align}
   a(s_1) &= \text{step-on} && \\
   a(s_n) &= \text{step-off} && \\
   e(s_i-1) &= s(s_i) && \forall i = 2, \dots, n \\
 \end{align}
-Let $cost(c)$ be defined as some function $\alpha_2 + \beta_2 \cdot (e(s_n) - s(s_n))$, where $\alpha_2$ and $\beta_2$ represent the fixed and variable costs for a crew member respectively. Let the set of all feasible crew schedules be called $C$. \\\\
-Now having our definitions of $V$ and $C$, we can formulate our integrated problem. In this, let $x_i$ and $y_i$ indicate the usage of $v_i \in V$ and $c_j \in C$ respectively. Additionally, let $a_it$ indicate that $v_i$ covers trip $t \in T$, and likewise with $b_jt$ for $c_j$.
+For a feasible crew schedule $c$, let us define its cost as being $cost(c) = \beta_1 + \beta_2 \cdot (p_{e_n,end} - p_{e_n,start}$, where $\beta$ is some set of scalar values representing the fixed and variable costs for a crew member respectively. Let the set of all feasible crew schedules be called $C$. \\\\
+Now having our definitions of $V$, $W$ and $C$, we can formulate our integrated problem. In this, let $x_i$ and $y_j$ be binary variables indicate the usage of $v_i \in V$ and $c_j \in C$ respectively. Additionally, let $n_{it} \in \{ 0, 1 \}$ be a constant indicating that $v_i$ covers trip $t \in T$, and let with $m_{ijw} \in \{ 0, 1 \} $ indicate that trip $w \in w(v_i)$ is covered by crew task $j$. Now, our minimization is as follows:
 \begin{align}
 \min \quad
-& \sum_{1 \leq t \leq |T|} (\sum_{1 \leq i \leq |V|} x_{it}c^v_i + \sum_{1 \leq j \leq |C|} y_{jt}c^c_j)  
+& \sum_{1 \leq i \leq |V|} x_{i}cost(v_i) + \sum_{1 \leq j \leq |C|} y_{j}cost(c_j)  
 \end{align}
 Subject to:
 \begin{align}
-\sum_{1 \leq i \leq |V|} x_{i}a^v_{it} &>= 1 && \forall t = 1,\:\dots,\:|T| \\
-\sum_{1 \leq j \leq |C|} y_{j}a^c_{it} &>= 1 && \forall t = 1,\:\dots,\:|T| \\
+\sum_{1 \leq i \leq |V|} x_{i}a^v_{it} &>= 1 && \forall t = 1,\:\dots,\:|T| \label{form:all-trips-covered} \\
+\sum_{1 \leq j \leq |C|} y_{j}m_{ijw} &>= x_{i} && \forall i = 1,\:\dots,\:|V|, w \in w(v_i) \label{form:all-segments-covered} \\
 x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|V| \\
 y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
 \end{align}
-
-
-\begin{align}
-\sum_{1 \leq i \leq |V|} x_{i}a^v_{it} &>= 1 && \forall t = 1,\:\dots,\:|T| \\
-\sum_{1 \leq j \leq |C|} y_{j}a^c_{it} &>= 1 && \forall t = 1,\:\dots,\:|T| \\
-x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|V| \\
-y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
-\end{align}
+Where (\ref{form:all-trips-covered}) ensures that all trips are covered by at least one vehicle, and (\ref{form:all-segments-covered}) ensures that the segments in used vehicle tasks are covered by corresponding crew tasks.
 
 \begin{table}
   \centering
@@ -404,34 +394,55 @@ y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
     \toprule
     \multicolumn{1}{l}{\textbf{Notation}} & \multicolumn{1}{l}{\textbf{Definition}}               \\
     \cmidrule(lr){1-1}\cmidrule(lr){2-2}
+    \multicolumn{2}{l}{\textit{Given}} \\
+    $v \in V$ & Set of all vehicle tasks, $v$ single vehicle task \\
+    $w \in W$ & Set of all vehicle segments, $w$ single vehicle segment \\
+    $v(w) \subseteq W$ & Set of vehicle segments for task $v$ \\ 
+    $c \in C$ & Set of all crew tasks, $c$ single crew task \\
     $t \in T$ & Set of all trips, $t$ a single trip \\
     $d \in D$ & Set of all depots, $d$ a single depot \\
     $l \in L$ & Set of all locations, $l$ a single location \\
+    $L_r \subseteq L$ & Set of relief locations \\ 
     $\phi \in \Phi$ & Set of vehicle types, $\phi$ a single type \\
-    $s \in S$ & Ordered sequence of vehicle steps \\ 
-    $l_{t,start}$ & Starting location of $t$ \\
-    $l_{t,end}$ & Ending location of $t$ \\ 
-    $l_{d}$ & Location of depot $d$ \\
-    $p_{t,start}$ & Planned starting time of $t$ \\
-    $p_{t,end}$ & Planned end time of $t$ \\
-    $d_t$ & Duration of $t$ \\ 
-    $k_t$ & Kilometers traveled in $t$ \\
     $\phi_t \subseteq \Phi$ & Set of compatible vehicle types for $t$ \\
     $g^\phi_{d} \in \mathbb{N}^+$ & Number of vehicles of type $\phi$ at $d$ \\
-    $\sigma$ & State of charge \\
+    $s \in S$ & Ordered sequence of vehicle steps, $s$ a single step \\ 
+    $e \in E$ & Ordered sequence of crew subtasks, $e$ a single subtask \\ 
+    $l_{\chi,start}$ & Starting location of $\chi$ \\
+    $l_{\chi,end}$ & Ending location of $\chi$ \\ 
+    $l_{\chi} $ & Location of $\chi$ \\
+    $p_{\chi,start}$ & Planned starting time of $\chi$ \\
+    $p_{\chi,end}$ & Planned end time of $\chi$ \\
+    $d_{\chi}$ & Duration of $\chi$ \\ 
+    $d_{\chi,\chi'}$ & Duration of drive between $\chi$ and $\chi'$ \\
+    $k_{\chi}$ & Kilometers traveled in $\chi$ \\
+    $k_{\chi,\chi'}$ & Kilometers driven between $\chi$ and $\chi'$ \\
+    $c^\phi_{\chi}$ & SoC used by $\chi$ on type $\phi$ \\
+    $c^\phi_{\chi,\chi'}$ & SoC used by $\phi$ driving between $\chi$ and $\chi'$ \\
     $\sigma^\phi_{min}$ & Minimum SoC of $\phi$ \\ 
     $\sigma^\phi_{max}$ & Maximum SoC of $\phi$ \\ 
     $\sigma^\phi_{start}$ & Starting SoC of $\phi$ \\ 
-    $c^\phi_{t}$ & SoC used by trip $t$ on type $\phi$ \\
-    $d_{s,s'}$ & Duration of drive between $s$ and $s'$ \\
-    $k_{s,s'}$ & Kilometers driven between $s$ and $s'$ \\
-    $c^\phi_{s,s'}$ & SoC used by $\phi$ driving between $s$ and $s'$ \\
     $u^\phi_{\sigma,t,t'}$ & Max. SoC gained between $t$, $t'$ for type $\phi$, start SoC $\sigma$ \\
-    $a_s$ & Action type of $s$ \\
+    $a_\chi$ & Action type of sequence element $\chi$ \\
+    $q_e$ & Vehicle associated with subtask $e$ \\
+    $n_{it} \in \{ 0, 1 \}$ & Vehicle task $v_i$ covers $t$ \\ 
+    $m_{ijw} \in \{ 0, 1 \}$ & Crew task $c_j$ covers $w \in w(v_i)$ \\
+    \addlinespace[0.6em]
+    \multicolumn{2}{l}{\textit{Decision variables}} \\
+    $x_{i} \in \{ 0, 1 \}$ & Usage of vehicle task $v_i$  \\ 
+    $y_{j} \in \{ 0, 1 \}$ & Usage of crew task $c_j$ \\ 
+    \addlinespace[0.6em]
+    \multicolumn{2}{l}{\textit{Additional helper functions}} \\
+    $d(v)$ & Total duration of $v$ \\ 
+    $k(v)$ & Total kilometers traveled in $v$ \\ 
+    $c(v)$ & Total charge used by $v$ \\ 
+    $b(E)$ & Set of break actions in $E$ \\ 
+    $cost(\chi)$ & Cost of task $\chi$ \\ 
+    \addlinespace[0.2em]
     \bottomrule
   \end{tabular}
   \label{tab:notation}
-  \caption{Notation used for formal problem description}
+  \caption{Notation used for formal problem description, where $\chi$ is used as a placeholder when multiple argument types can be applied.}
 \end{table}
 
 \section{Global planning for thesis}
