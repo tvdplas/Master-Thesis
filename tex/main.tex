@@ -299,35 +299,36 @@ Research has also been done into integrating the E-VSP with the step before it i
 
 \section{Problem definition}
 \label{sec:problem_def}
-In this section, we will give a definition of the integrated electric vehicle and crew scheduling problem (E-VCSP). As mentioned in previous sections, our goal is to create minimum cost schedules for both vehicles and crew members such that a given set of trips is covered. Before discussing how we define these schedules, we will first formally define the data which is given. \\
-Let $T$ be a set of trips that need to be driven, let $D$ be a set of depots that can be used, and let $L$ be a set of locations. A trip is defined as a travel between two locations in $L$; let $l_s(t) \in L$ and $l_e(t) \in L$ represent the starting and ending location of trip $t$ respectively, and let $l(d) \in L$ represent the location of depot $d$. Next, let $p_s(t)$ and $p_e(t)$ refer to the planned starting and ending time of trip $t$, and let $d(t) = p_e(t) - p_s(t)$ be the duration of the trip. Lastly, let $k(t)$ be equal to the number of kilometers traveled during the trip. \\
-As multiple vehicles types may be in use, let $\Phi$ represent the set of all vehicle types. For each trip $t$, a subset of these vehicle types $\phi(t) \subseteq \Phi$ may be used in order to drive the trip. Each depot $d$ also has a preallocated number of each vehicle type $\phi \in \Phi$ available; let this be represented by $g(d, \phi) \in \mathbb{N}^+$. Different vehicles might have different battery capacities; let $\sigma_{min}(\phi)$ and $\sigma_{max}(\phi)$ represent the minimal and maximal SoC of vehicle type $\phi$, both expressed in KWh. Additionally, let $\sigma_{start}(\phi)$ represent the capacity that a vehicle starts with at the beginning of a day, and let $c^\phi(t)$ represent the amount of charge a vehicle of type $\phi$ would use when traveling the trip, expressed in KWh. \\
-Now, let us define given metrics when traveling between different locations. As the exact travel between locations may differ depending on the time of day (such as longer driving times when dealing with congestion), we will define our metrics based on subtasks instead of locations; this allows us to incorporate the departure time associated with the subtasks.\\
-Let $d_m(s, s')$ represent the duration of the drive between $l_e(s)$ and $l_s(s')$, adjusted for departure time. Similarly, let $k_m(s, s')$ represent the amount of kilometers traveled, and let $c^\phi_m(s, s')$ represent the amount of battery charge used. Note that this last metric is dependent on the vehicle type $\phi$, as different vehicle types might have different usage patterns. \\
+\todo{Negeert de volgende constraints die wel bij Qbuzz aanwezig zijn: capaciteit van charge (plekken + totaal), batterijgebruik wachttijd bus, }
+In this section, we will give a definition of the integrated electric vehicle and crew scheduling problem (E-VCSP). As mentioned in previous sections, our goal is to create minimum cost schedules for both vehicles and crew members; vehicle tasks must be constructed for individual vehicles such that each trip is covered, and crew tasks must be constructed such that the vehicle tasks can be driven. Before defining these tasks, we will first formally define the data which is given. A summary of the notation used has been provided in Table \ref{tab:notation}. \\
+Let $T$ be a set of trips that need to be driven, let $D$ be a set of depots that can be used, and let $L$ be a set of locations. A trip is defined as a travel between two locations in $L$; let $l_{t,start} \in L$ and $l_{t,end} \in L$ represent the starting and ending location of trip $t$ respectively, and let $l_d \in L$ represent the location of depot $d$. Next, let $p_{t,start}$ and $p_{t,end}$ refer to the planned starting and ending time of trip $t$, and let $d_t = p_{t,end} - p_{t,start}$ be the duration of the trip. Lastly, let $k_t$ be equal to the number of kilometers traveled during the trip. \\
+As multiple vehicles types may be in use, let $\Phi$ represent the set of all vehicle types. For each trip $t$, a subset of these vehicle types $\phi_t \subseteq \Phi$ may be used in order to drive the trip. Each depot $d$ also has a preallocated number of each vehicle type available; let this be represented by $g^\phi_{d} \in \mathbb{N}^+$. Different vehicles might have different battery capacities; let $\sigma^\phi_{min}$ and $\sigma^\phi_{max}$ represent the minimum and maximum allowable SoC of vehicle type $\phi$, both expressed in KWh. Additionally, let $\sigma^\phi_{start}$ represent the capacity that a vehicle starts with at the beginning of a day, and let $c^\phi_t$ represent the amount of charge a vehicle of type $\phi$ would use when traveling the trip, expressed in KWh. \\
+Now, let us define given metrics when traveling between different locations. As the exact travel between locations may differ depending on the time of day, we will define these relations on a trip basis instead of location basis. Travels to and from depots are of course also allowed; let us therefore define these relations on some pair ($s,s'$) where $s$ and $s'$ must be either a trip or depot. Of these, at least one must be a trip, giving us a departure time. \\
+Let $d_{s,s'}$ represent the duration of the drive between (the end of) $s$ and (start of) $s'$, adjusted for departure time. Similarly, let $k_{s, s'}$ represent the amount of kilometers traveled, and let $c^\phi_{s, s'}$ represent the amount of battery charge used. Note that this last metric is dependent on the vehicle type $\phi$, as different vehicle types might have different usage patterns. \\
 Lastly, let us define our recharging behavior. In charging behavior, we will make two key assumptions: firstly, we assume that it is only possible for a vehicle to charge between trips. Charging at a depot is therefore not directly modeled unless one of the trip locations is the depot itself. Secondly, we assume charging may only be done at the start of a deadhead; if charging is desired at the end of a deadhead instead, a dummy 0-duration trip must be introduced at the deadhead target to model this behavior. Using these two assumptions, we can determine a maximum amount of charge that can be added during a deadhead from $t$ to $t'$ while still allowing for travel between the two trips. \\
-As charging is a nonlinear process, the starting SoC $\sigma$ of a vehicle at $t$ is also of importance, as well as the vehicle type $\phi$. Using all this information, we therefore define $u^\phi_\sigma(t, t')$ as being this maximum possible amount of charge gained in the deadhead from $t$ to $t'$ while still allowing for travel between the trips. Note that when using discrete values for $\sigma$, all values of $u^\phi_\sigma(t, t')$ can be calculated based on the input. \todo{toevoegen locaties, charging, etc} \\\\
-Using these given values, we will now start by formally defining a feasible vehicle task for a vehicle of type $\phi$. A vehicle task must start at a depot, then perform a sequence of compatible trips and charging actions, before finally returning to a depot. We will refer to this ordered sequence as $S = \{ s_0, s_1, \dots, s_n, s_{n+1} \}$, where each subtask $s \in S$ can represent one of two actions: driving a trip $t \in T$, or being at a depot $d \in D$. In this sequence, let $a(s) \in \{ depot, trip \}$ represent the specific action that is performed by $s$. In order for a sequence to be a feasible vehicle schedule, the following conditions must be met. \\
+As charging is a nonlinear process, the starting SoC $\sigma$ of a vehicle at the end of $t$ is of importance. Additionally, charging speeds may differ depending on the vehicle type $\phi$. Combining this, we define $u^\phi_{\sigma,t,t'}$ as being this maximum possible amount of charge gained in the deadhead from $t$ to $t'$ while still allowing for travel between the trips. Note that when using discrete values for $\sigma$, all values of $u^\phi_{\sigma,t, t'}$ can be predetermined. In this, charging infrastructure available at $l_{t,end}$ must be considered considered. If no such infrastructure is available, $u^\phi_{\sigma,t, t'} = 0$. \\\\
+Using these given values, we will now start by formally defining a feasible vehicle task for a vehicle of type $\phi$. A vehicle task must start at a depot, then perform a sequence of compatible trips and charging actions, before finally returning to a depot. We will refer to this ordered sequence as $S = \{ s_0, s_1, \dots, s_n, s_{n+1} \}$, where each subtask $s \in S$ can represent one of two actions: driving a trip $t \in T$, or being at a depot $d \in D$. In this sequence, let $a_s \in \{ depot, trip \}$ represent the specific action that is performed by $s$. In order for a sequence to be a feasible vehicle schedule, the following conditions must be met. \\
 First, the vehicle must start at a depot, then perform a sequence of trips, before finally returning to the depot. Note that trips may have starting or ending locations that coincide with that of the depot, however their respective subtask is not considered to be a depot action.
 \begin{align}
-  a(s_0) &= \text{depot} && \\
-  a(s_{n+1}) &= \text{depot} && \\ 
-  a(s_i) &= \text{trip} && \forall i = 1, \dots, n
+  a_{s_0} &= \text{depot} && \\
+  a_{s_{n+1}} &= \text{depot} && \\ 
+  a_{s_i} &= \text{trip} && \forall i = 1, \dots, n
 \end{align}
 The type of the vehicle must match those allowed for driving a trip. 
 \begin{align}
-  \phi &\in \phi(t_i) && \forall i = 1, \dots, n
+  \phi &\in \phi_{t_i} && \forall i = 1, \dots, n
 \end{align}
 Trips may only be driven sequentially if there is time to travel from one trip to the next. Note that we make the assumption that there is always time to drive to and from a depot at the start and end of the day. 
 \begin{align}
-  e(s_i) + d(s_i, s_{i+1}) &\leq s(s_{i+1}) && \forall i = 1, \dots, n-1
+  p_{s_i,end} + d_{s_i, s_{i+1}} &\leq p_{s_{i+1},start} && \forall i = 1, \dots, n-1
 \end{align}
-Lastly, we want to ensure that the battery capacity is always respected. Again, charging can only take place at the end of a trip before traveling to the next trip. \todo{beter verwoorden}.
+Lastly, we want to ensure that the battery capacity is always respected. As mentioned before, the assumption is made that charging can only take place at the end of a trip before traveling to a following trip.
 \begin{align}
-  \sigma'_0 &= \sigma_{start}(\phi) \\
-  \sigma_{i} &= \sigma'_{i-1} - c^\phi(s_{i-1}, s_{i}) - c(s_{i}) && \forall i = 1, \dots, n + 1 \\
-  \sigma_{i} &\geq \sigma_{min}(\phi) && \forall i = 1, \dots, n + 1 \\
-  \sigma'_{i} &= \sigma_{i} + \delta_j \cdot u^\phi_{\sigma_{i}}(s_{j}, s_{j+1}) && \forall i = 1, \dots, n \\
-  \sigma'_{i} &\leq \sigma_{max}(\phi) && \forall i = 1, \dots, n
+  \sigma'_0 &= \sigma^\phi_{start} \\
+  \sigma_{i} &= \sigma'_{i-1} - c^\phi_{s_{i-1}, s_{i}} - c_{s_{i}} && \forall i = 1, \dots, n + 1 \\
+  \sigma_{i} &\geq \sigma^\phi_{min} && \forall i = 1, \dots, n + 1 \\
+  \sigma'_{i} &= \sigma_{i} + \delta_j \cdot u^\phi_{\sigma_{i},s_{j}, s_{j+1}} && \forall i = 1, \dots, n \\
+  \sigma'_{i} &\leq \sigma^\phi_{max} && \forall i = 1, \dots, n
 \end{align}
 Where $\sigma_i$ represents the SoC at the end of subtask $i$, and $\sigma'_i$ represents the SoC after possible charging is done at the end of subtask $i$. Additionally, $0 \leq \delta_i \leq 1$ represents a fraction of the maximum charge received. \\
 For a feasible vehicle schedule $v$, let us define the following the following:
@@ -338,7 +339,9 @@ For a feasible vehicle schedule $v$, let us define the following the following:
   cost(v) &= \alpha_1 + \alpha_2 \cdot c(v) + \alpha_3 \cdot d(v) + \alpha_4 \cdot k(v) 
 \end{align}
 Where $c(v)$, $d(v)$ and $k(v)$ represent the total charge used, active time and distance traveled, with some set of scalar values $\alpha$. We will refer to the set of all feasible vehicle tasks as $V$. \\\\
-Next, let us consider crew tasks. A crew task $c$ may perform multiple segments of different vehicle tasks, and we will therefore also model our crew tasks on a trip basis. A crew task can therefore once again be defined as a sequence of steps throughout the day of the form $S = \{ s_1, \dots, s_n \}$. We will however now need to incorporate breaks, waiting and handovers as well; we will consider all of these to be steps in this sequence, and will differentiate between action types using $a(s) \in \{\text{ drive, break, wait, step-on, step-off }\}$. In order for a vehicle task to be feasible, the following conditions need to be met. We base our conditions on Dutch labor regulations, however similar regulations are present in other countries as well. \\ 
+Next, let us consider crew tasks. Vehicle tasks can be split up into multiple segments, each of which must be performed continuously by a single crew member. In some cases, this can be a single trip; in other cases, it might not be possible for a driver to be replaced when arriving at the destination. Let $L_r \subseteq L$ be a subset of the locations at which the driver can be replaced; using these relief points, we are able to split up our available vehicle tasks into into a set of segments $W$. \\
+Similar to individual trips, let $l_w$
+A crew task can therefore once again be defined as a sequence of steps throughout the day of the form $S = \{ s_1, \dots, s_n \}$. We will however now need to incorporate breaks, waiting and handovers as well; we will consider all of these to be steps in this sequence, and will differentiate between action types using $a(s) \in \{\text{ drive, break, wait, step-on, step-off }\}$. In order for a vehicle task to be feasible, the following conditions need to be met. We base our conditions on Dutch labor regulations, however similar regulations are present in other countries as well. \\ 
 First, overall time feasibility. A driver may have a duty length of at most 9 hours. \\
 \begin{align}
   e(s_n) - s(s_1) \leq 9\text{hours}
@@ -394,6 +397,42 @@ y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
 x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|V| \\
 y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
 \end{align}
+
+\begin{table}
+  \centering
+  \begin{tabular}{ll}
+    \toprule
+    \multicolumn{1}{l}{\textbf{Notation}} & \multicolumn{1}{l}{\textbf{Definition}}               \\
+    \cmidrule(lr){1-1}\cmidrule(lr){2-2}
+    $t \in T$ & Set of all trips, $t$ a single trip \\
+    $d \in D$ & Set of all depots, $d$ a single depot \\
+    $l \in L$ & Set of all locations, $l$ a single location \\
+    $\phi \in \Phi$ & Set of vehicle types, $\phi$ a single type \\
+    $s \in S$ & Ordered sequence of vehicle steps \\ 
+    $l_{t,start}$ & Starting location of $t$ \\
+    $l_{t,end}$ & Ending location of $t$ \\ 
+    $l_{d}$ & Location of depot $d$ \\
+    $p_{t,start}$ & Planned starting time of $t$ \\
+    $p_{t,end}$ & Planned end time of $t$ \\
+    $d_t$ & Duration of $t$ \\ 
+    $k_t$ & Kilometers traveled in $t$ \\
+    $\phi_t \subseteq \Phi$ & Set of compatible vehicle types for $t$ \\
+    $g^\phi_{d} \in \mathbb{N}^+$ & Number of vehicles of type $\phi$ at $d$ \\
+    $\sigma$ & State of charge \\
+    $\sigma^\phi_{min}$ & Minimum SoC of $\phi$ \\ 
+    $\sigma^\phi_{max}$ & Maximum SoC of $\phi$ \\ 
+    $\sigma^\phi_{start}$ & Starting SoC of $\phi$ \\ 
+    $c^\phi_{t}$ & SoC used by trip $t$ on type $\phi$ \\
+    $d_{s,s'}$ & Duration of drive between $s$ and $s'$ \\
+    $k_{s,s'}$ & Kilometers driven between $s$ and $s'$ \\
+    $c^\phi_{s,s'}$ & SoC used by $\phi$ driving between $s$ and $s'$ \\
+    $u^\phi_{\sigma,t,t'}$ & Max. SoC gained between $t$, $t'$ for type $\phi$, start SoC $\sigma$ \\
+    $a_s$ & Action type of $s$ \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:notation}
+  \caption{Notation used for formal problem description}
+\end{table}
 
 \section{Global planning for thesis}
 The following constraints list of constraints seem to make the problem the most challenging (when compared to just SDVSP): Partial charges, Nonlinear charges, Battery degradation, Capacitated charging stations, Multiple vehicle types and Multiple depots. Other than that, percentage of used crew shifts must match x type constraints seem like they might make solving harder; I'm unsure of their effects on the results of CG within a set covering context as I haven't seen them mentioned before, however intuitively it seems like it seems like a larger part of the searchspace would need to be traversed in order to find a good solution. \\
