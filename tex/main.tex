@@ -5,13 +5,13 @@
 \usepackage{multicol}
 \usepackage{mathtools, amssymb, amsmath}
 \usepackage[
-  sorting=none,
-  sortcites=true,
+  sorting=nty,
   backend=bibtex,
   giveninits=true,
   style=authoryear-comp,
   natbib=true,
   maxcitenames=2,
+  useprefix=true,
 ]{biblatex}
 \bibliography{bibliography}
 
@@ -40,7 +40,7 @@ line operators such as the Dutch \citet{qbuzzQbuzz} are slowly replacing even mo
 combustion based fleet with electric vehicles. It is therefore almost certain that this share will only grow in
 coming years across different countries. \\
 This shift in energy source has introduced new challenges to the methods currently in use to keep our public transport moving. Of primary concern are charging infrastructure and vehicle ranges, both of which are much more limited than their traditional combustion based counterparts. The planning process which has traditionally been used, as outlined in Figure \ref{fig:planning-overview}, therefore requires additional research into each of its steps in order to incorporate these newly relevant constraints.\\
-\noindent In this work, we will focus on incorporating electric vehicle restrictions into two of these steps: vehicle scheduling and crew scheduling. Specifically, we will consider the scheduling of electric buses and their drivers, as these two steps make up a majority of day-to-day costs within the bus transit sector. \\
+\noindent In this work, we focus on incorporating electric vehicle restrictions into two of these steps: vehicle scheduling and crew scheduling. Specifically, we consider the scheduling of electric buses and their drivers, as these two steps make up a majority of day-to-day costs within the bus transit sector. \\
 \begin{figure}[ht]
   \centering
   \begin{tikzpicture}[node distance=2cm]
@@ -69,7 +69,7 @@ This shift in energy source has introduced new challenges to the methods current
   \label{fig:planning-overview}
 \end{figure}
 The goal of vehicle scheduling is generally to assign vehicles such that a set of trips is covered. In the case of buses, trips are given by the timetables for the individual routes as generated in the previous planning step. Our goal is therefore to assign sequences of compatible trips to buses such that each individual trip is driven. \\
-In order to do this, a collection of vehicle tasks must be generated. A vehicle task can be seen as the individual schedule that a bus will follow throughout the day: it may start at a bus storage facility (more commonly called a depot), then perform one or more trips, before finally returning to the depot. The driving actions performed between between a depot and a trip, as well as those between trips themselves are called deadheads. The costs of driven deadheads along with the total number of buses used are the main focus for minimization, as the costs incurred for driving the trips themselves are fixed. This cost minimization problem is often referred to as the vehicle scheduling problem or VSP. The single-depot VSP with a single vehicle type is solvable in polynomial time, however extensions such as multiple vehicle types or limited vehicle ranges are shown to be NP-Hard by \citet{Bunte2009} and \citet{Haghani2002} respectively. \\
+In order to do this, a collection of vehicle tasks must be generated. A vehicle task can be seen as the individual schedule that a bus will follow throughout the day: it may start at a bus storage facility (more commonly called a depot), then perform one or more trips, before finally returning to the depot. The driving actions performed between between a depot and a trip, as well as those between trips themselves are called deadheads. The costs of driven deadheads along with the total number of buses used are the main focus for minimization, as the costs incurred for driving the trips themselves are fixed. This cost minimization problem is often referred to as the vehicle scheduling problem or VSP. The single-depot VSP with a single vehicle type is solvable in polynomial time, however extensions such as multiple vehicle types or limited vehicle ranges are shown to be NP-Hard by \citet{Bodin1983}. \\
 Once vehicle tasks are known, we can move on to scheduling our crew. Here, our goal is to find an assignment of crew members to vehicles  such that the previously made vehicle tasks can actually be performed. Continuing within the context of bus planning, we now need to match drivers with our previously planned buses such that there is always a driver present while the bus is moving. In order to do this, a set of crew tasks must be created that completely cover the given vehicle tasks. \\ 
 A one-to-one mapping between crew tasks and vehicle tasks is not always possible; overall driving time for a driver is limited in a single day due to labor regulations, and for longer shifts breaks are mandatory as well. As vehicles don't have these constraints, a vehicle task may not be feasible to perform in its entirety for a single driver. It is therefore necessary to split vehicle tasks up into multiple segments, whereafter we can create crew tasks that consist of a sequence of one or more compatible segments. The costs of vehicle tasks themselves are fixed as they must always be driven; in order to minimize costs, we must therefore find a covering set of crew tasks which minimizes the number of required crew members and paid hours in which the driver is not actively driving. This minimization problem is referred to as the crew scheduling problem or CSP, and has been shown to be NP-Hard by \citet{Fischetti1989}. \\ 
 Crew scheduling is the greatest contributor to day-to-day costs; a recent estimate by \citet{Perumal2019Crew} puts it at around 60\% of the overall operational costs for bus transit providers in Northern Europe. As can be seen however, the VSP and CSP are very closely related. The vehicle tasks that are selected in the VSP directly determine what crew
@@ -93,7 +93,7 @@ locations (such as only being able to charge at a bus depot) or charging
 behavior (such as modeling the process as being purely linear or only allowing
 full charges). Additionally, to the best of our knowledge battery degradation
 due to usage patterns has not been included in any integrated models at the
-time of writing. Our aim is to introduce an integrated E-VCSP model which incorporates more realistic behavior for battery charging and usage, by including the following: \todonocomment{Op volgorde van prioriteit, implementeren wat haalbaar is. Doel is minimaal eerste 2 punten.}
+time of writing. Our aim is to introduce an integrated E-VCSP model which incorporates more realistic behavior for battery charging and usage, by including the following: \todonocomment{Op volgorde van prioriteit, implementeren wat haalbaar is. Doel is minimaal eerste 2 punten ivm research gap gezien in tabel \ref{tab:eVCSP-lit}.}
 \begin{itemize}
   \item Nonlinear battery charging times.
   \item Partial charging of the battery throughout the day.
@@ -102,7 +102,7 @@ time of writing. Our aim is to introduce an integrated E-VCSP model which incorp
 \end{itemize}
 Using this model, we compare the overall costs of the integrated approach to an equivalent sequential formulation using instances provided by Qbuzz. \\
 \todonocomment{Alleen kosten vergelijken lijkt me met minimale doel; gevoeligheidsanalyse van kostenfactoren zou ook nog interessant zijn, maar alweer; kijken wat haalbaar is, gegeven progressie kijken of meer experimenten / meer implementatie het meest waardevol is}. \\
-This work is organized as follows. In Section 2, we will discuss work related to the E-VCSP and give an overview of common ways of modeling and solving the problem. In Section 3, we give our formal problem definition.
+This work is organized as follows. In Section 2, we discuss work related to the E-VCSP and give an overview of common ways of modeling and solving the problem. In Section 3, we give our formal problem definition.
 \begin{table}
   \centering
   \begin{tabular}{ll}
@@ -130,11 +130,11 @@ This work is organized as follows. In Section 2, we will discuss work related to
     \bottomrule
   \end{tabular}
   \label{tab:nomenclature}
-  \caption{Nomenclature used in this work}
+  \caption{Nomenclature used in this work \todo{formatting}}
 \end{table}
 
 \section{Related work}
-In this section, we will discuss work related to our research into the E-VCSP. An overview of the nomenclature used has been included in Table \ref{tab:nomenclature}, and an summary of how batteries and charging behavior is modeled in the discussed works has been included in Table \ref{tab:eVCSP-lit}.
+In this section, we discuss work related to our research into the E-VCSP. An overview of the nomenclature used has been included in Table \ref{tab:nomenclature}, and an summary of how batteries and charging behavior is modeled in the discussed works has been included in Table \ref{tab:eVCSP-lit}.
 \begin{landscape}
 \null
 \vfill
@@ -145,12 +145,12 @@ In this section, we will discuss work related to our research into the E-VCSP. A
                                      & Model   & ToU & SoC & Nonlinear Ch. & Partial Ch. & Ch. Location & Degradation \\
     \cmidrule(lr){2-8}
     \citet{Li2014}               & E-VSP   & No  & D   & No            & No          & D            & No          \\
-    \citet{vanKootenNiekerk2017} & E-VSP   & Yes & C/D & Yes           & Yes         & D/T          & Yes         \\
+    \Citet{vanKootenNiekerk2017} & E-VSP   & Yes & C/D & Yes           & Yes         & D/T          & Yes         \\
     \citet{Olsen2020}            & E-VSP   & No  & C   & Yes           & Yes         & D/T          & No          \\
     \citet{Zhang2021}            & E-VSP   & No  & C/D & Yes           & Yes         & D            & Yes         \\
     \citet{Parmentier2023}       & E-VSP   & No  & C   & Yes           & Yes         & D/T          & No          \\
     % \citet{Pulyassary2024}       & E-VSP   & No  & C/D & Yes           & Yes         & T            & No          \\
-    \citet{deVos2024}            & E-VSP   & No  & D   & Yes           & Yes         & D/T          & No          \\
+    \Citet{deVos2024}            & E-VSP   & No  & D   & Yes           & Yes         & D/T          & No          \\
     \addlinespace[0.4em]
     \citet{Perumal2021}          & E-VCSP  & No  & C   & No            & No          & D            & No          \\
     \citet{Wang2022}             & E-VCSP  & Yes & C   & No            & Yes         & D            & No          \\
@@ -168,9 +168,8 @@ In this section, we will discuss work related to our research into the E-VCSP. A
 \vfill
 \end{landscape}
 
-\todo{uitleg van de SDVSP}
 \subsection{(E-)VSP}
-Before considering previous work on the E-VSP, we will first cover the most basic form of vehicle scheduling: that which only considers a single depot, single vehicle type and unlimited vehicle ranges. This problem, referred to as the single depot vehicle scheduling problem (SDVSP), forms the underlying basis of both the multi-depot and electric vehicle extensions that we will consider later. We will therefore give a brief summary of one the most common models and solution methods used for the SDVSP, thereby having a baseline to which we can compare extensions. For a more comprehensive overview on different models used for the SDVSP and multi-depot VSP (MDVSP), we refer the reader to a review by \citet{Bunte2009}. \\
+Before considering previous work on the E-VSP, we first cover the most basic form of vehicle scheduling: that which only considers a single depot, single vehicle type and unlimited vehicle ranges. This problem, referred to as the single depot vehicle scheduling problem (SDVSP), forms the underlying basis of both the multi-depot and electric vehicle extensions that we consider later. We therefore give a brief summary of one the most common models and solution methods used for the SDVSP, thereby having a baseline to which we can compare extensions. For a more comprehensive overview on different models used for the SDVSP and multi-depot VSP (MDVSP), we refer the reader to a review by \citet{Bunte2009}. \\
 As mentioned before, our goal in the SDVSP is to create a set of vehicle tasks throughout the day in which the number of vehicles and the cost of driven deadheads is minimized while covering all trips. In order to solve this problem, a graph consisting of the trips and depot can be created. In this graph, we can then solve a min-cost flow problem in which all trips are covered; the optimal vehicle tasks then follow from the flow paths along the trips. \\
 More formally, given a set of trips $T$ and a single depot $d$, a graph $G = (V, A)$ can be constructed. Let $V = \{ v^s_t \mid t \in T \} \cup \{ v^e_t \mid t \in T \} \cup \{ v^s_d, v^e_d \}$, in which each pair of nodes $(v^s_t, v^e_t)$ represent the start and end of trip $t$ respectively. Additionally, the pair of nodes $(v^s_d, v^e_d)$ represent the depot at the start and end of the day. Next, let $A_T = \{ (v^s_t, v^e_t) \mid t \in T \}$ represent the arcs connecting the start and end of the trip, each with cost equal to the cost of driving the trip. Let $A_{DH} = \{ ( v^e_t,\: v^s_{t'}) \mid (t, t') \in T \times T,\: t'\text{ can be driven after }t \}$ represent a set of arcs which model feasible deadhead trips; once again, each with cost equal to those incurred when driving the deadhead between $t$ and $t'$. Let $A_{D} = \{ (v^s_d, v^s_t) \mid t \in T \} \cup \{ (v^e_t, v_d^e) \mid t \in T \}$ represent deadheads from the depot to a trip and vice versa, once again with costs equal to those when driving the deadheads. If fixed costs per vehicle are required, these can be added to arcs leaving the depot. Finally, let $A = A_T \cup A_{DH} \cup A_D$, and let all arcs have capacity equal to 1. \\
 Setting $v^s_d$ as our source and $v_d^e$ as our sink, we can now find a min-cost max-flow across the graph $G$. Due to our construction, all trips must be covered by exactly 1 flow, resulting in flow paths which we can directly use as vehicle tasks due to the assumption that our vehicles have enough range. It is therefore also shown that the SDVSP can be solved in polynomial time, as polynomial time min-cost max-flow algorithms exist and the graph elements are of size $|V| = O(|T|)$ and $|A| = O(|T|^2)$.\\
@@ -185,7 +184,7 @@ optimum is used instead. The proposed methods are tested on trips in the San Fra
 Area, with a maximum instance size of 242 trips. These tests resulted in
 optimality gaps of $<5\%$ for buses able to drive 150km, and between 7-15\%
 for a range of 120km depending on the instance. \\
-\citetnl{vanKootenNiekerk2017} introduces two models which aim to solve the single depot E-VSP
+\Citet{vanKootenNiekerk2017} introduce two models which aim to solve the single depot E-VSP
 while taking into account time dependent energy prices (ToU pricing), nonlinear charging times and
 battery degradation due to depth of discharge. The first model only allows for linear charging and no consideration for degradation or ToU, but uses continuous state of charge (SoC) variables which are added to the SDVSP network. The second model does allow for the extra inclusions, achieving this by duplicating trip nodes in the SDVSP network for discrete SoC values. The second model is solved using column generation and lagrangian relaxation, resulting in a possibly non-optimal solution. Tests are performed using data provided by Belgian bus company De Lijn in the city Leuven, using a total of 543 trips. They show that the
 discretized model can be solved in a considerably shorter time frame for large instances with similar results to
@@ -199,16 +198,7 @@ infrastructure is uniform. Testing is done on the \textit{large}
 instances introduced by \citet{Wen2016} which included up to 8
 depots, 16 charging stations and 500 trips. Here, they are able to find
 solutions that only have an 0.06\% optimality gap. \\
-% \citet{Pulyassary2024} show that the single depot E-VSP is solvable in polynomial time given the
-% assumption that the shortest path between two trips in the flow network is
-% equal to the path with lowest battery usage. They
-% consider the case in which charging at a select number of capacity bound nodes
-% is allowed with nonlinear charging behavior. For the single depot case, a
-% $O^*(|T|^6)$ algorithm for finding a set of vehicle schedules with lowest cost
-% given trips $T$ is provided based on DP. Additionally, polynomial algorithms
-% for determining maximum feasible charging capacity and minimum-cost flows based
-% on LP are provided. No computational experiments are performed. \\\\
-\citet{deVos2024} consider the E-VSP with partial recharges and capacitated charging stations. Their model includes discrete SoC trip nodes and discrete SoC and time charging location nodes, similar to the model found in \citet{Zhang2021}. Using these, a primal network is created using pessimistic SoC rounding when connecting trips with feasible deadheads. In order to solve, they apply CG with two separate approaches:
+\Citet{deVos2024} consider the E-VSP with partial recharges and capacitated charging stations. Their model includes discrete SoC trip nodes and discrete SoC and time charging location nodes, similar to the model found in \citet{Zhang2021}. Using these, a primal network is created using pessimistic SoC rounding when connecting trips with feasible deadheads. In order to solve, they apply CG with two separate approaches:
 branch-and-price and a diving heuristic. To overcome the limitations of dual
 bounds resulting from a discretized model, they incorporate ideas from \citet{Boland2017} resulting in a dual network with optimistic connections. This gives the same bounds as the ones found in the
 non-discretized model. Testing is performed on a bus concession south of
@@ -273,14 +263,14 @@ Research has also been done into integrating the E-VSP with the step before it i
 \section{Problem definition}
 \label{sec:problem_def}
 \todonocomment{Deze omschrijving is een versimpelde variant van het probleem zoals ik hem op het moment heb begrepen vanuit Qbuzz; naar mijn idee heb ik de hoofdlijnen nu uitgewerkt, maar een aantal constraints/mogelijkheden zijn nu nog niet toegevoegd. Ik denk dat deze versimpelde casus werkend krijgen de focus zal hebben voor de komende tijd, en dat deze uitbreiden gaandeweg kan worden gedaan als de tijd het toelaat. De volgende elementen zijn op dit moment nog niet (volledig) meegenomen: Capaciteit oplaadplekken (aantal plekken + totaal wattage), batterijgebruik tijdens wachttijd bus, personeel rustlocaties op loopafstand van elkaar (enige manier om van locatie te wisselen is door een bus rijden), tijdsgebonden elektriciteitsprijzen, kosten gebruikspatroon batterij, shiftpatronen (vroege/late diensten, gebroken shift). Daarnaast maak ik nu een versimpelende aanname dat laden alleen kan plaatsvinden vlak voordat je weggaat bij een deadhead/direct als je aankomt.} \\\\
-In this section, we will give a definition of the integrated electric vehicle and crew scheduling problem (E-VCSP). As mentioned in previous sections, our goal is to create minimum cost schedules for both vehicles and crew members; vehicle tasks must be constructed for individual vehicles such that each trip is covered, and crew tasks must be constructed such that the vehicle tasks can be driven. Before defining these tasks, we will first formally define the data which is given. A summary of the notation used throughout this section has been provided in Table \ref{tab:notation}. \\
+In this section, we give a definition of the integrated electric vehicle and crew scheduling problem (E-VCSP). As mentioned in previous sections, our goal is to create minimum cost schedules for both vehicles and crew members; vehicle tasks must be constructed such that each trip is covered, and crew tasks must be constructed such that the vehicle tasks can be driven. Before defining these tasks, we first formally define the data which is given. A summary of the notation used throughout this section has been provided in Table \ref{tab:notation}. \\
 Let $T$ be a set of trips that need to be driven, let $D$ be a set of depots that can be used, and let $L$ be a set of locations. A trip is defined as a travel between two locations in $L$; let $l_{t,start} \in L$ and $l_{t,end} \in L$ represent the starting and ending location of trip $t$ respectively, and let $l_d \in L$ represent the location of depot $d$. Next, let $p_{t,start}$ and $p_{t,end}$ refer to the planned starting and ending time of trip $t$, and let $d_t = p_{t,end} - p_{t,start}$ be the duration of the trip. Lastly, let $k_t$ be equal to the number of kilometers traveled during the trip. \\
-As multiple vehicles types may be in use, let $\Phi$ represent the set of all vehicle types. For each trip $t$, a subset of these vehicle types $\phi_t \subseteq \Phi$ may be used in order to drive the trip. Each depot $d$ also has a preallocated number of each vehicle type available; let this be represented by $g^\phi_{d} \in \mathbb{N}^+$. Different vehicles might have different battery capacities; let $\sigma^\phi_{min}$ and $\sigma^\phi_{max}$ represent the minimum and maximum allowable SoC of vehicle type $\phi$, both expressed in KWh. Additionally, let $\sigma^\phi_{start}$ represent the capacity that a vehicle starts with at the beginning of a day, and let $c^\phi_t$ represent the amount of charge a vehicle of type $\phi$ would use when traveling the trip, expressed in KWh. \\
-Now, let us define given metrics when traveling between different locations. As the exact travel between locations may differ depending on the time of day, we will define these relations on a trip basis instead of location basis. Travels to and from depots are of course also allowed; let us therefore define these relations on some pair ($s,s'$) where $s$ and $s'$ must be either a trip or depot. Of these, at least one must be a trip, giving us a departure time. \\
+As multiple vehicles types may be in use, let $\Phi$ represent the set of all vehicle types. For each trip $t$, a subset of these vehicle types $\phi_t \subseteq \Phi$ may be used in order to drive the trip. Each depot $d$ also has a preallocated number of each vehicle type available; let this be represented by $g^\phi_{d} \in \mathbb{N}^+$. Different vehicles might have different battery capacities; let $\sigma^\phi_{min}$ and $\sigma^\phi_{max}$ represent the minimum and maximum allowable SoC of vehicle type $\phi$, both expressed in KWh. Additionally, let $\sigma^\phi_{start}$ represent the capacity that a vehicle starts with at the beginning of a day, and let $c^\phi_t$ represent the amount of charge a vehicle of type $\phi$ would use when traveling the trip. \\
+Now, let us define given metrics when traveling between different locations. As the exact travel between locations may differ depending on the time of day, we define these relations on a trip basis instead of location basis. Travels to and from depots are of course also allowed; let us therefore define these relations on some pair ($s,s'$) where $s$ and $s'$ must be either a trip or depot. Of these, at least one must be a trip, giving us a departure time. \\
 Let $d_{s,s'}$ represent the duration of the drive between (the end of) $s$ and (start of) $s'$, adjusted for departure time. Similarly, let $k_{s, s'}$ represent the amount of kilometers traveled, and let $c^\phi_{s, s'}$ represent the amount of battery charge used. Note that this last metric is dependent on the vehicle type $\phi$, as different vehicle types might have different usage patterns. \\
-Lastly, let us define our recharging behavior. In charging behavior, we will make two key assumptions: firstly, we assume that it is only possible for a vehicle to charge between trips. Charging at a depot is therefore not directly modeled unless one of the trip locations is the depot itself. Secondly, we assume charging may only be done at the start of a deadhead; if charging is desired at the end of a deadhead instead, a dummy 0-duration trip must be introduced at the deadhead target to model this behavior. Using these two assumptions, we can determine a maximum amount of charge that can be added during a deadhead from $t$ to $t'$ while still allowing for travel between the two trips. \\
+Lastly, let us define our recharging behavior. In charging behavior, we make two key assumptions: firstly, we assume that it is only possible for a vehicle to charge between trips. Charging at a depot is therefore not directly modeled unless one of the trip locations is the depot itself. Secondly, we assume charging may only be done at the start of a deadhead; if charging is desired at the end of a deadhead instead, a dummy 0-duration trip must be introduced at the deadhead target to model this behavior. Using these two assumptions, we can determine a maximum amount of charge that can be added during a deadhead from $t$ to $t'$ while still allowing for travel between the two trips. \\
 As charging is a nonlinear process, the starting SoC $\sigma$ of a vehicle at the end of $t$ is of importance. Additionally, charging speeds may differ depending on the vehicle type $\phi$. Combining this, we define $u^\phi_{\sigma,t,t'}$ as being this maximum possible amount of charge gained in the deadhead from $t$ to $t'$ while still allowing for travel between the trips. Note that when using discrete values for $\sigma$, all values of $u^\phi_{\sigma,t, t'}$ can be predetermined. In this, charging infrastructure available at $l_{t,end}$ must be considered considered. If no such infrastructure is available, $u^\phi_{\sigma,t, t'} = 0$. \\\\
-Using these given values, we will now start by formally defining a feasible vehicle task for a vehicle of type $\phi$. A vehicle task must start at a depot, then perform a sequence of compatible trips and charging actions, before finally returning to a depot. We will refer to this ordered sequence as $S = \{ s_0, s_1, \dots, s_n, s_{n+1} \}$, where each step $s \in S$ can represent one of two actions: driving a trip $t \in T$, or being at a depot $d \in D$. In this sequence, let $a_s \in \{ depot, trip \}$ represent the specific action that is performed by $s$. In order for a sequence to be a feasible vehicle schedule, the following conditions must be met. \\
+Using these given values, we now start by formally defining a feasible vehicle task for a vehicle of type $\phi$. A vehicle task must start at a depot, then perform a sequence of compatible trips and charging actions, before finally returning to a depot. We refer to this ordered sequence as $S = \{ s_0, s_1, \dots, s_n, s_{n+1} \}$, where each step $s \in S$ can represent one of two actions: driving a trip $t \in T$, or being at a depot $d \in D$. In this sequence, let $a_s \in \{ depot, trip \}$ represent the specific action that is performed by $s$. In order for a sequence to be a feasible vehicle schedule, the following conditions must be met. \\
 First, the vehicle must start at a depot, then perform a sequence of trips, before finally returning to the depot. Note that trips may have starting or ending locations that coincide with that of the depot, however their respective step is not considered to be a depot action.
 \begin{align}
   a_{s_0} &= \text{depot} && \\
@@ -311,9 +301,9 @@ For a feasible vehicle schedule $v$, let us define the following the following:
   k(v) &= k(s_0, s_1) + \sum^{n}_{i = 1}(k(s_i) + k(s_i, s_i + 1))  \\
   cost(v) &= \alpha_1 + \alpha_2 \cdot c(v) + \alpha_3 \cdot d(v) + \alpha_4 \cdot k(v) 
 \end{align}
-Where $c(v)$, $d(v)$ and $k(v)$ represent the total charge used, active time and distance traveled, with some set of scalar values $\alpha$. We will refer to the set of all feasible vehicle tasks which match these constraints as $V$. \\
+Where $c(v)$, $d(v)$ and $k(v)$ represent the total charge used, active time and distance traveled, with some set of scalar values $\alpha$. We refer to the set of all feasible vehicle tasks which match these constraints as $V$. \\
 Vehicle tasks can be split up into multiple segments, each of which must be performed continuously by a single crew member. In some cases, this can be a single trip; in other cases, it might not be possible for a driver to be replaced when arriving at the destination. Let $L_r \subseteq L$ be a subset of the locations at which the driver can be replaced; using these relief points as splitting points, for each vehicle task $v \in V$, let its set of segments be defined as $w(v)$; our overall set of of segments $W$ can then be defined as $W = \bigcup_{v \in V}w(v)$. In this, $w \in W$ represents a single segment. \\\\
-Now, let us consider crew tasks. A crew task will be defined as an ordered sequence of subtasks $E = \{ e_1, \dots, e_n \}$. Each of these subtasks may be of one of 5 types: driving a segment, taking a break, entering a vehicle; leaving a vehicle, or waiting in a vehicle. In order to differentiate between subtasks types, let the action performed during subtask $e$ be defined as $a_e \in \{\text{ drive, break, step-on, step-off, wait }\}$. For every subtask $e$, let us define $q_e$ as an identifier of the vehicle associated with the action. If $a_e = break$, $q_e$ is undefined. Additionally, let us define $l_{e,start}$ and $l_{e,end}$ as the starting and ending location of a subtask, and let $p_{e,start}$, $p_{e,end}$ be the starting and ending time. Lastly, let $d_e = p_{e,end} - p_{e,start}$ be the duration of the subtask. In order to keep notation concise, we also define $b(E) = \{ e \mid e \in E, a_e = break \}$ or the set of all break subtasks within a sequence.\\
+Now, let us consider crew tasks. A crew task is defined as an ordered sequence of subtasks $E = \{ e_1, \dots, e_n \}$. Each of these subtasks may be of one of 5 types: driving a segment, taking a break, entering a vehicle; leaving a vehicle, or waiting in a vehicle. In order to differentiate between subtasks types, let the action performed during subtask $e$ be defined as $a_e \in \{\text{ drive, break, step-on, step-off, wait }\}$. For every subtask $e$, let us define $q_e$ as an identifier of the vehicle associated with the action. If $a_e = break$, $q_e$ is undefined. Additionally, let us define $l_{e,start}$ and $l_{e,end}$ as the starting and ending location of a subtask, and let $p_{e,start}$, $p_{e,end}$ be the starting and ending time. Similarly to trips $d_e = p_{e,end} - p_{e,start}$ be the duration of the subtask. Lastly, let $f_{l,on}$ and $f_{l,\textit{off}}$ represent the time needed in order to perform a step-on or step-off location at a location $l$. In order to keep notation concise, we also define $b(E) = \{ e \mid e \in E, a_e = break \}$ or the set of all break subtasks within a sequence.\\
 In order for a sequence of subtasks to be a feasible crew task, the following conditions need to be met. We base our conditions on Dutch labor regulations, however similar regulations are present in other countries as well. \\ 
 First, overall time feasibility. A driver may have a duty length of at most 9 hours. \\
 \begin{align}
@@ -334,11 +324,16 @@ Next, we must ensure feasibility of transfers between subtasks themselves. In ge
   && l_{e_{i-1},start} = l_{e_i,end} && \forall i = 2, \dots, n \\
   \text{if } a_{e_i} \neq \text{trip} \text{ then } && l_{e_i,start} = l_{e_i,end} && \forall i = 1, \dots, n
 \end{align}
-Handovers between drivers also need to be possible. A step-on or step-off subtask must be present in order for a driver to enter or exit a vehicle; without being in a vehicle, the corresponding segments may not be performed. Waiting may also not be performed without being in (or associated with) a vehicle. Note that the construction of our segments implicitly models the fact that drivers may only get on and off at designated locations; step-ons, step-offs and breaks are therefore always possible at segment ends.
+A step-on or step-off subtask must be present in order for a driver to enter or exit a vehicle; without being in a vehicle, the corresponding segments may not be performed. Waiting may also not be performed without being in (or associated with) a vehicle. Note that the construction of our segments implicitly models the fact that drivers may only get on and off at designated locations; step-ons, step-offs and breaks are therefore always possible at segment ends.
 \begin{align}
   \text{if } a_{e_i} &= \text{ drive}\text{ then} &&a_{e_{i-1}} \in \text{\{ wait, drive, step-on \}} \land q_{s_{i-1}} = q_{s_{i}} && \forall i = 2, \dots, n \\
   \text{if } a_{s_{i-1}} &= \text{ drive}\text{ then} &&a_{e_{i}} \in \text{\{ wait, drive, step-off \}} \land q_{s_{i-1}} = q_{s_{i}} && \forall i = 2, \dots, n \\
   \text{if } a_{s_{i}} &= \text{ wait}\text{ then} &&a_{e_{i-1}} \in \text{\{ drive, step-on \}} \land q_{s_{i-1}} = q_{s_{i}} && \forall i = 2, \dots, n
+\end{align}
+Step-on and step-off actions must also have a minimum duration; this time is dependent on the location at which the action is performed.
+\begin{align}
+  \text{if } a_{e_i} &= \text{ step-on}\text{ then} && d_{e} \geq f_{l_{e_i},on} && \forall i = 1, \dots, n \\
+  \text{if } a_{e_i} &= \text{ step-off}\text{ then} && d_{e} \geq f_{l_{e_i},\textit{off}} && \forall i = 1, \dots, n \\
 \end{align}
 Lastly, the schedule must be continuous; the driver must always be performing one of the 5 specified actions, and must start with a step-on and end with a step-off.
 \begin{align}
@@ -399,6 +394,8 @@ Where (\ref{form:all-trips-covered}) ensures that all trips are covered by at le
     $\delta$ & Fraction of maximum SoC gain used \\
     $a_\chi$ & Action type of sequence element $\chi$ \\
     $q_e$ & Vehicle associated with subtask $e$ \\
+    $f_{l,on}$ & Step-on time at location $l$\\
+    $f_{l,\textit{off}}$ & Step-off time at location $l$ \\
     $\alpha$ & Vector of cost scalars for vehicle tasks \\
     $\beta$ & Vector of cost scalars for crew tasks \\
     $n_{it} \in \{ 0, 1 \}$ & Vehicle task $v_i$ covers $t$ \\ 
@@ -418,40 +415,38 @@ Where (\ref{form:all-trips-covered}) ensures that all trips are covered by at le
     \bottomrule
   \end{tabular}
   \label{tab:notation}
-  \caption{Notation used for formal problem description, where $\chi$ is used as a placeholder when multiple argument types can be applied.}
+  \caption{Notation used for formal problem description, where $\chi$ is used as a placeholder when multiple argument types can be applied. \todo{formatting paginanummer}}
 \end{table}
 
-\section{Global planning for thesis}
-The following constraints list of constraints seem to make the problem the most challenging (when compared to just SDVSP): Partial charges, Nonlinear charges, Battery degradation, Capacitated charging stations, Multiple vehicle types and Multiple depots. Other than that, percentage of used crew shifts must match x type constraints seem like they might make solving harder; I'm unsure of their effects on the results of CG within a set covering context as I haven't seen them mentioned before, however intuitively it seems like it seems like a larger part of the searchspace would need to be traversed in order to find a good solution. \\
-Partial charges, nonlinear charges and battery degradation can all be solved by using a similar discrete model as the one used in \citet{vanKootenNiekerk2017}, \citet{Zhang2021} or \citet{deVos2024}; all of these allow for handling of partial and nonlinear in the charging deadhead arcs, and battery degradation can be included during vehicle task column generation. As all of these basically come for free with the choice of modeling, it would seem wise to focus on getting this working first. \\
-Next, the addition of capacitated charging stations is an issue. In both \citet{Zhang2021} and \citet{deVos2024}, this is handled by adding even more nodes to the graph which model the individual charging stations, however this only models the number of individual charging spots, and not total charging power available (which is a required constraint in the Qbuzz context). I currently don't have a solution for this in mind yet which remains compatible with nonlinear charging, so some further thought needs to be put into this idea. Depending on results from the initially implemented solution without these shared capacity limits, it might be necessary to focus here next; if it turns out that solutions don't generally exceed charging capacity, it might be worth it to put this off until the end. \\\\
-Next, the issue of multiple vehicle types and depots. Both of these can be approached in roughly the same manner, however from conversations with Qbuzz it seems wise to focus on doing vehicle types first as even the smallest instances use multiple vehicle types.\\
+\section{Rough planning}
+The following constraints list of constraints seem to make the problem the most challenging (when compared to a single-depot single-vehicle type combustion based model): Partial charges, Nonlinear charges, Capacitated charging stations, Multiple vehicle types and Multiple depots. \\
+Partial and nonlinear charges can both be solved by using a similar discrete model as the one used in \Citet{vanKootenNiekerk2017}, \citet{Zhang2021} or \Citet{deVos2024}; all of these allow for handling of partial and nonlinear in the charging deadhead arcs, and battery degradation costs/ToU pricing could be included during vehicle task column generation. As all of these basically come for free with the choice of modeling, it would seem wise to focus on getting this working with a single depot / single vehicle type instance first. \\
+Next, the issue of multiple vehicle types and depots. Both of these can be approached in roughly the same manner, however from conversations with Qbuzz it would seem that vehicle types should be done first as even the smallest instance provided to me now uses multiple vehicle types. Here, an approach similar to that found in \citet{Huisman2005} might be adaptable. \\
+Lastly, the addition of capacitated charging stations is an issue. In both \citet{Zhang2021} and \Citet{deVos2024}, this is handled however only the number of individual charging spots is constrained; total charging power available is also constrained in the Qbuzz context. I'm unsure of how to easily integrate this into a discretized model at time of writing without underestimating total power available, and doing so would probably require some pretty drastic changes to the model as a whole. \\
 In conclusion, my personal guess is that the following list of priorities is the best going forward:
 \begin{itemize}
-  \item Begin with extending one of the previously mentioned models (probably \cite{vanKootenNiekerk2017}) in order to get solutions to the E-VSP which incorporate partial charging, nonlinear charging and battery degredation.
-  \item Add extraction of task blocks for crew scheduling, link with a set cover approach to crew scheduling
-  \item If charging capacity turns out to be an issue, start by modifying E-VSP to incorporate this. 
-  \item Otherwise, start with adding multiple vehicle types and depots. 
-  \item Include charging capacity if not done before. 
+  \item Begin with implementing an adaptation of one of the previously mentioned models (probably a combination of \Citet{vanKootenNiekerk2017} and \Citet{deVos2024}) in order to get solutions to the E-VSP which incorporate partial charging, nonlinear charging and battery degredation.
+  \item Add extraction of task blocks for crew scheduling, link with a set cover approach to crew scheduling.
+  \item Expand model to include multiple vehicle types/depots.
+  \item Expand model to include charging capacity (if time allows).
 \end{itemize}
-Rough planning planning of this process is described in Table \ref{tab:planning}. Additionally, weekly meetings with Philip (and Han, however this can also be bi-weekly if this doesn't turn out to be necessary) seem like a good idea to keep a check on progress and motivation. Bi-weekly meetings with Qbuzz are also in the works, in order to validate model and possibly adjust planning if something interesting pops up.
+A rough planning has been outlined in Table \ref{tab:planning}. At time of writing I'm very unsure of the exact time required for each implementation step as this is my first time implementing most of the relevant techniques, so I've tried to leave some buffer room.
 \begin{table}[h]
   \centering
   \begin{tabular}{ll}
     \toprule
     \multicolumn{1}{l}{\textbf{Date}} & \multicolumn{1}{l}{\textbf{Task description}}               \\
     \cmidrule(lr){1-1}\cmidrule(lr){2-2}
-    Begin February - Mid February & Finalize proposal \\
-    Mid February - Mid March & Implementation of E-SDVSP \\
-    Begin March & Proposal Presentation for OR group (if slot available) \\
-    Mid March - Begin April & Link E-SDVSP with crew scheduling \\ 
-    Begin April - Mid April & Testing with E-SDVCSP, part of report w/ results, hand in draft \\
-    Mid April - Mid March & Extend to include multi-vehicle/cap constraints \\
-    Mid March - End March & Testing, write part of report, draft \\ 
-    End March - End June & Extend to include cap/multi-vehicle constraints \\
-    End June - Half July & Testing, write part of report, draft \\
-    Half July - End July & Finalize report, prepare for presentation \\ 
-    End July / Begin August & Hand in final report, final presentation \\ 
+    Mid February & Finalize project proposal \\
+    Mid February - End March & Implementation of E-SDVSP \\
+    Begin April - End April & Link E-SDVSP with crew scheduling \\ 
+    Begin May - Mid May & Testing with E-SDVCSP, report findings, draft \\
+    Mid May - End May & Buffer \\ 
+    Start June - End June & Extend to include multi-vehicle/multi-depot constraints \\
+    Start July - Mid July & Testing with E-MDVCSP, report findings, draft \\ 
+    Mid July - End July & Finalize report, prepare final presentation \\ 
+    Start August & Finalize project \\
+    If time available & Charging station capacities \\
     \bottomrule
   \end{tabular}
   \label{tab:planning}
