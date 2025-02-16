@@ -1,7 +1,9 @@
 
 using E_VCSP.Objects;
 using E_VCSP.Parsing;
+using Microsoft.Msagl.Core.Geometry.Curves;
 using Microsoft.Msagl.Drawing;
+using Microsoft.Msagl.Layout.Layered;
 
 namespace E_VCSP
 {
@@ -15,38 +17,9 @@ namespace E_VCSP
         List<Trip> trips;
         List<Deadhead> deadheads;
 
-
-
         public MainView()
         {
             InitializeComponent();
-
-
-
-
-
-
-
-            //Microsoft.Msagl.GraphViewerGdi.GViewer viewer = new Microsoft.Msagl.GraphViewerGdi.GViewer();
-            //Microsoft.Msagl.Drawing.Graph graph = new Microsoft.Msagl.Drawing.Graph("graph");
-
-            ////create the graph content 
-            //graph.AddEdge("A", "B");
-            //graph.AddEdge("B", "C");
-            //graph.AddEdge("A", "C").Attr.Color = Microsoft.Msagl.Drawing.Color.Green;
-            //graph.FindNode("A").Attr.FillColor = Microsoft.Msagl.Drawing.Color.Magenta;
-            //graph.FindNode("B").Attr.FillColor = Microsoft.Msagl.Drawing.Color.MistyRose;
-            //Microsoft.Msagl.Drawing.Node c = graph.FindNode("C");
-            //c.Attr.FillColor = Microsoft.Msagl.Drawing.Color.PaleGreen;
-            //c.Attr.Shape = Microsoft.Msagl.Drawing.Shape.Diamond;
-            ////bind the graph to the viewer 
-            //viewer.Graph = graph;
-
-            //SuspendLayout();
-            //viewer.Dock = System.Windows.Forms.DockStyle.Fill;
-            //Controls.Add(viewer);
-            //ResumeLayout();
-            //associate the viewer with the form 
         }
 
         private void loadButtonClick(object sender, EventArgs e)
@@ -59,6 +32,15 @@ namespace E_VCSP
                 parseAll();
                 refreshGraph();
             }
+        }
+
+        private string formatTime(int seconds, bool showHours = true)
+        {
+            string res = "";
+            res += showHours ? (seconds / 3600).ToString("00") : "";
+            res += ":" + ((seconds % 3600) / 60).ToString("00");
+            res += ":" + (seconds % 60).ToString("00");
+            return res;
         }
 
         private void parseAll()
@@ -80,8 +62,36 @@ namespace E_VCSP
             // Trips
             foreach (Trip t in trips)
             {
-                tripNodes.Add(graph.AddNode(t.Id));
+                Node node = new Node(t.Id)
+                {
+                    Attr = {
+                        LabelMargin = 5,
+                    },
+                    NodeBoundaryDelegate = (Node node) =>
+                    {
+                        double width = t.Duration / 10;  // Custom width
+                        double height = 40; // Custom height
+
+                        // Create a rounded rectangle as an example
+                        return CurveFactory.CreateRectangleWithRoundedCorners(
+                            width,
+                            height,
+                            0.3,
+                            0.3,
+                            new Microsoft.Msagl.Core.Geometry.Point(0, 0)
+                        );
+                    },
+                    LabelText = $"{t.FromLocation} -> {t.ToLocation}\n{formatTime(t.StartTime)}-{formatTime(t.EndTime)}",
+                };
+
+                tripNodes.Add(node);
+                graph.AddNode(node);
             }
+
+            graph.LayoutAlgorithmSettings = new SugiyamaLayoutSettings()
+            {
+                LiftCrossEdges = true,
+            };
 
             for (int i = 0; i < trips.Count; i++)
             {
@@ -103,13 +113,29 @@ namespace E_VCSP
                     }
 
                     // feasible and not unreasonable long wait
-                    if (t1.EndTime + dh.Duration <= t2.StartTime && t2.StartTime - t1.EndTime < 7200)
+                    if (t1.EndTime + dh.Duration <= t2.StartTime && t2.StartTime - t1.EndTime < 10_000)
                     {
                         tripNodes[i].AddOutEdge(new Edge(tripNodes[i], tripNodes[j], ConnectionToGraph.Connected));
                     }
                 }
             }
 
+            graph.LayerConstraints.RemoveAllConstraints();
+            for (int i = 0; i < trips.Count; i++)
+            {
+                Trip t1 = trips[i];
+                for (int j = 0; j < trips.Count; j++)
+                {
+                    Trip t2 = trips[j];
+
+                    if (t1.EndTime <= t2.StartTime)
+                    {
+                        graph.LayerConstraints.AddLeftRightConstraint(tripNodes[i], tripNodes[j]);
+                    }
+                }
+            }
+
+            graph.Directed = true;
             // Enable graph in viewer
             graphViewer.Graph = graph;
         }
