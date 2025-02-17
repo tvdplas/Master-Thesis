@@ -10,19 +10,22 @@ namespace E_VCSP.Parsing
             filename = "deadheads.csv";
             attributeNameMapping = new()
             {
-                ( "FromLocation", "From" ),
-                ( "ToLocation", "To" ),
+                ( "FromId", "From" ),
+                ( "ToId", "To" ),
                 ( "Duration", "Time" ),
                 ( "Distance", "Distance" ),
             };
         }
 
-        internal override Deadhead ParseSingle(int index, List<string> line, Dictionary<string, int> attributeIndexMapping)
+        internal override Deadhead ParseSingle(int index, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
         {
+            Location from = GetOrCreateLocation(line[attributeIndexMapping["FromId"]], locations);
+            Location to = GetOrCreateLocation(line[attributeIndexMapping["ToId"]], locations);
+
             return new Deadhead()
             {
-                FromLocation = line[attributeIndexMapping["FromLocation"]],
-                ToLocation = line[attributeIndexMapping["ToLocation"]],
+                From = from,
+                To = to,
                 Duration = ParseTime(line[attributeIndexMapping["Duration"]]),
                 Distance = (int)(1000 * double.Parse(line[attributeIndexMapping["Distance"]], CultureInfo.InvariantCulture)),
                 Id = $"dh{index}",

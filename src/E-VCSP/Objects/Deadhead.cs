@@ -1,17 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace E_VCSP.Objects
+﻿namespace E_VCSP.Objects
 {
     internal class Deadhead
     {
-        internal string FromLocation;
-        internal string ToLocation;
+        internal required Location From;
+        internal required Location To;
         internal int Duration;
         internal int Distance;
-        internal string Id;
+        internal required string Id;
+
+        public override string ToString()
+        {
+            return Id;
+        }
+        public string ToLongString(bool showInfo)
+        {
+            return $"{From} -> {To}" + (showInfo ? $"\n{Formatting.Time.HHMMSS(Duration)} ({Formatting.Distance.KM(Distance)})" : "");
+        }
     }
 }

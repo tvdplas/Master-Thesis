@@ -11,8 +11,8 @@ namespace E_VCSP.Parsing
             attributeNameMapping = new()
             {
                 ( "Route", "Route" ),
-                ( "FromLocation", "From" ),
-                ( "ToLocation", "To" ),
+                ( "FromId", "From" ),
+                ( "ToId", "To" ),
                 ( "StartTime", "Start" ),
                 ( "EndTime", "End" ),
                 ( "Duration", "Duration" ),
@@ -22,13 +22,16 @@ namespace E_VCSP.Parsing
             };
         }
 
-        internal override Trip ParseSingle(int index, List<string> line, Dictionary<string, int> attributeIndexMapping)
+        internal override Trip ParseSingle(int index, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
         {
+            Location from = GetOrCreateLocation(line[attributeIndexMapping["FromId"]], locations);
+            Location to = GetOrCreateLocation(line[attributeIndexMapping["ToId"]], locations);
+
             return new Trip()
             {
                 Route = line[attributeIndexMapping["Route"]],
-                FromLocation = line[attributeIndexMapping["FromLocation"]],
-                ToLocation = line[attributeIndexMapping["ToLocation"]],
+                From = from,
+                To = to,
                 StartTime = ParseTime(line[attributeIndexMapping["StartTime"]]),
                 EndTime = ParseTime(line[attributeIndexMapping["EndTime"]]),
                 Duration = ParseTime(line[attributeIndexMapping["Duration"]]),
