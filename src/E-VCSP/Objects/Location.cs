@@ -10,7 +10,7 @@
         {
             get
             {
-                return ChargeTotalPower / ChargeSpots;
+                return ChargeSpots > 0 ? ChargeTotalPower / ChargeSpots : 0;
             }
         }
 
