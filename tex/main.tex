@@ -34,39 +34,76 @@
 
 \section{Introduction}
 Electric vehicles are beginning to make up large portions of the fleet for public transport providers. In The Netherlands for example, approximately 21\% of all registered buses utilize an electric drivetrain, as reported by the \citet{RDW}. To comply with strict Dutch and the European \citet{europaRegulation20181999} on climate and sustainability, this proportion must increase substantially; from 2025 onward, the procurement of new buses powered by non-renewable energy sources will no longer be permitted, with the objective that by 2030, all public transport buses operate with zero emissions. Individual line operators such as \citet{qbuzzQbuzz} are therefore rapidly replacing their remaining combustion based buses, resulting in primarily electric-powered fleets. \\
-Effective use of these new electric vehicles is however more challenging than that of a combustion based fleet. One of the logistical steps in which this is most apparent is that of vehicle scheduling. The Vehicle Scheduling Problem (VSP) aims to assign vehicles such that a set of trips is covered; in the case of buses, these trips are defined by the timetables for individual lines. A typical solution to this problem comes in the form of a collection of vehicle tasks, each of which can be seen as a schedule that an individual bus will follow throughout the day: it may start at a bus storage facility (more commonly called a depot), then perform one or more trips, before finally returning to the depot. In order to string multiple trips together, a bus must make an empty travel between the ending location of one trip to the starting location of the next. These empty travels, often called deadheads, are the main focus when determining the overall costs of a collection of vehicle tasks. There is ample choice as to which deadheads can be driven, as in theory the deadhead between each pair of compatible trips can be included during the creation of a vehicle task. It is therefore necessary to determine which of these deadheads are required to be driven such that costs are minimized. In addition, the total number of used vehicles may also be minimized. Different variants of the VSP exist, such as the having a single/multiple vehicle types or a single/multiple depots. \\
-In each of these variants, a commonly made assumption is that a vehicle can travel an entire day without having to refuel. With electric vehicles, this assumption is often not valid: recharging throughout the day is required as the range of an electric vehicle is often quite limited. Additionally, recharging takes a long time when compared to the refueling of a combustion vehicle; refueling can be done in a matter of minutes, whereas recharging may take multiple hours for a full charge. The electrification of fleets therefore requires the VSP to be adapted to include maximum range constraints, as well charging possibilities within a vehicle task. This extended version of the problem, often referred to as the Electric Vehicle Scheduling Problem (E-VSP), is significantly harder than its non-electric counterpart; the VSP with a single depot can be solved in polynomial time, whereas the E-VSP is NP-Hard as shown by \citet{Bunte2009} and \citet{Sassi2014} respectively. \\
+Effective use of these new electric vehicles is however more challenging than that of a combustion based fleet. One of the logistical steps in which this is most apparent is that of vehicle scheduling. The Vehicle Scheduling Problem (VSP) aims to assign vehicles such that a set of trips is covered; in the case of buses, these trips are defined by the timetables for individual lines. A typical solution to this problem comes in the form of a collection of vehicle tasks, each of which can be seen as a schedule that an individual bus will follow throughout the day: it may start at a bus storage facility (more commonly called a depot), then perform one or more trips, before finally returning to the depot. In order to string multiple trips together, a bus must make an empty travel between the ending location of one trip to the starting location of the next. These empty travels, often called deadheads, are the main focus when determining the overall costs of a collection of vehicle tasks. There is ample choice as to which deadheads can be driven, as in theory the deadhead between each pair of compatible trips can be included during the creation of a vehicle task. It is therefore necessary to determine which of these deadheads are required to be driven such that costs are minimized. In addition, the total number of used vehicles may also be minimized. Different variants of the VSP exist, such as the having a single/multiple vehicle types or including a single/multiple depots. \\
+In each of these variants, a commonly made assumption is that a vehicle can travel an entire day without having to refuel. With electric vehicles, this assumption is often not valid: recharging throughout the day is required as the range of an electric vehicle is limited. Additionally, recharging takes a long time when compared to the refueling of a combustion vehicle; refueling can be done in a matter of minutes, whereas recharging may take multiple hours for a full charge. The electrification of fleets therefore requires the VSP to be adapted to include maximum range constraints, as well charging possibilities within a vehicle task. This extended version of the problem, often referred to as the Electric Vehicle Scheduling Problem (E-VSP), is significantly harder than its non-electric counterpart; the VSP with a single depot can be solved in polynomial time, whereas the E-VSP is NP-Hard as shown by \citet{Bunte2009} and \citet{Sassi2014} respectively. \\
 In addition to this added computational complexity in the E-VSP, other logistical planning steps are effected as well. The Crew Scheduling Problem (CSP) is commonly the step that follows vehicle scheduling. Here, schedules are made for individual crew members such that the planned vehicles always have a driver associated with them. As crew members are subject to labor regulations, additional constraints are now added when compared to vehicle scheduling such as maximum driving time and required breaks. The CSP is also NP-Hard, as shown by \citet{Fischetti1989}.\\
-Costs in this step often exceed those associated with the vehicles themselves, with a recent estimate by \citet{Perumal2019Crew} putting crew member costs at around 60\% of all operational costs. Optimal solutions for the CSP are however directly influenced by the selected vehicle tasks in the VSP; they determine where and at what time handovers are possible between crew members. Sequentially minimizing costs in the VSP and CSP may therefore not result in a solution with overall lowest costs, as the solution to the CSP may be improved greatly by incurring higher costs in the VSP. This was already pointed out in the 1980s by \citet{Bodin1983}, who instead advocated for an integrated approach; here, the VSP and CSP are considered at the same time, resulting in the Vehicle and Crew Scheduling Problem (VCSP). \\
+Costs in this step often exceed those associated with the vehicles themselves, with a recent estimate by \citet{Perumal2019Crew} putting crew member costs at around 60\% of all operational costs. Optimal solutions for the CSP are however directly influenced by the selected vehicle tasks; they determine where and at what time handovers are possible between crew members. Sequentially minimizing costs in the VSP and CSP may therefore not result in a solution with overall lowest costs, as the solution to the CSP may be improved greatly by incurring higher costs in the VSP. This was already pointed out in the 1980s by \citet{Bodin1983}, who instead advocated for an integrated approach; here, the VSP and CSP are considered at the same time, resulting in the Vehicle and Crew Scheduling Problem (VCSP). \\
 A lot of work has already been done on the VSP, CSP and VCSP. Both the sequential and integrated approach have been extensively studied since the 1980s, as shown by reviews such as \citet{Ibarra-Rojas2015} and \citet{Ge2024}. As mentioned before however, the introduction of electric vehicles has introduced significant constraints on recharging times and vehicle ranges, invalidating the critical assumption in many of these works that a vehicle was able to drive an entire day without being refueled. As a response to this, the E-VSP has also been the focus of many studies going back to around 2014. We refer the reader to a survey by \citet{Perumal2022LitRev} for a detailed overview of recent progress in that regard. \\
 The integrated VCSP with electric vehicles (E-VCSP) has seen less attention; to the best of our knowledge, only 5 works consider this problem. In these, simplifying assumptions are made which might limit real world applicability or accurate modeling of costs. Most notably, assumptions are currently made about charging locations (such as only being able to charge at a bus depot) or charging behavior (such as exclusively allowing full charges). In this work, our aim is therefore to introduce an integrated E-VCSP model which incorporates more realistic behavior for battery charging and usage. \\
 The rest of this work is organized as follows. In Section 2, we will give more background information on the E-VCSP and provide a formal problem definition. In Section 3, we review literature related to the E-VCSP and identify gaps in the current research. \dots
 
 \section{Problem definition}
 \label{sec:problem_def}
-In this section, we give a definition of the integrated Electric Vehicle and Crew Scheduling Problem (E-VCSP). In order to do so, we will first give a global overview of the problem at hand. Afterwards, we discuss the data which is given, before finally formalizing our the resulting problem. A summary of the notation used throughout this section has been provided in Table \ref{tab:notation}.
+In this section, we give a definition of the integrated Electric Vehicle and Crew Scheduling Problem (E-VCSP). In order to do so, we will first give a global overview of the problem at hand. Afterwards, we discuss the data which is given, before finally formalizing our the resulting problem.
 
 \subsection{Overview}
-The E-VCSP is part of the planning process used in bus public transit; an overview of this process has been provided in Figure \ref{fig:planning-overview}. It comes directly after the timetabling step, in which trips are defined for each line according to passenger demand. An individual timetabled trip can be seen as a bus traveling along a line at a specified time. Oftentimes, these trips are scheduled regularly throughout the day from the start to the end of a line, however irregular schedules and partial travels are also possible. \\
-With these trips being laid out, we now need to determining in what way they will be driven. Individual trips often have lengths of around 0.5-2 hours, therefore making it possible to perform multiple trips with a single vehicle and driver in a day. In order to perform a trip, a vehicle must travel to its starting location before driving it; this travel is called a deadhead. Deadheads occur between trips and between a trip and a depot. During a deadhead, the vehicle itself is empty except for the driver. The vehicle and its driver are therefore not of any use to passengers for its duration. It is therefore beneficial to minimize the total amount of time that vehicles and crew members spend driving deadheads, as costs incurred during this time do not have any direct benefit to the customer. \\
+The E-VCSP is part of the planning process used in bus public transit, as can be seen in Figure \ref{fig:planning-overview}. It comes directly after the timetabling step, in which trips are defined for each line according to passenger demand. Each individual timetabled trip represents a bus traveling along a line at a specified time. Oftentimes, these trips are scheduled regularly throughout the day from the start to the end of a line, however irregular schedules and partial travels are also possible. \\
+With these trips being laid out, we now need to determine how they will be driven. Individual trips often have lengths of around 0.5-2 hours, therefore making it possible to perform multiple trips with a single vehicle and driver in a day. In order to perform a trip, a vehicle must travel to its starting location before driving it; this travel is called a deadhead. Deadheads occur between trips and between a trip and a depot. During a deadhead, the vehicle itself is empty except for the driver. It is therefore beneficial to minimize the total amount of time that vehicles and crew members spend driving deadheads, as costs incurred during this time do not have any direct benefit to passengers. \\
 When considering electric vehicles, the time between trips is not only used for deadheads. As electric vehicles generally have small ranges and long recharging times, this downtime can also be used in order to recharge the vehicle. Often, recharging stations will be available at the depot, however additional recharging stations may also be present at the starting or ending locations of trips (also called the terminal trip stops). Charging locations in the middle of a trip are generally not present. \\
-Charging a vehicle at one of these locations can take a long time: even with fast charging infrastructure, time for a full recharge can be on the order of hours for a single vehicle. Additionally, recharging is often a non-linear process. This process is split into two phases: 0 to 80\%, in which the charging curve is roughly linear; and 80-100\%, in which charging speed decreases until the battery is full. Often, these two phases take roughly the same amount of time. \\
+Charging a vehicle at one of these locations can take a long time: even with fast charging infrastructure, time for a full recharge can be on the order of hours for a single vehicle. Additionally, recharging is often a non-linear process that can be seen as two phases: from 0 to 80\%, where the rate is linear, and from 80 to 100\%, where it slows significantly. These phases often take similar amounts of time. \\
 The additional vehicle downtime resulting from charging necessitates careful planning of crew schedules. Crew members must follow local labor regulations, which often consist of maximum driving times throughout the day and required breaks. In order to minimize crew costs, it is beneficial to maximize the time spent actually driving instead of waiting for a vehicle to be ready. Handovers of vehicles between crew members throughout the day are therefore common in order to minimize paid crew downtime. Additionally, long recharging periods may be combined with crew breaks in order to minimize lost productivity. \\
-Handovers between crew members are often only possible at a predetermined set of locations; these often have waiting areas or break rooms connected to them, providing a place for a crew member to wait before the next handover. This means that handovers cannot always occur on a trip by trip basis; the schedule of a vehicle can be broken up into multiple segments, each of which starts and ends at a relief location. Each of these segments must be driven continuously by a single driver. \\
-Overall, the goal is to find a set of feasible vehicle and crew schedules that minimize costs. In this, vehicle schedules must ensure that each individual trip while minimizing deadhead and charging costs. Crew schedules on the other hand must ensure that each vehicle schedule segment is covered whilst having feasible handovers. \\
+Handovers between crew members are often only possible at a predetermined set of locations; these relief points have waiting areas or break rooms connected to them, providing a place for a crew member to stay before entering their next vehicle. This means that handovers cannot always occur on a trip by trip basis; the schedules of vehicles and drivers can be broken up into multiple blocks, each of which starts and ends at a relief location. Each of these blocks must be driven continuously by a single driver. \\
+Overall, the goal is to find a set of feasible vehicle and crew schedules that minimize costs. In this, vehicle schedules must ensure that each individual trip is driven while minimizing deadhead and charging costs. Crew schedules, on the other hand, must ensure that each vehicle schedule segment is covered while having feasible handovers. \\
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{ll}
+    \toprule
+    \multicolumn{1}{l}{\textbf{Notation}} & \multicolumn{1}{l}{\textbf{Definition}}               \\
+    \cmidrule(lr){1-1}\cmidrule(lr){2-2}
+    \multicolumn{2}{l}{\textit{Given}} \\
+    $\mathcal{D}$ & The depot \\ 
+    $t \in \mathcal{T}$ & Set of all trips, $t$ a single trip \\
+    $dh \in \mathcal{DH}$ & Set of all feasible deadheads, $dh$ a single deadhead \\ 
+    $b \in B$ & Set of all blocks, $b$ a single block \\
+    $v \in V$ & Set of all vehicle tasks, $v$ single vehicle task \\
+    $c \in C$ & Set of all crew tasks, $c$ single crew task \\
+    $d$ & Amount of charge used driving a trip/deadhead \\
+    $u_\sigma$ & Max. charge gained in deadhead with starting SoC $\sigma$ \\
+    $\sigma_{start}$ & SoC at beginning of block/task \\
+    $\sigma_{min}$ & Minimum SoC of vehicle \\
+    $\sigma_{max}$ & Maximum SoC of vehicle \\ 
+    $k_{i,t}$ & Binary constant, vehicle task $v_i$ covers trip $t$ \\ 
+    $l_{i,b}$ & Binary constant, vehicle task $v_i$ uses block $b$ \\ 
+    $m_{j,b}$ & Binary constant, crew task $c_j$ uses block $b$ \\ 
+    \addlinespace[0.6em]
+    \multicolumn{2}{l}{\textit{Decision variables}} \\
+    $x_{i} \in \{ 0, 1 \}$ & Usage of vehicle task $v_i$  \\ 
+    $y_{j} \in \{ 0, 1 \}$ & Usage of crew task $c_j$ \\ 
+    \addlinespace[0.6em]
+    \multicolumn{2}{l}{\textit{Helper functions}} \\
+    $b(v) \subseteq B$ & Set of blocks covered by $v$ \\ 
+    $cost(\chi) \in \mathbb{R}^+$ & Cost of task $\chi$ \\ 
+    \addlinespace[0.2em]
+    \bottomrule
+  \end{tabular}
+  \label{tab:notation}
+  \caption{Notation used for formal problem description, where $\chi$ is used as a placeholder when multiple argument types can be applied.}
+\end{table}
 
 \subsection{Formal definition}
-We will now formally define the E-VCSP. In this, we will consider the variant with a single depot, single vehicle type and charging stations without capacity limitations. \\
-Given timetables for each of the considered lines, let $\mathcal{T}$ be the set of trips that they define. Additionally, let $\mathcal{DH}$ be the set of deadheads that represent either a travel to or from the depot $\mathcal{D}$, or a travel between trips in $\mathcal{T}$. In this, only deadheads are present which can feasibly be driven; that is, there must be enough time to drive the deadhead such that a vehicle arrives on time to drive the next trip. \\ 
-Next, let us define our battery behavior. For each trip and deadhead, let $c$ indicate the amount of charge that is used during its travel. Additionally, let $u_\sigma$ indicate the maximum amount of charge that can be gained during a deadhead if a vehicle starts at a State of Charge (SoC) of $\sigma$; in this, let charging at any possible given charging location be considered. Depending on available charging infrastructure, this may imply that a deadhead is not driven directly, instead making a time-feasible detour via a charging location which provides faster charging than at either end of the deadhead. Note that we do not directly define charging behavior; depending on available infrastructure and the given charging curve for for the vehicles, different amounts of charge may be achieved in the same time span depending on the initial SoC, allowing for non-linear charging curves. \\
-Lastly, let us define relief points. A subset of the terminal locations of trips may serve as relief points; these locations are the only ones at which a handover or break for a crew member can take place. Using these relief points, let us define a \textit{block} as a sequence of trips and deadheads that can be driven sequentially, in which only the first and last location in the sequence are relief points. This implies that a block must be driven by a single driver, as there is no opportunity to hand over the vehicle to another driver during the block itself. In order to be feasible, the block must match the following requirements: 
+We will now formally define the E-VCSP. In this, we will consider the variant with a single depot, single vehicle type and charging stations without capacity limitations. A summary of the notation used has been provided in Table \ref{tab:notation}\\
+Given timetables for each of the considered lines, let $\mathcal{T}$ be the set of trips that they define. Additionally, let $\mathcal{DH}$ be the set of deadheads that represent either a travel to or from the depot $\mathcal{D}$, or a travel between trips in $\mathcal{T}$. In this, only deadheads are present which can feasibly be driven; that is, the travel time of the deadhead must be less than the time between its departure and the start of a target trip. Note that deadheads including a depot as either the origin or target are always considered to be time-feasible. \\ 
+Next, let us define our battery behavior. For each trip and deadhead, let $d$ indicate the amount of charge that is used during its travel. Additionally, let $u_\sigma$ indicate the maximum amount of charge that can be gained during a deadhead if a vehicle starts at a State of Charge (SoC) of $\sigma$; in this, let charging at any possible given charging location be considered. Depending on available charging infrastructure, this may imply that a deadhead is not driven directly, instead making a time-feasible detour via a charging location which provides the fastest charging capabilities. SoC gained at a location depends on given (possibly non-linear) charging curves for the vehicles, allowing for different amounts of charge to be achieved in the same time span depending on the initial SoC. \\
+Lastly, let us define relief points. A subset of the terminal locations of trips may serve as relief points; these locations are the only ones at which a handover or break for a crew member can take place. Using these relief points, we can now start formally defining our schedules.\\
+Let a \textit{block} be a sequence of trips and/or deadheads that can be driven sequentially, in which only the first and last location in the sequence are relief points. This implies that a block must be driven by a single driver, as there is no opportunity to hand over the vehicle to another driver during the block itself. In order to be feasible, the block must match the following requirements: 
 \begin{itemize}
   \item A block consists of at least one trip or deadhead.
   \item Only the first and last location visited in the block are relief points.
   \item If there is an element in the block directly following a trip, this must be a deadhead originating from that trip.
-  \item If there is an element in the block directly following a deadhead, this must be a trip starting at the deadhead target.
+  \item If there is an element in the block directly following a deadhead, this must be the deadheads target trip.
   \item For each deadhead driven, the vehicle must charge with some value $\alpha \cdot u_\sigma$, where $0 \leq \alpha \leq 1$ represents a fraction of the maximal charge gained. 
-  \item Given a SoC $\sigma_{start}$ at the beginning of the block, the SoC of the vehicle should remain within the range $[ \sigma_{min}, \sigma_{max} ]$ throughout the block.
+  \item Given an SoC $\sigma_{start}$ at the beginning of the block, the SoC of the vehicle should remain within the range $[ \sigma_{min}, \sigma_{max} ]$ throughout the block.
 \end{itemize}
 Let the set of all feasible blocks be $B$. A schedule for a vehicle throughout the day can now be constructed as a sequence of blocks. Let us refer to such a schedule as a \textit{vehicle task}. In order for a vehicle task to be feasible, the following conditions need to be met:
 \begin{itemize}
@@ -75,7 +112,7 @@ Let the set of all feasible blocks be $B$. A schedule for a vehicle throughout t
   \item The task must start and end at the depot. 
   \item Given a SoC $\sigma_{start}$ at the beginning of the task, the SoC of the vehicle should always remain within $[ \sigma_{min}, \sigma_{max} ]$ during all blocks.
 \end{itemize}
-Let the set of all feasible vehicle tasks be $V$. For a vehicle task $v$, let us define its cost as being $cost(v)$; let this be some combination of fixed and variable costs based on the trips and deadheads driven within the task. Let the blocks used by vehicle task $v$ be denoted as an ordered set $b(v) \subseteq B$. \\\\
+Let the set of all feasible vehicle tasks be $V$. For a vehicle task $v$, let us define its cost as being $cost(v)$; let this be some combination of fixed and variable costs based on the trips and deadheads driven within the task. \\
 Next, let us consider crew tasks. Crew members are bound by labor regulations; in most cases, this means that we will need to include break time in a crew schedule. Additionally, idle time at a handover location may be required in order to wait for an arriving vehicle. A crew task will therefore consist of a sequence of blocks and idle/break times. Exact feasibility constraints for crew tasks will differ per country and region, however we base the following constraints on a simplified version of the Dutch labor regulations: 
 \begin{itemize}
   \item The crew task consists of one or more blocks and break/idle times.
@@ -87,81 +124,40 @@ Next, let us consider crew tasks. Crew members are bound by labor regulations; i
   \item For shifts starting after 15:00, at least one break between 16:30 and 20:30 of at least 20 minutes must be included. 
 \end{itemize}
 Of these, the first three constraints will be applicable regardless of local labor regulations. Let the set of all feasible crew tasks be $C$. For a crew task $c$, let us define its cost as being $cost(c)$; let this be some combination of fixed and variable costs based based on duty and break length. \\\\
-Using the definitions of the blocks $B$, vehicle tasks $V$ and crew tasks $C$, we can formulate our integrated problem. In this, let $x_i$ and $y_j$ be binary variables indicate the usage of $v_i \in V$ and $c_j \in C$ respectively. Additionally, let $k_{i,t} \in \{ 0, 1 \}$ indicate that $v_i$ covers trip $t \in \mathcal{T}$, let $l_{i,b}$ indicate that $v_i$ contains block $b \in B$, and let with $m_{j,b} \in \{ 0, 1 \} $ indicate that $c_j$ includes block $b \in B$.
+Using the definitions of the blocks $B$, vehicle tasks $V$ and crew tasks $C$, we can formulate a linear program to describe our integrated problem. In this, let $x_i$ and $y_j$ be binary variables indicate the usage of $v_i \in V$ and $c_j \in C$ respectively. Additionally, let $k_{i,t} \in \{ 0, 1 \}$ indicate that $v_i$ covers trip $t \in \mathcal{T}$, let $l_{i,b}$ indicate that $v_i$ contains block $b \in B$, and let with $m_{j,b} \in \{ 0, 1 \} $ indicate that $c_j$ includes block $b \in B$.
 \begin{align}
 \min \quad
 & \sum_{1 \leq i \leq |V|} x_{i} \cdot cost(v_i) + \sum_{1 \leq j \leq |C|} y_{j} \cdot cost(c_j)  
 \end{align}
 Subject to:
 \begin{align}
-\sum_{1 \leq i \leq |V|} x_{i}a_{it} &\geq 1 && \forall t = 1,\:\dots,\:|T| \label{form:all-trips-covered} \\
-\sum_{1 \leq j \leq |C|}y_j m_{j,b} &\geq \sum_{1 \leq i \leq |V|}x_i l_{i,b}  && \forall b \in B \label{form:all-blocks-covered} \\
+\sum_{1 \leq i \leq |V|} x_{i}a_{it} &= 1 && \forall t = 1,\:\dots,\:|T| \label{form:all-trips-covered} \\
+\sum_{1 \leq i \leq |V|}x_i l_{i,b}  &= \sum_{1 \leq j \leq |C|}y_j m_{j,b}  && \forall b \in B \label{form:all-blocks-covered} \\
 x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|V| \\
 y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
 \end{align}
-Here, constraint (\ref{form:all-trips-covered}) ensures that all trips are covered by at least one vehicle, and constraint (\ref{form:all-blocks-covered}) ensures that for each block, the number of assigned drivers is greater than or equal to the number of assigned vehicles. Note that in the case that multiple vehicles are assigned to the same trip, one of the vehicle can simply drive it as a deadhead; if more drivers are assigned to a block than vehicles, the extra drivers can simply function as passengers for the duration of the block.
-\begin{table}
-  \centering
-  \begin{tabular}{ll}
-    \toprule
-    \multicolumn{1}{l}{\textbf{Notation}} & \multicolumn{1}{l}{\textbf{Definition}}               \\
-    \cmidrule(lr){1-1}\cmidrule(lr){2-2}
-    \multicolumn{2}{l}{\textit{Given}} \\
-    $v \in V$ & Set of all vehicle tasks, $v$ single vehicle task \\
-    $w \in W$ & Set of all vehicle segments, $w$ single vehicle segment \\
-    $v(w) \subseteq W$ & Set of vehicle segments for task $v$ \\ 
-    $c \in C$ & Set of all crew tasks, $c$ single crew task \\
-    $t \in T$ & Set of all trips, $t$ a single trip \\
-    $d \in D$ & Set of all depots, $d$ a single depot \\
-    $l \in L$ & Set of all locations, $l$ a single location \\
-    $L_r \subseteq L$ & Set of relief locations \\ 
-    $\phi \in \Phi$ & Set of vehicle types, $\phi$ a single type \\
-    $\phi_t \subseteq \Phi$ & Set of compatible vehicle types for $t$ \\
-    $g^\phi_{d} \in \mathbb{N}^+$ & Number of vehicles of type $\phi$ at $d$ \\
-    $s \in S$ & Ordered sequence of vehicle steps, $s$ a single step \\ 
-    $e \in E$ & Ordered sequence of crew subtasks, $e$ a single subtask \\ 
-    $l_{\chi,start}$ & Starting location of $\chi$ \\
-    $l_{\chi,end}$ & Ending location of $\chi$ \\ 
-    $l_{\chi} $ & Location of $\chi$ \\
-    $p_{\chi,start}$ & Planned starting time of $\chi$ \\
-    $p_{\chi,end}$ & Planned end time of $\chi$ \\
-    $d_{\chi}$ & Duration of $\chi$ \\ 
-    $d_{\chi,\chi'}$ & Duration of drive between $\chi$ and $\chi'$ \\
-    $k_{\chi}$ & Kilometers traveled in $\chi$ \\
-    $k_{\chi,\chi'}$ & Kilometers driven between $\chi$ and $\chi'$ \\
-    $c^\phi_{\chi}$ & SoC used by $\chi$ on type $\phi$ \\
-    $c^\phi_{\chi,\chi'}$ & SoC used by $\phi$ driving between $\chi$ and $\chi'$ \\
-    $\sigma^\phi_{min}$ & Minimum SoC of $\phi$ \\ 
-    $\sigma^\phi_{max}$ & Maximum SoC of $\phi$ \\ 
-    $\sigma^\phi_{start}$ & Starting SoC of $\phi$ \\ 
-    $u^\phi_{\sigma,t,t'}$ & Max. SoC gained between $t$, $t'$ for type $\phi$, start SoC $\sigma$ \\
-    $\delta$ & Fraction of maximum SoC gain used \\
-    $a_\chi$ & Action type of sequence element $\chi$ \\
-    $q_e$ & Vehicle associated with subtask $e$ \\
-    $f_{l,on}$ & Step-on time at location $l$\\
-    $f_{l,\textit{off}}$ & Step-off time at location $l$ \\
-    $\alpha$ & Vector of cost scalars for vehicle tasks \\
-    $\beta$ & Vector of cost scalars for crew tasks \\
-    $n_{it} \in \{ 0, 1 \}$ & Vehicle task $v_i$ covers $t$ \\ 
-    $m_{ijw} \in \{ 0, 1 \}$ & Crew task $c_j$ covers $w \in w(v_i)$ \\
-    \addlinespace[0.6em]
-    \multicolumn{2}{l}{\textit{Decision variables}} \\
-    $x_{i} \in \{ 0, 1 \}$ & Usage of vehicle task $v_i$  \\ 
-    $y_{j} \in \{ 0, 1 \}$ & Usage of crew task $c_j$ \\ 
-    \addlinespace[0.6em]
-    \multicolumn{2}{l}{\textit{Additional helper functions}} \\
-    $d(v)$ & Total duration of $v$ \\ 
-    $k(v)$ & Total kilometers traveled in $v$ \\ 
-    $c(v)$ & Total charge used by $v$ \\ 
-    $b(E)$ & Set of break actions in $E$ \\ 
-    $cost(\chi)$ & Cost of task $\chi$ \\ 
-    \addlinespace[0.2em]
-    \bottomrule
-  \end{tabular}
-  \label{tab:notation}
-  \caption{Notation used for formal problem description, where $\chi$ is used as a placeholder when multiple argument types can be applied. \todo{formatting paginanummer}}
-\end{table}
-
+Here, constraint (\ref{form:all-trips-covered}) ensures that all trips are covered by a vehicle, and constraint (\ref{form:all-blocks-covered}) ensures that for each block, the number of assigned drivers is equal to the number of assigned vehicles. This integrated formulation minimizes the costs for both vehicle and crew tasks simultaneously. For comparison, when the E-VSP and CSP are solved sequentially, the formulation becomes the following. First, vehicle tasks are selected such that their costs are minimized:
+\begin{align}
+\min \quad
+& \sum_{1 \leq i \leq |V|} x_{i} \cdot cost(v_i)
+\end{align}
+Subject to:
+\begin{align}
+\sum_{1 \leq i \leq |V|} x_{i}a_{it} &\geq 1 && \forall t = 1,\:\dots,\:|\mathcal{T}| \label{form:all-trips-covered-seq} \\
+x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|V|
+\end{align}
+Here, constraint (\ref{form:all-trips-covered-seq}) once again ensures that all trips are covered by a vehicle task. Once the vehicle tasks are selected, we can use them to derive the set of blocks that are driven. Let $b(v) \subseteq B$ represent the set of blocks driven by a vehicle task $v$. The overall set of blocks driven is then $B' = \bigcup_{v_i \in V, x_i = 1}b(v_i)$. Note that each block is present at most once due to the fact that all trips must be covered exactly once. \\
+Using this, our formulation for crew tasks becomes the following:
+\begin{align}
+\min \quad
+& \sum_{1 \leq j \leq |C|} y_{j} \cdot cost(c_j)  
+\end{align}
+Subject to:
+\begin{align}
+\sum_{1 \leq j \leq |C|} y_j m_{j,b} &= 1  && \forall b \in B' \label{form:all-blocks-covered-seq} \\
+y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
+\end{align}
+Here, we now consider a greatly reduced number of available blocks to cover in constraint (\ref{form:all-blocks-covered-seq}), resulting in a formulation with significantly fewer constraints overall.
 
 \section{Related work}
 In this section, we discuss work related to our research into the E-VCSP. An overview of the nomenclature used has been included in Table \ref{tab:nomenclature}, and an summary of how batteries and charging behavior is modeled in the discussed works has been included in Table \ref{tab:eVCSP-lit}.
