@@ -4,38 +4,53 @@ namespace E_VCSP.Objects
 {
     internal class Instance
     {
+        internal List<Location> ChargingLocations;
         internal List<Location> Locations;
         internal List<Trip> Trips;
         internal List<Deadhead> Deadheads;
+        internal List<VehicleType> VehicleTypes;
 
-        private List<DeadheadTemplate> deadheadTemplates;
+        public List<DeadheadTemplate> DeadheadTemplates;
 
         internal Instance(string path)
         {
-            // Get all charger locations, keep copy in order to check for charging trips later.
+            // Load initial set of locations with chargers; may not be complete.
             Locations = new ParserLocations().Parse(path, []);
-            List<Location> chargingLocations = [.. Locations];
+            ChargingLocations = [.. Locations];
 
-            // Trips are parsed directly
+            // Add additional location info based on crew properties
+            new ParserCrew().Parse(path, Locations);
+
+            // If no depot is found yet; let the first parsed location be the depot. 
+            // TODO: dit werkt toevallig voor de Terschelling dataset, maar dit moet wel echt gefixt worden. 
+            if (Locations.Find(loc => loc.IsDepot) == null) Locations[0].IsDepot = true;
+
+            // Trips are parsed directly; Can add locations that were not previously known.
             Trips = new ParserTrips().Parse(path, Locations);
+
+            // Vehicle types; can add charging curve info to locations
+            VehicleTypes = new ParserVehicleTypes().Parse(path, Locations);
 
             // Deadheads between locations are given, additional self-edge deadheads are added
             // for easier formulations later
-            deadheadTemplates = new ParserDeadheadTemplates().Parse(path, Locations);
+            DeadheadTemplates = new ParserDeadheadTemplates().Parse(path, Locations);
             foreach (Location loc in Locations)
             {
-                deadheadTemplates.Add(new DeadheadTemplate
+                DeadheadTemplates.Add(new DeadheadTemplate
                 {
                     From = loc,
                     To = loc,
                     Distance = 0,
                     Duration = 0,
-                    Id = $"dht-self{deadheadTemplates.Count}"
+                    Id = $"dht-self{DeadheadTemplates.Count}"
                 });
             }
 
             // Usign deadhead templates, determine feasible deadheads based on trips
             Deadheads = [];
+
+            // Bonk no more deadheads
+            if (true) return;
             foreach (Trip t1 in Trips)
             {
                 foreach (Trip t2 in Trips)
@@ -45,10 +60,10 @@ namespace E_VCSP.Objects
 
                     // Check all charging locations to see which ones are feasible and/or result in most charge gained
                     Deadhead? dh = null;
-                    foreach (Location chargeLoc in chargingLocations)
+                    foreach (Location chargeLoc in ChargingLocations)
                     {
-                        DeadheadTemplate? dhtToCharge = deadheadTemplates.Find(x => x.From == t1.To && x.To == chargeLoc);
-                        DeadheadTemplate? dhtFromCharge = deadheadTemplates.Find(x => x.From == chargeLoc && x.To == t2.From);
+                        DeadheadTemplate? dhtToCharge = DeadheadTemplates.Find(x => x.From == t1.To && x.To == chargeLoc);
+                        DeadheadTemplate? dhtFromCharge = DeadheadTemplates.Find(x => x.From == chargeLoc && x.To == t2.From);
 
                         // No templates found; deadhead might be possible, but we dont have the info to know.
                         if (dhtToCharge == null || dhtFromCharge == null) continue;
@@ -80,7 +95,7 @@ namespace E_VCSP.Objects
                     // We will check for the first case; if that also fails, we know that we can't create a deadhead.
                     if (dh == null)
                     {
-                        DeadheadTemplate? dht = deadheadTemplates.Find(x => x.From == t1.To && x.To == t2.From);
+                        DeadheadTemplate? dht = DeadheadTemplates.Find(x => x.From == t1.To && x.To == t2.From);
 
                         // No deadhead between t1 and t2 possible, skip to next
                         if (dht == null) continue;

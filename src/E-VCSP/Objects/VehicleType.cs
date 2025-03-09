@@ -1,12 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace E_VCSP.Objects
+﻿namespace E_VCSP.Objects
 {
+    // All values rescaled to percentages [0-100] except Capacity
     internal class VehicleType
     {
+        internal required string Id;
+        internal double Capacity; // KWh
+        internal double DriveUsage; // Usage per KM driven
+        internal double IdleUsage; // Usage per second idle
+        internal double MinCharge = 0; // Fraction of total capacity
+        internal double MaxCharge = 100;
+        internal double StartCharge = 100;
+
+        // TODO: actual values
+        internal double INDIVIDUAL_COST = 100;
+        internal double CHARGE_COST = 1;
+        internal double DRIVE_COST = 0.05;
     }
 }

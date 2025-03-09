@@ -36,5 +36,9 @@
         internal static int EDGE_MAX_TIME_SHOWN = 1 * 60 * 60;
         internal static ChargeDisplay EDGE_CHARGE_SHOWN = ChargeDisplay.ChargeHighlighted;
         internal static bool EDGE_INCLUDE_NOT_SHOWN = false;
+
+        internal static double KWH_COST = 0.32;
+        internal static double KM_COST = 0.01; // TODO: actual value
+        internal static double DEPLOY_COST = 10; // Costs to deploy a vehicle at the beginning of the day.
     }
 }

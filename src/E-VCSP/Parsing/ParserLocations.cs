@@ -20,6 +20,7 @@ namespace E_VCSP.Parsing
             Location loc = GetOrCreateLocation(line[attributeIndexMapping["Id"]], locations);
             loc.ChargeSpots = int.Parse(line[attributeIndexMapping["ChargeSpots"]]);
             loc.ChargeTotalPower = double.Parse(line[attributeIndexMapping["ChargeTotalPower"]]);
+            loc.ChargingCurve = new([(100, loc.ChargeTotalPower)]); // fully linear
             return loc;
         }
     }
