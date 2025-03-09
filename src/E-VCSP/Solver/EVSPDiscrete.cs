@@ -56,7 +56,7 @@ namespace E_VCSP.Solver
             }
 
             // Add feasible deadheads (sorry philip het wordt een dictionary want dat is wel makkelijk)
-            HashSet<(DeadheadPoint, DeadheadPoint)> feasibleDeadheads = new();
+            Dictionary<(DeadheadPoint, DeadheadPoint), double> feasibleDeadheads = new();
             foreach ((var dl1, var dl2) in discreteTrips.SelectMany(x => discreteTrips.Select(y => (x, y))))
             {
                 foreach ((DiscreteTrip dt1, DiscreteTrip dt2) in dl1.SelectMany(x => dl2.Select(y => (x, y))))
@@ -67,8 +67,6 @@ namespace E_VCSP.Solver
                     // Early return when the initial trip can't even be driven at the starting SoC.
                     double SoCusedInDT1 = dt1.Trip.Distance * vh.DriveUsage;
                     if (SoCusedInDT1 > dt1.StartingSoC) continue;
-
-                    bool feasibleFound = false;
 
                     // Two possibilities: direct drive from dt1 to dt2 or drive via charging station. Both also need to be time-feasible
                     // First: check if direct drive is timefeasible
@@ -85,43 +83,53 @@ namespace E_VCSP.Solver
                         {
                             // May be compatible; Note that SoC < 0 may still be possible via indirect trip, therefore no early termination. 
                             SoC = floorToDiscreteValue(SoC);
-                            if (SoC == dt2.StartingSoC) feasibleFound = true;
-                        }
-                    }
-
-                    if (!feasibleFound)
-                    {
-                        // Iterate over all charging locations, see whether we can find a valid match in here.
-                        for (int i = 0; i < Instance.ChargingLocations.Count && !feasibleFound; i++)
-                        {
-                            Location chargeLoc = Instance.ChargingLocations[i];
-                            // Check if detour via charging location is time-feasible.
-                            DeadheadTemplate? dht_toCharge = Instance.DeadheadTemplates.Find(dht => dht.From == dt1.Trip.To && dht.To == chargeLoc);
-                            DeadheadTemplate? dht_fromCharge = Instance.DeadheadTemplates.Find(dht => dht.From == chargeLoc && dht.To == dt2.Trip.From);
-
-                            // No deadhead found / not feasible 
-                            if (dht_toCharge == null || dht_fromCharge == null) continue;
-                            int idleTime = dt2.Trip.StartTime - dt1.Trip.EndTime - dht_toCharge.Duration - dht_fromCharge.Duration;
-                            if (idleTime < 0) continue;
-
-                            // Deadhead feasible; see how much charge can be gained.
-                            double SoCAtCharge = dt1.StartingSoC - SoCusedInDT1 - (dht_toCharge.Distance * vh.DriveUsage);
-                            (double maxCharge, _) = chargeLoc.ChargingCurves[vh.Id].ChargeGained(SoCAtCharge, idleTime);
-
-                            // Now, check if the charge is actually compatible; In order to do so, we need to check if we can use some partial charge such that our target SOC is reached.
-                            double SoCDiff = dt2.StartingSoC - (SoCAtCharge - (dht_fromCharge.Duration * vh.DriveUsage));
-                            double alpha = SoCDiff / maxCharge;
-                            if (alpha >= 0 && alpha <= 0)
+                            if (SoC == dt2.StartingSoC)
                             {
-                                // Charge is compatible
-                                feasibleFound = true;
+                                // Determine costs of deadhead; only driving time is used
+                                // TODO: idle wordt helemaal niet meegenomen
+                                double drivingCost = dht_direct.Distance * Config.KM_COST;
+                                feasibleDeadheads.Add((dt1, dt2), drivingCost);
+                                continue;
                             }
                         }
                     }
 
-                    if (feasibleFound)
+                    // Iterate over all charging locations, see whether we can find a valid match in here.
+                    // TODO: misschien handig om over alles heen te itereren / duplicate deadheads to te voegen 
+                    // om te checken of het goedkoper kan dmv idle time/charging
+                    for (int i = 0; i < Instance.ChargingLocations.Count; i++)
                     {
-                        feasibleDeadheads.Add((dt1, dt2));
+                        Location chargeLoc = Instance.ChargingLocations[i];
+                        // Check if detour via charging location is time-feasible.
+                        DeadheadTemplate? dht_toCharge = Instance.DeadheadTemplates.Find(dht => dht.From == dt1.Trip.To && dht.To == chargeLoc);
+                        DeadheadTemplate? dht_fromCharge = Instance.DeadheadTemplates.Find(dht => dht.From == chargeLoc && dht.To == dt2.Trip.From);
+
+                        // No deadhead found / not feasible 
+                        if (dht_toCharge == null || dht_fromCharge == null) continue;
+                        int idleTime = dt2.Trip.StartTime - dt1.Trip.EndTime - dht_toCharge.Duration - dht_fromCharge.Duration;
+                        if (idleTime < 0) continue;
+
+                        // Deadhead feasible; see how much charge can be gained.
+                        double SoCAtCharge = dt1.StartingSoC - SoCusedInDT1 - (dht_toCharge.Distance * vh.DriveUsage);
+                        ChargingCurve cc = chargeLoc.ChargingCurves[vh.Id];
+                        ChargeResult cr = cc.MaxChargeGained(SoCAtCharge, idleTime);
+
+                        // Now, check if the charge is actually compatible; In order to do so, we need to check if we can use some partial charge such that our target SOC is reached.
+                        double SoCDiff = dt2.StartingSoC - (SoCAtCharge - (dht_fromCharge.Duration * vh.DriveUsage));
+                        double alpha = SoCDiff / cr.SoCGained;
+                        if (alpha >= 0 && alpha <= 0)
+                        {
+                            // A feasible charge schedule was found; we now rerun the charge sequence in order to get costs
+                            ChargeResult crUsed = cc.ChargeCosts(SoCAtCharge, SoCAtCharge + SoCDiff);
+
+                            // Add deadhead that takes into account 2x driving costs and charging costs
+                            // TODO: add time-dependent prices, staat nu gewoon vast
+
+                            double drivingCosts = Config.KM_COST * (dht_toCharge.Distance + dht_fromCharge.Distance);
+                            double chargingCost = crUsed.Cost;
+                            feasibleDeadheads.Add((dt1, dt2), drivingCosts + chargingCost);
+                            continue;
+                        }
                     }
                 }
             }

@@ -1,5 +1,12 @@
 ﻿namespace E_VCSP.Objects
 {
+    internal class ChargeResult
+    {
+        internal double SoCGained;
+        internal double TimeUsed;
+        internal double Cost;
+    }
+
     /// <summary>
     /// Describes a piecewise linear charging curve.
     /// </summary>
@@ -10,13 +17,6 @@
             internal int MinSoC;
             internal int MaxSoC;
             internal double Rate;
-        }
-
-        internal class ChargeResult
-        {
-            internal double SoCGained;
-            internal double TimeUsed;
-            internal double Cost;
         }
 
         private List<CurvePiece> Pieces;
@@ -63,7 +63,7 @@
         /// <param name="startSoC">SoC at start of charging operation</param>
         /// <param name="time">Time allowed for use in the operation</param>
         /// <returns>Tuple with maxSoCGained, timetaken and total cost if charging actions is performed fully</returns>
-        public ChargeResult ChargeGained(double startSoC, int time)
+        public ChargeResult MaxChargeGained(double startSoC, int time)
         {
             int timeRemaining = time;
             double currSoC = startSoC;
@@ -71,10 +71,7 @@
             {
                 // Get the part of the charging curve which is currently applicable.
                 CurvePiece? p = Pieces.Find(piece => piece.MinSoC <= currSoC && piece.MaxSoC > currSoC);
-                if (p == null)
-                {
-                    throw new InvalidDataException("Charging curve is not defined for the current SoC");
-                }
+                if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
 
                 // Determine amount of time to get from current SoC to the piece max SoC
                 int timeToMax = (int)Math.Ceiling(p.MaxSoC - (currSoC / (1.0 * p.Rate)));
@@ -91,6 +88,36 @@
                 SoCGained = currSoC - startSoC,
                 TimeUsed = -(time - timeRemaining),
                 Cost = CostPerPercentage * (currSoC - startSoC),
+            };
+        }
+
+        /// <summary>
+        /// Get the charging costs associated with charging to a certain SoC
+        /// </summary>
+        /// <param name="startSoC">SoC that vehicle starts at</param>
+        /// <param name="targetSoC">Target SoC</param>
+        /// <returns>Charge result representing the requested charge</returns>
+        public ChargeResult ChargeCosts(double startSoC, double targetSoC)
+        {
+            double currSoC = startSoC;
+            int currTime = 0;
+            while (startSoC < targetSoC)
+            {
+                CurvePiece? p = Pieces.Find(piece => piece.MinSoC <= currSoC && piece.MaxSoC > currSoC);
+                if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
+
+                // Charge until end of piece or until desired SoC is reached
+                double SoCChargedInPiece = Math.Max(targetSoC - currSoC, p.MaxSoC - currSoC);
+                int timeUsed = (int)Math.Ceiling(SoCChargedInPiece / p.Rate);
+                currSoC += SoCChargedInPiece;
+                currTime += timeUsed;
+            }
+
+            return new ChargeResult()
+            {
+                SoCGained = targetSoC - startSoC,
+                TimeUsed = currTime,
+                Cost = CostPerPercentage * (targetSoC - startSoC),
             };
         }
     }
