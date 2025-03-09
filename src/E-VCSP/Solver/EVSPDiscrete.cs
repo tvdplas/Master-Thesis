@@ -55,8 +55,8 @@ namespace E_VCSP.Solver
                 }
             }
 
-            // Add feasible deadheads (sorry philip het wordt een dictionary want dat is wel makkelijk)
-            Dictionary<(DeadheadPoint, DeadheadPoint), double> feasibleDeadheads = new();
+            // Add feasible deadheads
+            List<(DeadheadPoint, DeadheadPoint, double)> feasibleDeadheads = new();
             foreach ((var dl1, var dl2) in discreteTrips.SelectMany(x => discreteTrips.Select(y => (x, y))))
             {
                 foreach ((DiscreteTrip dt1, DiscreteTrip dt2) in dl1.SelectMany(x => dl2.Select(y => (x, y))))
@@ -88,7 +88,7 @@ namespace E_VCSP.Solver
                                 // Determine costs of deadhead; only driving time is used
                                 // TODO: idle wordt helemaal niet meegenomen
                                 double drivingCost = dht_direct.Distance * Config.KM_COST;
-                                feasibleDeadheads.Add((dt1, dt2), drivingCost);
+                                feasibleDeadheads.Add((dt1, dt2, drivingCost));
                                 continue;
                             }
                         }
@@ -127,7 +127,7 @@ namespace E_VCSP.Solver
 
                             double drivingCosts = Config.KM_COST * (dht_toCharge.Distance + dht_fromCharge.Distance);
                             double chargingCost = crUsed.Cost;
-                            feasibleDeadheads.Add((dt1, dt2), drivingCosts + chargingCost);
+                            feasibleDeadheads.Add((dt1, dt2, drivingCosts + chargingCost));
                             continue;
                         }
                     }
@@ -149,6 +149,7 @@ namespace E_VCSP.Solver
             };
 
             // From depot to trip
+            // TODO: depot to trip and vice versa can also do charging actions
             foreach (DiscreteTrip dt in discreteTrips.SelectMany(dts => dts.Select(x => x)))
             {
                 // Check if there is a deadhead from the depot to the starting location of the trip
@@ -159,7 +160,9 @@ namespace E_VCSP.Solver
                 double discretizedSoC = floorToDiscreteValue(SoCAtTrip);
                 if (discretizedSoC == dt.StartingSoC)
                 {
-                    feasibleDeadheads.Add((depotStart, dt));
+                    double drivingCosts = dh.Distance * Config.KM_COST;
+                    double pullOutCosts = Config.PULLOUT_COST;
+                    feasibleDeadheads.Add((depotStart, dt, drivingCosts + pullOutCosts));
                 }
             }
 
@@ -170,44 +173,94 @@ namespace E_VCSP.Solver
                 DeadheadTemplate? dh = Instance.DeadheadTemplates.Find(dh => dh.From == dt.Trip.To && dh.To == depot);
                 if (dh == null) throw new InvalidDataException("Can't go from the deadhead to a trip; This might be wrong");
 
-                // TODO: je zou hier mogelijk ook nog kunnen opladen, maar dat lijkt me een beetje dom
                 double SoCAtDepot = dt.StartingSoC - ((dt.Trip.Distance + dh.Distance) * vh.DriveUsage);
                 if (SoCAtDepot >= 0)
                 {
-                    feasibleDeadheads.Add((dt, depotEnd));
+                    double drivingCosts = dh.Distance * Config.KM_COST;
+                    feasibleDeadheads.Add((dt, depotEnd, drivingCosts));
                 }
             }
 
 
-            // We can now _finally_ create the actual model
+            // Using this, we can now create the model
 
-            List<GRBVar> deadheadUsed = new(feasibleDeadheads.Count);
-            foreach ((var from, var to) in feasibleDeadheads)
-            {
-                deadheadUsed.Add(model.AddVar(0, 1, 1, GRB.INTEGER, $"x_{from.Id},{to.Id}"));
-            }
-
+            // Minimize the costs of all driven deadheads
+            List<GRBVar> deadheadVars = new(feasibleDeadheads.Count);
             GRBLinExpr obj = new();
-            for (int i = 0; i < deadheadUsed.Count; i++)
+            for (int i = 0; i < feasibleDeadheads.Count; i++)
             {
-                // TODO: actual cost lmao
-                obj.AddTerm(1, deadheadUsed[i]);
+                (var from, var to, var costs) = feasibleDeadheads[i];
+                GRBVar v = model.AddVar(0, 1, 1, GRB.INTEGER, $"x_{from.Id},{to.Id}");
+                deadheadVars.Add(v);
+                obj.AddTerm(costs, v);
             }
             model.SetObjective(obj);
 
+            // For each trip node, ensure that flow constraints are met.
+            Dictionary<string, GRBLinExpr> tripFlowConstraints = new();
+            Dictionary<string, GRBLinExpr> tripCoveredContraints = new();
+            for (int i = 0; i < feasibleDeadheads.Count; i++)
+            {
+                (var from, var to, _) = feasibleDeadheads[i];
+                GRBVar dhVar = deadheadVars[i];
+                if (from is DiscreteTrip dtFrom)
+                {
+                    string key = dtFrom.Trip.Id + dtFrom.StartingSoC;
+                    GRBLinExpr fromFlowExpr = tripFlowConstraints.ContainsKey(key)
+                        ? tripFlowConstraints[key]
+                        : new();
+                    fromFlowExpr.AddTerm(-1, dhVar);
+                }
+                if (to is DiscreteTrip dtTo)
+                {
+                    string key = dtTo.Trip.Id + dtTo.StartingSoC;
+                    GRBLinExpr fromFlowExpr = tripFlowConstraints.ContainsKey(key)
+                        ? tripFlowConstraints[key]
+                        : new();
+                    fromFlowExpr.AddTerm(1, dhVar);
 
+                    // Only use trip id as key here, as we dont care which soc a trip is covered at
+                    GRBLinExpr fromCoverExpr = tripFlowConstraints.ContainsKey(dtTo.Trip.Id)
+                        ? tripFlowConstraints[dtTo.Trip.Id]
+                        : new();
+                }
+            }
+            // Finalize by setting expressions equal to 0
+            foreach ((string name, GRBLinExpr expr) in tripFlowConstraints)
+            {
+                model.AddConstr(expr, GRB.EQUAL, 0, "flow-" + name);
+            }
+            foreach ((string name, GRBLinExpr expr) in tripCoveredContraints)
+            {
+                model.AddConstr(expr, GRB.GREATER_EQUAL, 1, "cover-" + name);
+            }
 
-            // min \sum_{(u, v) \in feasibleDeadeads} x_{u,v} c_{u,v}
-            // s.t.
-            // \sum_{v} x_{u,v} - \sum_{w} x_{w,u} = 0 for all u \in V \ {depot}
-            // \sum 
-            // \sum_{v} x_{depot, v} = 1
-            // \sum_{v} x_{v, depot} = 1
-            // x_{u,v} \in {0, 1} for all (u, v) \in feasibleDeadheads
+            // Lastly, ensure that depot trips are constrained. 
+            // Max outgoing = n, ingoing = outgoing
+            GRBLinExpr depotBalanced = new();
+            GRBLinExpr depotOutgoingConstrained = new();
+            for (int i = 0; i < feasibleDeadheads.Count; i++)
+            {
+                (var from, var to, _) = feasibleDeadheads[i];
+                GRBVar dhVar = deadheadVars[i];
+                if (from is DiscreteDepot dpFrom)
+                {
+                    depotBalanced.AddTerm(1, dhVar);
+                    depotOutgoingConstrained.AddTerm(1, dhVar);
+                }
+                if (to is DiscreteDepot dpTo)
+                {
+                    depotBalanced.AddTerm(-1, dhVar);
+                }
+            }
+            model.AddConstr(depotBalanced, GRB.EQUAL, 0, "depot_balanced");
+            model.AddConstr(depotBalanced, GRB.LESS_EQUAL, Config.MAX_VEHICLES, "depot_balanced");
 
-
-
+            // Solve
             model.Optimize();
+
+            // Use model results.
+            // TODO.
         }
     }
 }

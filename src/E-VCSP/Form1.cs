@@ -1,5 +1,6 @@
 
 using E_VCSP.Objects;
+using E_VCSP.Solver;
 using Microsoft.Msagl.Drawing;
 using Microsoft.Msagl.Layout.Layered;
 using System.Reflection;
@@ -13,6 +14,7 @@ namespace E_VCSP
 
         Graph? graph;
         Instance? instance;
+        EVSPDiscrete? discreteSolver;
 
         public MainView()
         {
@@ -26,7 +28,18 @@ namespace E_VCSP
             Type configType = typeof(Config);
             FieldInfo[] fields = configType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
 
-            int yOffset = 40;
+            Panel scrollablePanel = new Panel
+            {
+                AutoScroll = true,
+                BorderStyle = BorderStyle.FixedSingle,
+                Location = new System.Drawing.Point(10, 40),
+                Size = new System.Drawing.Size(280, 500),
+                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom,
+                Padding = new Padding(0, 0, 0, 100),
+            };
+            panel1.Controls.Add(scrollablePanel);
+
+            int yOffset = 10;
             foreach (FieldInfo field in fields)
             {
                 System.Windows.Forms.Label label = new System.Windows.Forms.Label
@@ -35,13 +48,16 @@ namespace E_VCSP
                     AutoSize = true,
                     Location = new System.Drawing.Point(10, yOffset)
                 };
-                Controls.Add(label);
+                scrollablePanel.Controls.Add(label);
+
+                if (field.FieldType == typeof(Header))
+                {
+                    yOffset += 30;
+                    continue;
+                }
 
                 Control inputControl;
-
-                if (field.FieldType == typeof(int)
-                || field.FieldType == typeof(double)
-                || field.FieldType == typeof(string))
+                if (field.FieldType == typeof(int) || field.FieldType == typeof(double) || field.FieldType == typeof(string))
                 {
                     TextBox textBox = new TextBox
                     {
@@ -81,7 +97,7 @@ namespace E_VCSP
                     continue;
                 }
 
-                Controls.Add(inputControl);
+                scrollablePanel.Controls.Add(inputControl);
                 controlsMap[field.Name] = inputControl;
                 yOffset += 30;
             }
@@ -93,7 +109,7 @@ namespace E_VCSP
                 Width = 200
             };
             applyButton.Click += (sender, e) => reload();
-            Controls.Add(applyButton);
+            scrollablePanel.Controls.Add(applyButton);
         }
 
         private void UpdateString(FieldInfo field, string text)
@@ -119,11 +135,23 @@ namespace E_VCSP
             }
         }
 
+        private void solveButtonClick(object sender, EventArgs e)
+        {
+            solve();
+        }
+
+        private void solve()
+        {
+            if (discreteSolver == null) return;
+            discreteSolver.Solve();
+        }
+
         private void reload()
         {
             if (activeFolder == "No folder selected") return;
 
             instance = new Instance(activeFolder);
+            discreteSolver = new(instance) { DiscreteFactor = 10 };
             refreshGraph();
         }
 
@@ -157,7 +185,6 @@ namespace E_VCSP
             }
 
             graph.LayerConstraints.RemoveAllConstraints();
-
             for (int i = 0; i < instance.Trips.Count; i++)
             {
                 Trip t1 = instance.Trips[i];
@@ -165,7 +192,8 @@ namespace E_VCSP
                 {
                     Trip t2 = instance.Trips[j];
 
-                    if (t1.EndTime <= t2.StartTime)
+
+                    if (t1.EndTime <= t2.StartTime || t1.StartTime < t2.StartTime)
                     {
                         graph.LayerConstraints.AddLeftRightConstraint(graph.FindNode(t1.Id), graph.FindNode(t2.Id));
                     }

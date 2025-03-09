@@ -24,7 +24,7 @@ namespace E_VCSP.Parsing
             Dictionary<string, int> attributeIndexMapping = new Dictionary<string, int>();
             foreach (var kv in attributeNameMapping)
             {
-                int index = header.IndexOf(kv.Item2);
+                int index = header.FindIndex(col => col.Contains(kv.Item2));
                 if (index == -1) throw new Exception($"Could not find a column {kv.Item2} to load attribute {kv.Item1}");
                 attributeIndexMapping[kv.Item1] = index;
             }

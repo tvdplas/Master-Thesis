@@ -9,13 +9,13 @@ namespace E_VCSP.Parsing
             filename = "vehicles.csv";
             attributeNameMapping = new()
             {
-                ( "Type", "Id" ),
-                ( "Capaciteit", "Capacity" ),
-                ( "Verbruik (kWh/km)", "DriveUsage" ),
-                ( "Verbruik bij stilstand (kWh per uur stilstand)", "IdleUsage" ),
-                ( "Laagste toegestane lading", "MinCharge" ),
-                ( "Laadsnelheid (0-100%) kWh", "ChargeSpeedUniform" ),
-                ( "Aantal beschikbaar", "Available" ),
+                ( "Id", "Type" ),
+                ( "Capacity", "Capaciteit" ),
+                ( "DriveUsage", "Verbruik (kWh/km)" ),
+                ( "IdleUsage", "Verbruik bij stilstand (kWh per uur stilstand)" ),
+                ( "MinCharge", "Laagste toegestane lading" ),
+                ( "ChargeSpeedUniform", "Laadsnelheid (0-100%) kWh" ),
+                ( "Available", "Aantal beschikbaar" ),
             };
         }
 

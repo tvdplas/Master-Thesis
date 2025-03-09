@@ -1,4 +1,5 @@
-﻿using E_VCSP.Objects;
+﻿
+using E_VCSP.Objects;
 
 namespace E_VCSP.Parsing
 {
@@ -10,12 +11,12 @@ namespace E_VCSP.Parsing
             filename = "crew.csv";
             attributeNameMapping = new()
             {
-                ( "Locatie", "Id" ),
-                ( "Switch allowed", "HandoverAllowed" ),
-                ( "Opstaptijd", "SignOnTime" ),
-                ( "Afstaptijd", "SignOffTime" ),
-                ( "Break allowed", "BreakAllowed" ),
-                ( "Brutto-netto", "BrutoNetto" ),
+                ( "Id", "Locatie" ),
+                ( "HandoverAllowed", "Switch allowed" ),
+                ( "SignOnTime", "Opstaptijd" ),
+                ( "SignOffTime", "Afstaptijd" ),
+                ( "BreakAllowed", "Break allowed" ),
+                ( "BrutoNetto", "Brutto-netto" ),
             };
         }
 
