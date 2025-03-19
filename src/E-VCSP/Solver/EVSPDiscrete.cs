@@ -337,8 +337,8 @@ namespace E_VCSP.Solver
         public Graph GenerateSolutionGraph()
         {
             Console.WriteLine("Reconstructing paths");
-
             List<List<(int, DiscreteDeadhead)>> adj = new(); // trips 1->n are map to 0->n-1, depot start = n, depot end = n + 1
+            HashSet<int> visited = new(); // Validation that all nodes are actually visited
             for (int i = 0; i < discreteTrips.Count + 2; i++) adj.Add(new());
             GRBVar[] vars = model.GetVars();
             for (int i = 0; i < vars.Length; i++)
@@ -360,11 +360,10 @@ namespace E_VCSP.Solver
                 }
             }
 
-
-
             List<List<DiscreteDeadhead>> paths = new();
             List<DiscreteDeadhead> dfs(int curr, List<List<(int, DiscreteDeadhead)>> adj, List<DiscreteDeadhead> currPath)
             {
+                visited.Add(curr);
                 if (curr == adj.Count - 1)
                 {
                     return currPath;
@@ -386,8 +385,8 @@ namespace E_VCSP.Solver
 
             Console.WriteLine("Paths reconstructed");
             Console.WriteLine($"Total trips: {discreteTrips.Count}");
-            Console.WriteLine($"Trips covered: {paths}");
-            // Find flow paths in order to define vehicle schedules. 
+            Console.WriteLine($"Trips covered: {visited.Count - 2}"); // -2 due to depot start and end
+
 
             // Time to create the actual nodes representing the times; We now distinguish between 4 seperate node types: 
             // 1. Trips
@@ -540,24 +539,33 @@ namespace E_VCSP.Solver
             // For each trip node, ensure that flow constraints are met.
             Dictionary<string, GRBLinExpr> tripFlowConstraints = new();
             Dictionary<string, GRBLinExpr> tripCoveredContraints = new();
+
+            // Ensure that constraints are added even if there are no headheads
+            // Useful for IIS if there are mistakes in the deadheads
+            foreach (var dts in discreteTrips)
+            {
+                tripCoveredContraints[dts.First().Trip.Id] = new();
+                foreach (var dt in dts)
+                {
+                    tripFlowConstraints[dt.Id] = new();
+                }
+            }
+
             for (int i = 0; i < feasibleDeadheads.Count; i++)
             {
                 var fdh = feasibleDeadheads[i];
                 GRBVar dhVar = deadheadVars[i];
                 if (fdh.From is DiscreteTrip)
                 {
-                    if (!tripFlowConstraints.ContainsKey(fdh.From.Id)) tripFlowConstraints[fdh.From.Id] = new();
                     GRBLinExpr fromFlowExpr = tripFlowConstraints[fdh.From.Id];
                     fromFlowExpr.AddTerm(-1, dhVar);
                 }
                 if (fdh.To is DiscreteTrip dtTo)
                 {
-                    if (!tripFlowConstraints.ContainsKey(fdh.To.Id)) tripFlowConstraints[fdh.To.Id] = new();
                     GRBLinExpr fromFlowExpr = tripFlowConstraints[fdh.To.Id];
                     fromFlowExpr.AddTerm(1, dhVar);
 
                     // Only use trip id as key here, as we dont care which soc a trip is covered at
-                    if (!tripCoveredContraints.ContainsKey(dtTo.Trip.Id)) tripCoveredContraints[dtTo.Trip.Id] = new();
                     GRBLinExpr fromCoverExpr = tripCoveredContraints[dtTo.Trip.Id];
                     fromCoverExpr.AddTerm(1, dhVar);
                 }
@@ -565,7 +573,7 @@ namespace E_VCSP.Solver
             // Finalize by setting expressions equal to 0
             foreach ((string name, GRBLinExpr expr) in tripFlowConstraints)
             {
-                model.AddConstr(expr == 0, "flow-" + name);
+                model.AddConstr(expr == 0, "flow-" + 7);
             }
             foreach ((string name, GRBLinExpr expr) in tripCoveredContraints)
             {

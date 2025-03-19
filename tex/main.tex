@@ -12,11 +12,25 @@
   style=authoryear-comp,
   natbib=true,
   maxcitenames=2,
+  maxbibnames=99,
   useprefix=true,
-  uniquename=init,
+  uniquename=init
 ]{biblatex}
-\bibliography{bibliography}
 
+\addbibresource{bibliography.bib}
+% Prioritize DOI > Eprint > URL
+\AtEveryBibitem{%
+  \ifboolexpr{ test {\ifentrytype{article}} or test {\ifentrytype{book}} or test {\ifentrytype{inproceedings}} }{%
+    \iffieldundef{doi}{%
+      \iffieldundef{eprint}{}{%
+        \clearfield{url} % Keep eprint if present, remove URL
+      }
+    }{%
+      \clearfield{eprint} % Remove eprint if DOI exists
+      \clearfield{url}    % Remove URL if DOI exists
+    }%
+  }{}%
+}
 \newcommand{\todo}[1]{{\color{red}[\textit{TODO: #1}]}}
 \newcommand{\todonocomment}[1]{{\color{red}[\textit{#1}]}}
 
@@ -27,16 +41,16 @@
 
 \input{tikz-setup.tex}
 
-\title{Integrated Vehicle and Crew Scheduling for Electric Buses with Realistic Charging Behavior}
+\title{Integrated Vehicle and Crew Scheduling for Electric Buses}
 \date{July 2025}
 \author{Thomas van der Plas, Han Hoogeveen, Philip de Bruin}
 \begin{document}
 \maketitle
 
 \section{Introduction}
-Electric vehicles are beginning to make up large portions of the fleet for public transport providers. In The Netherlands for example, approximately 21\% of all registered buses utilize an electric drivetrain, as reported by the \citet{RDW}. To comply with strict Dutch and the European \citet{europaRegulation20181999} on climate and sustainability, this proportion must increase substantially; from 2025 onward, the procurement of new buses powered by non-renewable energy sources will no longer be permitted, with the objective that by 2030, all public transport buses operate with zero emissions. Individual line operators such as \citet{qbuzzQbuzz} are therefore rapidly replacing their remaining buses that use fossil fuels, resulting in primarily electric-powered fleets. \\
-Effective use of these new electric vehicles is however more challenging than that of a combustion based fleet. One of the logistical steps in which this is most apparent is that of vehicle scheduling. The Vehicle Scheduling Problem (VSP) aims to assign vehicles such that a set of trips is covered; in the case of buses, these trips are defined by the timetables for individual lines. A typical solution to this problem comes in the form of a collection of vehicle tasks, each of which can be seen as a schedule that an individual bus will follow throughout the day. It may start at a bus storage facility (more commonly called a depot), then perform one or more trips, before finally returning to the depot. In order to string multiple trips together, a bus must make an empty travel from the ending location of one trip to the starting location of the next. These empty travels, often called deadheads, are the main focus when determining the overall costs of a collection of vehicle tasks. There is ample choice as to which deadheads can be driven, as in theory the deadhead between each pair of compatible trips can be included during the creation of a vehicle task. It is therefore necessary to determine which of these deadheads are required in order to drive all trips while minimizing costs. \\
-In the VSP and its variants, a commonly made assumption is that a vehicle can travel an entire day without having to refuel. With electric vehicles, this assumption is often not valid: recharging throughout the day is required as the range of an electric vehicle is limited. Additionally, recharging takes a long time when compared to the refueling of a combustion vehicle: refueling can be done in a matter of minutes, whereas recharging may take multiple hours for a full charge. The electrification of fleets therefore requires the VSP to be adapted to include maximum range constraints, as well charging possibilities within a vehicle task. This extended version of the problem, often referred to as the Electric Vehicle Scheduling Problem (E-VSP), is significantly harder than its non-electric counterpart; the VSP with a single depot can be solved in polynomial time, whereas the E-VSP is NP-Hard as shown by \citet{Bunte2009} and \citet{Sassi2014} respectively. \\
+Electric vehicles are beginning to make up large portions of the fleet for public transport providers. In The Netherlands for example, approximately 21\% of all registered buses utilize an electric drivetrain, as reported by the \citet{RDW}. To comply with strict Dutch and \citet{europaRegulation20181999} on climate and sustainability, this proportion must increase substantially; from 2025 onward, the procurement of new buses powered by non-renewable energy sources will no longer be permitted, with the objective that by 2030, all public transport buses operate with zero emissions. Individual line operators such as \citet{qbuzzQbuzz} are therefore rapidly replacing their remaining buses that use fossil fuels, resulting in primarily electric-powered fleets. \\
+Effective use of these new electric vehicles is however more challenging than that of a combustion based fleet. One of the logistical steps in which this is most apparent is that of vehicle scheduling. The Vehicle Scheduling Problem (VSP) aims to assign vehicles such that a set of trips are driven at minimum cost; in the case of buses, these trips are defined by the timetables for individual lines. A typical solution to this problem comes in the form of a collection of vehicle tasks, each of which can be seen as a schedule that an individual bus will follow throughout the day. It may start at a bus storage facility (more commonly called a depot), then perform one or more trips, before finally returning to the depot. In order to string multiple trips together, a bus must make an empty travel from the ending location of one trip to the starting location of the next. These empty travels, often called deadheads, are the main focus when determining the overall costs of a collection of vehicle tasks. There is ample choice as to which deadheads can be driven, as in theory the deadhead between each pair of compatible trips can be included during the creation of a vehicle task. It is therefore necessary to determine which of these deadheads are required in order to drive all trips while minimizing costs. \\
+In the VSP and its variants, a commonly made assumption is that a vehicle can travel an entire day without having to refuel. With electric vehicles, this assumption is often not valid: recharging throughout the day is required as the range of an electric vehicle is limited. Additionally, recharging takes a long time when compared to the refueling of a combustion vehicle: refueling can be done in a matter of minutes, whereas recharging may take multiple hours for a full charge. The electrification of fleets therefore requires the VSP to be adapted to include maximum range constraints, as well as charging possibilities within a vehicle task. This extended version of the problem, often referred to as the Electric Vehicle Scheduling Problem (E-VSP), is significantly harder than its non-electric counterpart; the VSP with a single depot can be solved in polynomial time, whereas the E-VSP is NP-Hard as shown by \citet{Bunte2009} and \citet{Sassi2014} respectively. \\
 In addition to this added computational complexity in the E-VSP, other logistical planning steps are effected as well. The Crew Scheduling Problem (CSP) is commonly the step that follows vehicle scheduling. Here, schedules are made for individual crew members such that the planned vehicles always have a driver associated with them. As crew members are subject to labor regulations, additional constraints are now added when compared to vehicle scheduling such as maximum driving time and required breaks. The CSP is also NP-Hard, as shown by \citet{Fischetti1989}.\\
 Costs in this step often exceed those associated with the vehicles themselves, with a recent estimate by \citet{Perumal2019Crew} putting crew member costs at around 60\% of all operational costs. Optimal solutions for the CSP are however directly influenced by the selected vehicle tasks; they determine where and at what time handovers of vehicles are possible between crew members. Sequentially minimizing costs in the VSP and CSP may therefore not result in a solution with overall lowest costs, as the solution to the CSP may be improved greatly by incurring higher costs in the VSP. This was already pointed out in the 1980s by \citet{Bodin1983}, who instead advocated for an integrated approach; here, the costs of the VSP and CSP are minimized simultaneously, resulting in the Vehicle and Crew Scheduling Problem (VCSP). \\
 A lot of work has already been done on the VSP, CSP and VCSP. Both the sequential and integrated approach have been extensively studied since the 1980s, as shown by reviews such as \citet{Ibarra-Rojas2015} and \citet{Ge2024}. As mentioned before however, the introduction of electric vehicles has introduced significant constraints on recharging times and vehicle ranges, invalidating the critical assumption in many of these works that a vehicle was able to drive an entire day without being refueled. As a response to this, the E-VSP has also been the focus of many studies going back to around 2014. We refer the reader to a survey by \citet{Perumal2022LitRev} for a detailed overview of recent progress. \\
