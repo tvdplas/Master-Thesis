@@ -29,7 +29,8 @@ namespace E_VCSP.Parsing
             double Capacity = double.Parse(line[attributeIndexMapping["Capacity"]]);
 
             // Rescale all usage patterns to percentage instead of direct KWh measures
-            double DriveUsage = double.Parse(line[attributeIndexMapping["DriveUsage"]]) / Capacity * 100;
+            // Driveusage is also rescaled to per meter instead of per km
+            double DriveUsage = double.Parse(line[attributeIndexMapping["DriveUsage"]]) / 1000 / Capacity * 100;
             double IdleUsage = double.Parse(line[attributeIndexMapping["IdleUsage"]]) / Capacity * 100;
 
             VehicleType vh = new()

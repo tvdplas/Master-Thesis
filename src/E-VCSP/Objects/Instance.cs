@@ -31,9 +31,19 @@ namespace E_VCSP.Objects
             // Vehicle types; can add charging curve info to locations
             VehicleTypes = new ParserVehicleTypes().Parse(path, Locations);
 
-            // Deadheads between locations are given, additional self-edge deadheads are added
-            // for easier formulations later
+            // Deadheads between locations are given
             DeadheadTemplates = new ParserDeadheadTemplates().Parse(path, Locations);
+            // Add symetric deadheads to model drives back
+            var sym = DeadheadTemplates.Select(dh => new DeadheadTemplate
+            {
+                From = dh.To,
+                To = dh.From,
+                Distance = dh.Distance,
+                Duration = dh.Duration,
+                Id = $"dht-sym{dh.Id}"
+            }).ToList();
+            DeadheadTemplates.AddRange(sym);
+            // Add self-edges to model waiting time
             foreach (Location loc in Locations)
             {
                 DeadheadTemplates.Add(new DeadheadTemplate
@@ -41,7 +51,7 @@ namespace E_VCSP.Objects
                     From = loc,
                     To = loc,
                     Distance = 0,
-                    Duration = 0,
+                    Duration = 300,// TODO: add actual modeled time
                     Id = $"dht-self{DeadheadTemplates.Count}"
                 });
             }

@@ -1,0 +1,7 @@
+Route;From;Start;End;To;Trip;Duration;Distance;MinLay;VehGrp
+F521;otdwie;6:15;6:45;tschav;1004;0:30;17.657;0;V12E,V18S
+F521;otdwie;7:25;8:00;tschav;1016;0:35;17.657;0;V12E,V18S
+F521;tschav;8:00;8:30;otdwie;1003;0:30;14.945;0;V12E,V18S
+F521;otdwie;8:30;9:05;tschav;1228;0:35;14.946;0;V12E,V18S
+F521;tschav;9:10;9:40;otdwie;1015;0:30;14.945;0;V12E,V18S
+F521;otdwie;9:45;10:20;tschav;1040;0:35;17.657;0;V12E,V18S

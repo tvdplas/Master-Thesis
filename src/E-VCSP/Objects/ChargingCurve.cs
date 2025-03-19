@@ -74,9 +74,9 @@
                 if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
 
                 // Determine amount of time to get from current SoC to the piece max SoC
-                int timeToMax = (int)Math.Ceiling(p.MaxSoC - (currSoC / (1.0 * p.Rate)));
+                int timeToMax = (int)Math.Ceiling((p.MaxSoC - currSoC) / (1.0 * p.Rate));
                 int usableTime = Math.Min(timeRemaining, timeToMax);
-                int gainableSoC = (int)Math.Floor(usableTime * p.Rate);
+                double gainableSoC = usableTime * p.Rate;
                 currSoC += gainableSoC;
                 timeRemaining -= usableTime;
             }
@@ -86,7 +86,7 @@
             return new ChargeResult()
             {
                 SoCGained = currSoC - startSoC,
-                TimeUsed = -(time - timeRemaining),
+                TimeUsed = time - timeRemaining,
                 Cost = CostPerPercentage * (currSoC - startSoC),
             };
         }
@@ -101,13 +101,13 @@
         {
             double currSoC = startSoC;
             int currTime = 0;
-            while (startSoC < targetSoC)
+            while (currSoC < targetSoC)
             {
                 CurvePiece? p = Pieces.Find(piece => piece.MinSoC <= currSoC && piece.MaxSoC > currSoC);
                 if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
 
                 // Charge until end of piece or until desired SoC is reached
-                double SoCChargedInPiece = Math.Max(targetSoC - currSoC, p.MaxSoC - currSoC);
+                double SoCChargedInPiece = Math.Min(targetSoC - currSoC, p.MaxSoC - currSoC);
                 int timeUsed = (int)Math.Ceiling(SoCChargedInPiece / p.Rate);
                 currSoC += SoCChargedInPiece;
                 currTime += timeUsed;

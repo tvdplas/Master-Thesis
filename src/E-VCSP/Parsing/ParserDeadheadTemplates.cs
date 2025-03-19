@@ -26,7 +26,7 @@ namespace E_VCSP.Parsing
             {
                 From = from,
                 To = to,
-                Duration = ParseTime(line[attributeIndexMapping["Duration"]]),
+                Duration = ParseTime(line[attributeIndexMapping["Duration"]]) * 60,
                 Distance = (int)(1000 * double.Parse(line[attributeIndexMapping["Distance"]], CultureInfo.InvariantCulture)),
                 Id = $"dht{index}",
             };

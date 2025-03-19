@@ -1,8 +1,7 @@
 
+using E_VCSP.Formatting;
 using E_VCSP.Objects;
 using E_VCSP.Solver;
-using Microsoft.Msagl.Drawing;
-using Microsoft.Msagl.Layout.Layered;
 using System.Reflection;
 
 namespace E_VCSP
@@ -12,13 +11,15 @@ namespace E_VCSP
         private Dictionary<string, Control> controlsMap = new();
         public string activeFolder = "No folder selected";
 
-        Graph? graph;
         Instance? instance;
         EVSPDiscrete? discreteSolver;
 
         public MainView()
         {
             InitializeComponent();
+            Console.SetOut(new TextBoxWriter(textBox1));
+            Console.WriteLine("Program started");
+
             activeFolderLabel.Text = activeFolder;
             GenerateConfigUI();
         }
@@ -32,8 +33,8 @@ namespace E_VCSP
             {
                 AutoScroll = true,
                 BorderStyle = BorderStyle.FixedSingle,
-                Location = new System.Drawing.Point(10, 40),
-                Size = new System.Drawing.Size(280, 500),
+                Location = new System.Drawing.Point(10, 70),
+                Size = new System.Drawing.Size(280, 470),
                 Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom,
                 Padding = new Padding(0, 0, 0, 100),
             };
@@ -131,6 +132,7 @@ namespace E_VCSP
             {
                 activeFolder = loadFolderBrowser.SelectedPath;
                 activeFolderLabel.Text = activeFolder.Split("\\").Last();
+                Console.WriteLine($"Loaded folder: {activeFolder}");
                 reload();
             }
         }
@@ -142,66 +144,33 @@ namespace E_VCSP
 
         private void solve()
         {
+            reload();
             if (discreteSolver == null) return;
-            discreteSolver.Solve();
+
+            if (discreteSolver.Solve())
+            {
+                graphViewer.Graph = discreteSolver.GenerateSolutionGraph();
+                Random r = new();
+            }
         }
 
         private void reload()
         {
             if (activeFolder == "No folder selected") return;
 
-            instance = new Instance(activeFolder);
-            discreteSolver = new(instance) { DiscreteFactor = 10 };
-            refreshGraph();
-        }
-
-        private void refreshGraph()
-        {
-            if (instance == null)
+            instance = new(activeFolder);
+            discreteSolver = new(instance);
+            if (Config.GRAPH_SHOWN && instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN)
             {
-                throw new InvalidOperationException("Cannot refresh graph if no instance is loaded");
+                graphViewer.Graph = discreteSolver.GenerateDiscreteGraph();
             }
-
-            // Reset graph
-            graph = new Microsoft.Msagl.Drawing.Graph("graph");
-            graph.LayoutAlgorithmSettings = new SugiyamaLayoutSettings()
+            else
             {
-                LiftCrossEdges = true,
-            };
-
-            foreach (Trip t in instance.Trips)
-            {
-                Node node = Formatting.GraphElement.TripNode(t);
-                graph.AddNode(node);
+                Microsoft.Msagl.Drawing.Graph g = new();
+                g.AddNode("Graph not shown");
+                graphViewer.Graph = g;
             }
-            foreach (Deadhead dh in instance.Deadheads)
-            {
-                // Dont include edges even if their not show to save space
-                if (!Formatting.GraphElement.ShouldHideEdge(dh) || Config.EDGE_INCLUDE_NOT_SHOWN)
-                {
-                    Edge edge = Formatting.GraphElement.DeadheadEdge(dh, graph);
-                    graph.AddPrecalculatedEdge(edge);
-                }
-            }
-
-            graph.LayerConstraints.RemoveAllConstraints();
-            for (int i = 0; i < instance.Trips.Count; i++)
-            {
-                Trip t1 = instance.Trips[i];
-                for (int j = 0; j < instance.Trips.Count; j++)
-                {
-                    Trip t2 = instance.Trips[j];
-
-
-                    if (t1.EndTime <= t2.StartTime || t1.StartTime < t2.StartTime)
-                    {
-                        graph.LayerConstraints.AddLeftRightConstraint(graph.FindNode(t1.Id), graph.FindNode(t2.Id));
-                    }
-                }
-            }
-
-            graph.Directed = true;
-            graphViewer.Graph = graph;
+            Console.WriteLine("Instance reloaded");
         }
     }
 }

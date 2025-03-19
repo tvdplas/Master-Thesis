@@ -25,6 +25,7 @@
             textBox1 = new TextBox();
             panel1 = new Panel();
             splitContainer1 = new SplitContainer();
+            solveButton = new Button();
             panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
             splitContainer1.Panel1.SuspendLayout();
@@ -60,15 +61,15 @@
             graphViewer.BackwardEnabled = false;
             graphViewer.BuildHitTree = true;
             graphViewer.CurrentLayoutMethod = Microsoft.Msagl.GraphViewerGdi.LayoutMethod.UseSettingsOfTheGraph;
-            graphViewer.EdgeInsertButtonVisible = true;
+            graphViewer.EdgeInsertButtonVisible = false;
             graphViewer.FileName = "";
             graphViewer.ForwardEnabled = false;
             graphViewer.Graph = null;
             graphViewer.IncrementalDraggingModeAlways = false;
             graphViewer.InsertingEdge = false;
-            graphViewer.LayoutAlgorithmSettingsButtonVisible = true;
+            graphViewer.LayoutAlgorithmSettingsButtonVisible = false;
             graphViewer.LayoutEditingEnabled = true;
-            graphViewer.Location = new Point(0, 12);
+            graphViewer.Location = new Point(0, 0);
             graphViewer.LooseOffsetForRouting = 0.25D;
             graphViewer.MouseHitDistance = 0.05D;
             graphViewer.Name = "graphViewer";
@@ -82,7 +83,7 @@
             graphViewer.SaveButtonVisible = true;
             graphViewer.SaveGraphButtonVisible = true;
             graphViewer.SaveInVectorFormatEnabled = true;
-            graphViewer.Size = new Size(442, 534);
+            graphViewer.Size = new Size(443, 534);
             graphViewer.TabIndex = 3;
             graphViewer.TightOffsetForRouting = 0.125D;
             graphViewer.ToolBarIsVisible = true;
@@ -96,6 +97,7 @@
             // 
             textBox1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             textBox1.BackColor = Color.Black;
+            textBox1.Font = new Font("Consolas", 10F);
             textBox1.ForeColor = Color.White;
             textBox1.Location = new Point(0, 0);
             textBox1.MaxLength = 1000000000;
@@ -103,11 +105,12 @@
             textBox1.Name = "textBox1";
             textBox1.ReadOnly = true;
             textBox1.ScrollBars = ScrollBars.Both;
-            textBox1.Size = new Size(408, 558);
+            textBox1.Size = new Size(553, 558);
             textBox1.TabIndex = 4;
             // 
             // panel1
             // 
+            panel1.Controls.Add(solveButton);
             panel1.Controls.Add(loadButton);
             panel1.Controls.Add(activeFolderLabel);
             panel1.Dock = DockStyle.Left;
@@ -133,6 +136,16 @@
             splitContainer1.Size = new Size(860, 558);
             splitContainer1.SplitterDistance = 445;
             splitContainer1.TabIndex = 0;
+            // 
+            // button1
+            // 
+            solveButton.Location = new Point(4, 33);
+            solveButton.Name = "solveButton";
+            solveButton.Size = new Size(75, 23);
+            solveButton.TabIndex = 2;
+            solveButton.Text = "Solve";
+            solveButton.UseVisualStyleBackColor = true;
+            solveButton.Click += solveButtonClick;
             // 
             // MainView
             // 
@@ -163,5 +176,6 @@
         private TextBox textBox1;
         private Panel panel1; // Panel for the Button and FolderBrowserDialog
         private SplitContainer splitContainer1; // SplitContainer for the TextBox and GraphViewer
+        private Button solveButton;
     }
 }
