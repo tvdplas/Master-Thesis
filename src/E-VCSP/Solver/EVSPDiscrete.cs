@@ -65,6 +65,10 @@ namespace E_VCSP.Solver
                 for (int j = 0; j <= Config.DISCRETE_FACTOR; j++)
                 {
                     double SoC = Math.Floor(j * 100.0 / Config.DISCRETE_FACTOR);
+
+                    // Dont even add nodes whose charge is infeasible
+                    if (SoC < vh.MinCharge) continue;
+
                     discreteTrips[i].Add(new DiscreteTrip()
                     {
                         Id = $"{instance.Trips[i].Id}@{SoC}%",
@@ -97,7 +101,7 @@ namespace E_VCSP.Solver
                         // Check if charge is compatible between the two trips
                         double SoC = dt1.StartingSoC - SoCusedInDT1;
                         SoC -= dht_direct.Distance * vh.DriveUsage;
-                        if (SoC > 0)
+                        if (SoC > vh.MinCharge)
                         {
                             // May be compatible; Note that SoC < 0 may still be possible via indirect trip, therefore no early termination. 
                             SoC = floorToDiscreteValue(SoC);
@@ -177,12 +181,12 @@ namespace E_VCSP.Solver
             if (depot == null) throw new InvalidDataException("At least one location should be flagged as a depot.");
             depotStart = new()
             {
-                Id = "depot_start",
+                Id = "start",
                 Location = depot,
             };
             depotEnd = new()
             {
-                Id = "depot_end",
+                Id = "end",
                 Location = depot,
             };
 
@@ -381,6 +385,8 @@ namespace E_VCSP.Solver
             }
 
             Console.WriteLine("Paths reconstructed");
+            Console.WriteLine($"Total trips: {discreteTrips.Count}");
+            Console.WriteLine($"Trips covered: {paths}");
             // Find flow paths in order to define vehicle schedules. 
 
             // Time to create the actual nodes representing the times; We now distinguish between 4 seperate node types: 
@@ -416,7 +422,7 @@ namespace E_VCSP.Solver
 
                     if (dtf != null)
                     {
-                        var node = Formatting.GraphElement.ScheduleNode(currTime, dtf.Trip.Duration, pathPart.From.Id, Color.LightBlue, i);
+                        var node = Formatting.GraphElement.ScheduleNode(currTime, currTime + dtf.Trip.Duration, pathPart.From.Id, Color.LightBlue, i);
                         graph.AddNode(node);
                         pathNodes.Add(node);
                         currTime += dtf.Trip.Duration;

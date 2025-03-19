@@ -30,7 +30,7 @@
         internal static Header NODES = new();
         internal static bool NODE_SHOWN = true;
         internal static GraphElementDisplay NODE_LABEL = GraphElementDisplay.TripsAndDetails;
-        internal static int NODE_MIN_WIDTH = 150;
+        internal static int NODE_MIN_WIDTH = 75;
         internal static double NODE_WIDTH_SCALAR = 0.1;
         internal static int NODE_HEIGHT = 40;
 

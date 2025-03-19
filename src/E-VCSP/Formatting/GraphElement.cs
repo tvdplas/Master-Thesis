@@ -16,10 +16,17 @@ namespace E_VCSP.Formatting
                     LabelMargin = 5,
                     FillColor = color,
                 },
+                Label = {
+
+                    FontSize = Math.Min(13, Math.Max(4, (endTime - startTime) * (Config.NODE_MIN_WIDTH / 12000.0))),
+                },
                 UserData = (startTime, endTime),
                 NodeBoundaryDelegate = (Node node) =>
                 {
-                    double width = (endTime - startTime) * Config.NODE_WIDTH_SCALAR;
+                    // We assume that the minimum amount of time represented is 5 min
+                    // So everything must scale according to this 
+                    double widthPerSecond = Config.NODE_MIN_WIDTH / 300.0;
+                    double width = (endTime - startTime) * widthPerSecond;
                     double height = Config.NODE_HEIGHT;
 
                     return CurveFactory.CreateRectangleWithRoundedCorners(
