@@ -1,0 +1,65 @@
+% Credits: Philip de Bruin (p.debruin@uu.nl)
+
+\documentclass[./main.tex]{subfiles}
+
+\begin{document}
+
+\newgeometry{margin=2cm} % Special margins on the titlepage. It is also possible to set each margin separately; see package Geometry.
+\DTMlangsetup{showdayofmonth=false}
+
+
+\makeatletter
+\begin{titlepage}
+    \begin{center}
+
+    \vspace*{.02\textheight}
+    % * University logo
+    {\includegraphics[align=c, width=0.4\textwidth]{uulogo.png}}%\vspace{0.5cm}
+    {\includegraphics[align=c, width=0.3\textwidth]{qbuzzlogo.png}\par}%\vspace{0.5cm}
+    \textsc{\Large Department of Information and Computing Sciences}\\[0.5cm] % Department
+
+    \HRule \\[0.4cm] % Horizontal line
+    % * Thesis title
+    {\huge \bfseries \@title \par}\vspace{0.4cm}
+    \HRule \\[0.5cm] % Horizontal line
+
+    {\Large \textsc{
+        Computing Science Master Thesis \\[0.2cm]
+        % Student Number
+        \large{\@studentnumber}
+    }} \\[5.5cm]
+
+
+    \begin{minipage}[t]{0.4\textwidth}
+        % * Author
+        \begin{flushleft} \large
+            \emph{Author:}\\
+            \@author
+        \end{flushleft}
+    \end{minipage}
+    \begin{minipage}[t]{0.4\textwidth}
+        % * Supervisors
+        \begin{flushright} \large
+            % TODO: Make single command
+            \emph{Supervisors:} \\
+            \@firstsupervisor \\
+            \@secondsupervisor \\
+            \@dailysupervisor \\
+            \@externalsupervisor
+        \end{flushright}
+    \end{minipage}\\[2cm]
+
+    \vfill
+
+    % * Date
+    {\large \@date }\\[4cm]
+
+    \end{center}
+\end{titlepage}
+\makeatother
+
+\restoregeometry %%% Restores the margins for the rest of the document.
+\DTMlangsetup{showdayofmonth=true}
+
+
+\end{document}

@@ -1,0 +1,112 @@
+
+% Basic language setup
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[UKenglish]{babel}
+\usepackage[autostyle]{csquotes}
+\usepackage[en-GB]{datetime2}
+
+\usepackage{
+    graphicx,
+    subfiles
+}
+\usepackage[
+    paper=a4paper,
+    margin=2.5cm,
+    headheight=14pt,
+]{geometry}
+\usepackage{pdflscape}
+\usepackage{booktabs}
+\usepackage{multicol}
+\usepackage{mathtools, amssymb, amsmath}
+\usepackage{afterpage}
+\usepackage{graphbox}
+\usepackage[
+  sorting=nty,
+  backend=bibtex,
+  giveninits=true,
+  style=authoryear-comp,
+  natbib=true,
+  maxcitenames=2,
+  maxbibnames=99,
+  useprefix=true,
+  uniquename=init
+]{biblatex}
+
+\addbibresource{bibliography.bib}
+% Prioritize DOI > Eprint > URL
+\AtEveryBibitem{%
+  \ifboolexpr{ test {\ifentrytype{article}} or test {\ifentrytype{book}} or test {\ifentrytype{inproceedings}} }{%
+    \iffieldundef{doi}{%
+      \iffieldundef{eprint}{}{%
+        \clearfield{url} % Keep eprint if present, remove URL
+      }
+    }{%
+      \clearfield{eprint} % Remove eprint if DOI exists
+      \clearfield{url}    % Remove URL if DOI exists
+    }%
+  }{}%
+}
+\newcommand{\todo}[1]{{\color{red}[\textit{TODO: #1}]}}
+\newcommand{\todonocomment}[1]{{\color{red}[\textit{#1}]}}
+
+
+% Make abstract part of page numbering
+\makeatletter
+\newif\if@abstractmode
+
+\renewenvironment{titlepage}
+{
+    \if@twocolumn
+    \@restonecoltrue\onecolumn
+    \else
+    \@restonecolfalse\newpage
+    \fi
+    \if@abstractmode
+    \thispagestyle{plain}%
+    \stepcounter{page}%
+    \else
+    \thispagestyle{empty}%
+    \setcounter{page}\@ne%
+    \fi
+}%
+{\if@restonecol\twocolumn \else \newpage \fi
+    \if@twoside\else
+    \if@abstractmode
+    \else
+    \setcounter{page}\@ne%
+    \fi
+    \fi
+}
+
+\AtBeginEnvironment{abstract}{%
+    \@abstractmodetrue%
+}
+
+\makeatother
+
+% * Title page constants
+\makeatletter
+\newcommand{\@studentnumber}{}
+\newcommand{\@firstsupervisor}{}
+\newcommand{\@secondsupervisor}{}
+\newcommand{\@dailysupervisor}{}
+\newcommand{\@externalsupervisor}{}
+
+\renewcommand{\author}[2]{
+    \renewcommand{\@author}{#1}
+    \renewcommand{\@studentnumber}{#2}
+}
+\newcommand{\supervisors}[4]{
+    \renewcommand{\@firstsupervisor}{#1}
+    \renewcommand{\@secondsupervisor}{#2}
+    \renewcommand{\@dailysupervisor}{#3}
+    \renewcommand{\@externalsupervisor}{#4}
+}
+\makeatother
+
+% * Title page setup
+
+% Command to make the lines in the title page
+\newcommand{\HRule}{\rule{.9\linewidth}{.6pt}}

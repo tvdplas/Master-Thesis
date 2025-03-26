@@ -160,9 +160,9 @@ namespace E_VCSP
 
             instance = new(activeFolder);
             discreteSolver = new(instance);
-            if (Config.GRAPH_SHOWN && instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN)
+            if (instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN)
             {
-                graphViewer.Graph = discreteSolver.GenerateDiscreteGraph();
+                graphViewer.Graph = discreteSolver.DGraph.GenerateDiscreteGraph();
             }
             else
             {

@@ -1,4 +1,4 @@
-﻿using E_VCSP.Solver;
+﻿using E_VCSP.Objects.Discrete;
 using Microsoft.Msagl.Core.Geometry.Curves;
 using Microsoft.Msagl.Drawing;
 using Color = Microsoft.Msagl.Drawing.Color;
@@ -17,8 +17,7 @@ namespace E_VCSP.Formatting
                     FillColor = color,
                 },
                 Label = {
-
-                    FontSize = Math.Min(13, Math.Max(4, (endTime - startTime) * (Config.NODE_MIN_WIDTH / 12000.0))),
+                    FontSize = content.Length > 0 ? Math.Min(13, Math.Max(4, (endTime - startTime) * (Config.NODE_MIN_WIDTH / 12000.0))) : 12,
                 },
                 UserData = (startTime, endTime),
                 NodeBoundaryDelegate = (Node node) =>
@@ -29,33 +28,24 @@ namespace E_VCSP.Formatting
                     double width = (endTime - startTime) * widthPerSecond;
                     double height = Config.NODE_HEIGHT;
 
-                    return CurveFactory.CreateRectangleWithRoundedCorners(
-                        width,
-                        height,
-                        0.3,
-                        0.3,
-                        new Microsoft.Msagl.Core.Geometry.Point(0, 0)
-                    );
+                    return CurveFactory.CreateRectangle(width, height, new(0, 0));
                 },
                 LabelText = $"{content}\n{Formatting.Time.HHMMSS(startTime)}-{Formatting.Time.HHMMSS(endTime)}",
             };
 
             return node;
         }
-        internal static Node TripNode(DiscreteTrip t)
+        internal static Node TripNode(DTrip t)
         {
             Node node = new Node(t.Id.ToString())
             {
                 Attr = {
                     LabelMargin = 5,
                 },
-                DrawNodeDelegate = (Node _node, object _g) =>
-                {
-                    return !Config.NODE_SHOWN;
-                },
                 NodeBoundaryDelegate = (Node node) =>
                 {
-                    double width = Math.Max(t.Trip.Duration * Config.NODE_WIDTH_SCALAR, Config.NODE_MIN_WIDTH);
+                    double widthPerSecond = Config.NODE_MIN_WIDTH / 300.0;
+                    double width = t.Trip.Duration * widthPerSecond;
                     double height = Config.NODE_HEIGHT;
 
                     return CurveFactory.CreateRectangleWithRoundedCorners(
@@ -66,13 +56,7 @@ namespace E_VCSP.Formatting
                         new Microsoft.Msagl.Core.Geometry.Point(0, 0)
                     );
                 },
-                LabelText = $"{t.StartingSoC}% {Config.NODE_LABEL switch
-                {
-                    GraphElementDisplay.Id => t.ToString(),
-                    GraphElementDisplay.Trips => t.Trip.ToLongString(false),
-                    GraphElementDisplay.TripsAndDetails => t.Trip.ToLongString(true),
-                    _ => "",
-                }}"
+                LabelText = t.StartingSoC + t.Trip.ToLongString(true)
             };
 
             return node;
