@@ -38,6 +38,7 @@
         internal static int MIN_CHARGE_TIME = 300;
 
         internal static Header SOLVER = new();
+        internal static bool USE_COLUMN_GENERATION = true;
         internal static bool DETERMINE_IIS = false;
     }
 }

@@ -3,6 +3,7 @@
     internal class Location
     {
         internal required string Id;
+        internal int Index = -1;
 
         internal double ChargeTotalPower = 0; // KWh
         internal int ChargeSpots = 0;

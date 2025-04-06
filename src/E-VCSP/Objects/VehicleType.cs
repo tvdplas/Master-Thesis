@@ -10,10 +10,5 @@
         internal double MinCharge = 0; // Fraction of total capacity
         internal double MaxCharge = 100;
         internal double StartCharge = 100;
-
-        // TODO: actual values
-        internal double INDIVIDUAL_COST = 100;
-        internal double CHARGE_COST = 1;
-        internal double DRIVE_COST = 0.05;
     }
 }

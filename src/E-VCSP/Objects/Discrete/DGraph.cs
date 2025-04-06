@@ -147,12 +147,12 @@ namespace E_VCSP.Objects.Discrete
             if (depot == null) throw new InvalidDataException("At least one location should be flagged as a depot.");
             DDepotStart = new()
             {
-                Id = "start",
+                Id = "start-" + depot.Id,
                 Location = depot,
             };
             DDepotEnd = new()
             {
-                Id = "end",
+                Id = "end-" + depot.Id,
                 Location = depot,
             };
 

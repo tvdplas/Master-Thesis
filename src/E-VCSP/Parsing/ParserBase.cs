@@ -73,7 +73,7 @@ namespace E_VCSP.Parsing
             }
             else
             {
-                val = new Location() { Id = id };
+                val = new Location() { Id = id, Index = locations.Count };
                 locations.Add(val);
             }
             return val;

@@ -12,7 +12,7 @@ namespace E_VCSP
         public string activeFolder = "No folder selected";
 
         Instance? instance;
-        EVSPDiscrete? discreteSolver;
+        Solver.Solver? solver;
 
         public MainView()
         {
@@ -145,12 +145,11 @@ namespace E_VCSP
         private void solve()
         {
             reload();
-            if (discreteSolver == null) return;
+            if (solver == null) return;
 
-            if (discreteSolver.Solve())
+            if (solver.Solve())
             {
-                graphViewer.Graph = discreteSolver.GenerateSolutionGraph();
-                Random r = new();
+                graphViewer.Graph = solver.GenerateSolutionGraph();
             }
         }
 
@@ -159,10 +158,10 @@ namespace E_VCSP
             if (activeFolder == "No folder selected") return;
 
             instance = new(activeFolder);
-            discreteSolver = new(instance);
-            if (instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN)
+            solver = Config.USE_COLUMN_GENERATION ? new EVSPDiscreteCG(instance) : new EVSPDiscrete(instance);
+            if (instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN && solver is EVSPDiscrete sd)
             {
-                graphViewer.Graph = discreteSolver.DGraph.GenerateDiscreteGraph();
+                graphViewer.Graph = sd.DGraph.GenerateDiscreteGraph();
             }
             else
             {

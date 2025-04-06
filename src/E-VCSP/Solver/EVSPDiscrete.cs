@@ -147,10 +147,10 @@ namespace E_VCSP.Solver
                     DDeadhead fdh = deadheadVarMapping[v.VarName];
 
                     int from = fdh.From is DDepot
-                        ? (fdh.From.Id.EndsWith("start") ? DGraph.DTrips.Count : DGraph.DTrips.Count + 1)
+                        ? (fdh.From.Id.Contains("start") ? DGraph.DTrips.Count : DGraph.DTrips.Count + 1)
                         : int.Parse(((DTrip)fdh.From).Trip.Id.Substring(1)) - 1;
                     int to = fdh.To is DDepot
-                        ? (fdh.To.Id.EndsWith("start") ? DGraph.DTrips.Count : DGraph.DTrips.Count + 1)
+                        ? (fdh.To.Id.Contains("start") ? DGraph.DTrips.Count : DGraph.DTrips.Count + 1)
                         : int.Parse(((DTrip)fdh.To).Trip.Id.Substring(1)) - 1;
                     adj[from].Add((to, fdh));
                     Console.WriteLine($"{v.VarName} used; adj[{from}][{to}] = 1");
@@ -221,17 +221,35 @@ namespace E_VCSP.Solver
 
                     if (dtf != null)
                     {
-                        var node = Formatting.GraphElement.ScheduleNode(currTime, currTime + dtf.Trip.Duration, pathPart.From.Id, Color.LightBlue, i);
+                        var node = Formatting.GraphElement.ScheduleNode(currTime, currTime + dtf.Trip.Duration, $"{dtf.Trip.From} -> {dtf.Trip.To} ({dtf.Trip.Route})", Color.LightBlue, i);
                         graph.AddNode(node);
                         pathNodes.Add(node);
                         currTime += dtf.Trip.Duration;
                     }
-                    if (pathPart.DrivingTimes.Count >= 1)
+                    if (pathPart.DrivingTimes.Count == 1)
                     {
+                        string textFrom = pathPart.From is DTrip ppf ? ppf.Trip.To.Id : pathPart.From.Id;
+                        string textTo = pathPart.To is DTrip ppt ? ppt.Trip.From.Id : pathPart.To.Id;
+
+
                         var node = Formatting.GraphElement.ScheduleNode(
                             currTime,
                             currTime + pathPart.DrivingTimes[0],
-                            pathPart.DrivingTimes.Count == 1 ? $"{pathPart.From.Id} -> {pathPart.To.Id}" : $"{pathPart.From.Id} -> charger",
+                            $"{textFrom} -> {textTo}",
+                            Color.Blue,
+                            i
+                        );
+                        graph.AddNode(node);
+                        pathNodes.Add(node);
+                        currTime += pathPart.DrivingTimes[0];
+                    }
+                    if (pathPart.DrivingTimes.Count > 1)
+                    {
+                        string textFrom = pathPart.From is DTrip ppf ? ppf.Trip.To.Id : pathPart.From.Id;
+                        var node = Formatting.GraphElement.ScheduleNode(
+                            currTime,
+                            currTime + pathPart.DrivingTimes[0],
+                            $"{textFrom} -> charger",
                             Color.Blue,
                             i
                         );
@@ -254,10 +272,11 @@ namespace E_VCSP.Solver
                     }
                     if (pathPart.DrivingTimes.Count == 2)
                     {
+                        string text = "charger -> " + (pathPart.To is DTrip ppt ? ppt.Trip.From.Id : pathPart.To.Id);
                         var node = Formatting.GraphElement.ScheduleNode(
                             currTime,
                             currTime + pathPart.DrivingTimes[1],
-                            $"charger -> {pathPart.To.Id}",
+                            text,
                             Color.Blue,
                             i
                         );
@@ -267,10 +286,11 @@ namespace E_VCSP.Solver
                     }
                     if (pathPart.IdleTime > 0)
                     {
+                        string text = "idle @ " + (pathPart.To is DTrip ppt ? ppt.Trip.From.Id : pathPart.To.Id);
                         var node = Formatting.GraphElement.ScheduleNode(
                             currTime,
                             currTime + pathPart.IdleTime,
-                            $"idle @ {pathPart.To.Id}",
+                            text,
                             Color.LightGray,
                             i
                         );

@@ -8,9 +8,10 @@ namespace E_VCSP.Formatting
 {
     internal static class GraphElement
     {
+        static Random r = new();
         internal static Node ScheduleNode(int startTime, int endTime, string content, Color color, int offset)
         {
-            Node node = new Node($"{startTime}-{endTime}-{content}")
+            Node node = new Node($"{startTime}-{endTime}-{content}-{r.Next()}")
             {
                 Attr = {
                     LabelMargin = 5,
