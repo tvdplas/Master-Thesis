@@ -39,6 +39,7 @@ namespace E_VCSP.Parsing
                 MinimumLayover = ParseTime(line[attributeIndexMapping["MinimumLayover"]]),
                 AllowedVehicleTypes = line[attributeIndexMapping["AllowedVehicleTypes"]].Split(',').ToList(),
                 Id = $"t{index}",
+                Index = index,
             };
         }
     }

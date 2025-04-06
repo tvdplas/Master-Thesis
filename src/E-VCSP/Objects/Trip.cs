@@ -12,6 +12,7 @@
         internal int MinimumLayover; // unit: seconds
         internal required List<string> AllowedVehicleTypes;
         internal required string Id;
+        internal required int Index = -1;
 
         public override string ToString()
         {

@@ -39,6 +39,7 @@
 
         internal static Header SOLVER = new();
         internal static bool USE_COLUMN_GENERATION = true;
+        internal static int MAX_COL_GEN_ITS = 20;
         internal static bool DETERMINE_IIS = false;
     }
 }

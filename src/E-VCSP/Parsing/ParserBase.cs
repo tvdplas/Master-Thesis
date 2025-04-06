@@ -100,7 +100,7 @@ namespace E_VCSP.Parsing
             List<T> res = new();
             for (int i = 1; i < file.Count; i++)
             {
-                res.Add(ParseSingle(i, file[i], attributeIndexMapping, locations));
+                res.Add(ParseSingle(i - 1, file[i], attributeIndexMapping, locations));
             }
             return res;
         }
