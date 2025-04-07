@@ -81,8 +81,6 @@
                 timeRemaining -= usableTime;
             }
 
-            // TODO: de SoC kan nu wel non-linear, maar de kosten doen dat niet; 
-            // aanpassing is nodig waarbij je na het berekenen van gebruik opnieuw de kosten bepaalt.
             return new ChargeResult()
             {
                 SoCGained = currSoC - startSoC,
@@ -101,9 +99,15 @@
         {
             double currSoC = startSoC;
             int currTime = 0;
+
             while (currSoC < targetSoC)
             {
-                CurvePiece? p = Pieces.Find(piece => piece.MinSoC <= currSoC && piece.MaxSoC > currSoC);
+                CurvePiece? p = null;
+                for (int i = 0; i < Pieces.Count; i++) if (Pieces[i].MinSoC <= currSoC && Pieces[i].MaxSoC >= currSoC)
+                    {
+                        p = Pieces[i];
+                        break;
+                    }
                 if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
 
                 // Charge until end of piece or until desired SoC is reached

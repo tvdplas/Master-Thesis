@@ -70,14 +70,14 @@ namespace E_VCSP.Solver
             for (int i = l; i < front.Count; i++)
             {
                 // Skip once domination is found
-                if (front[i].costs <= label.costs) return;
+                if (front.Values[i].costs <= label.costs) return;
             }
 
             // Label is inserted, all dominated items need to be removed
-            for (int i = l; l >= 0; l--)
+            for (int i = l - 1; i >= 0 && i < front.Count; i--)
             {
-                var b = front[i];
-                if (label.costs < b.costs)
+                var b = front.Values[i];
+                if (label.costs <= b.costs)
                 {
                     front.RemoveAt(i);
                 }
@@ -85,6 +85,8 @@ namespace E_VCSP.Solver
             front[label.currSoC] = label;
         }
         internal int Count => front.Count;
+
+        internal void Clear() => front.Clear();
 
         internal SPLabel Pop()
         {
@@ -113,8 +115,8 @@ namespace E_VCSP.Solver
 
         private GRBModel model;
 
-        private double floorToDiscreteValue(double inp) => Math.Floor(inp / (100.0 / Config.DISCRETE_FACTOR)) * (100.0 / Config.DISCRETE_FACTOR);
-
+        private List<List<SPLabel>> allLabels = new();
+        private List<Front> activeLabels = new();
 
         internal EVSPLabeling(Instance instance)
         {
@@ -137,6 +139,13 @@ namespace E_VCSP.Solver
 
             // Generate initial set of vehicle tasks
             GenerateInitialTasks();
+
+            // Initialize labels
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                allLabels.Add(new());
+                activeLabels.Add(new());
+            }
         }
 
         private void GenerateGraph()
@@ -433,8 +442,12 @@ namespace E_VCSP.Solver
             return graph;
         }
 
+
+
         private (double minCosts, VehicleTask vehicleTask) getShortestPath()
         {
+            Console.WriteLine("Starting label correction");
+
             if (model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
                 throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
 
@@ -444,19 +457,20 @@ namespace E_VCSP.Solver
             {
                 reducedCosts.Add(constrs[i].Pi);
             }
-            List<List<SPLabel>> allLabels = new();
-            List<Front> activeLabels = new();
+
             for (int i = 0; i < nodes.Count; i++)
             {
-                allLabels.Add(new());
-                activeLabels.Add(new());
+                allLabels[i].Clear();
+                activeLabels[i].Clear();
             }
+
             int labelId = 0;
-            var addLabel = (SPLabel spl, int index) =>
+            void addLabel(SPLabel spl, int index)
             {
                 allLabels[index].Add(spl);
                 activeLabels[index].Insert(spl);
-            };
+            }
+
 
             addLabel(new SPLabel(nodes.Count - 2, -1, vt.StartCharge, 0, labelId++), nodes.Count - 2);
 
@@ -507,32 +521,14 @@ namespace E_VCSP.Solver
                     }
 
                     // For each label possibility, check if it is not already dominated at the target node. 
-                    // TODO: ook dit kan echt veel beter
-                    options = options.Where((option) =>
-                    {
-                        return allLabels[targetIndex].Find((x) => x.currSoC >= option.newSoC && x.costs <= option.cost) == null;
-                    }).ToList();
-
-                    // For all options that remain, add them one by one and remove any other labels that are dominated
                     foreach (var option in options)
                     {
-                        for (int j = 0; j < activeLabels[targetIndex].Count; j++)
-                        {
-                            var al = activeLabels[targetIndex][j];
-
-                            if (al.currSoC <= option.newSoC && al.costs >= option.cost)
-                            {
-                                var temp = al;
-                                activeLabels[targetIndex][j] = activeLabels[targetIndex][^1];
-                                activeLabels[targetIndex][^1] = al;
-                                activeLabels[targetIndex].RemoveAt(activeLabels[targetIndex].Count - 1);
-                                j--;
-                            }
-                        }
                         addLabel(new SPLabel(currIndex, l.id, option.newSoC, option.cost, labelId++), targetIndex);
                     }
                 }
             }
+
+            Console.WriteLine($"Total of {labelId} labels considered");
 
             // Backtrack in order to get path
             // indexes to nodes
