@@ -20,6 +20,10 @@
     internal static class Config
     {
         // Graph display
+        internal static Header DEBUG = new();
+        internal static bool CONSOLE_GUROBI = true;
+        internal static bool CONSOLE_LABELING = true;
+
         // General layout
         internal static Header GRAPH_LAYOUT = new();
         internal static int MAX_NODES_FOR_SHOWN = 150;
@@ -40,6 +44,7 @@
         internal static Header SOLVER = new();
         internal static bool USE_COLUMN_GENERATION = true;
         internal static int MAX_COL_GEN_ITS = 20;
+        internal static double COL_GEN_GEQ_THRESHOLD = 0.1;
         internal static bool DETERMINE_IIS = false;
     }
 }

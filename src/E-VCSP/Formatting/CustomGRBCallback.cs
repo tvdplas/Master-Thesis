@@ -6,7 +6,7 @@ namespace E_VCSP.Formatting
     {
         protected override void Callback()
         {
-            if (where == GRB.Callback.MESSAGE)
+            if (where == GRB.Callback.MESSAGE && Config.CONSOLE_GUROBI)
             {
                 String text = GetStringInfo(GRB.Callback.MSG_STRING);
                 Console.WriteLine(text);

@@ -285,7 +285,7 @@ namespace E_VCSP.Solver
             int[] covered = new int[instance.Trips.Count];
             foreach (GRBVar v in model.GetVars())
             {
-                if (v.X >= 0.5)
+                if (v.X >= Config.COL_GEN_GEQ_THRESHOLD)
                 {
                     VehicleTask dvt = varTaskMapping[v.VarName];
                     Console.WriteLine($"Reduced costs: {v.RC}");
@@ -446,7 +446,7 @@ namespace E_VCSP.Solver
 
         private (double minCosts, VehicleTask vehicleTask) getShortestPath()
         {
-            Console.WriteLine("Starting label correction");
+            if (Config.CONSOLE_LABELING) Console.WriteLine("Starting label correction");
 
             if (model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
                 throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
@@ -528,7 +528,7 @@ namespace E_VCSP.Solver
                 }
             }
 
-            Console.WriteLine($"Total of {labelId} labels considered");
+            if (Config.CONSOLE_LABELING) Console.WriteLine($"Total of {labelId} labels considered");
 
             // Backtrack in order to get path
             // indexes to nodes
@@ -585,6 +585,8 @@ namespace E_VCSP.Solver
                     EndTime = endTime,
                 });
             }
+
+            if (Config.CONSOLE_LABELING) Console.WriteLine($"Generated column with reduced cost of {minCosts}");
 
             return (minCosts, new VehicleTask(taskElements));
         }
