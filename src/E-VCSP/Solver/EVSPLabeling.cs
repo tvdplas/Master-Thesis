@@ -442,9 +442,7 @@ namespace E_VCSP.Solver
             return graph;
         }
 
-
-
-        private (double minCosts, VehicleTask vehicleTask) getShortestPath()
+        private (double minCosts, VehicleTask vehicleTask) getVehicleTaskLabeling()
         {
             if (Config.CONSOLE_LABELING) Console.WriteLine("Starting label correction");
 
@@ -635,7 +633,7 @@ namespace E_VCSP.Solver
             while (currIts < Config.MAX_COL_GEN_ITS && !shouldStop && model.Status != GRB.Status.INFEASIBLE)
             {
                 // Generate new column with shortest labeled pat
-                (double minCosts, VehicleTask vehicleTask) = getShortestPath();
+                (double minCosts, VehicleTask vehicleTask) = getVehicleTaskLabeling();
 
                 // Add column to model 
                 if (minCosts < 0)

@@ -9,6 +9,11 @@ namespace E_VCSP.Objects.Discrete
         internal int EndTime;
     }
 
+    internal class VEDepot : VehicleElement
+    {
+        internal required Location Location;
+    }
+
     internal class VETrip : VehicleElement
     {
         internal required Trip Trip;
