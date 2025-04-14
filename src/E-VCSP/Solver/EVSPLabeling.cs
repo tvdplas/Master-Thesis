@@ -174,7 +174,7 @@ namespace E_VCSP.Solver
                 }
             }
 
-            // depot start arcs
+            // depot start -> trip arcs
             for (int i = 0; i < nodes.Count - 2; i++)
             {
                 TripNode tn = (TripNode)nodes[i];
@@ -183,10 +183,11 @@ namespace E_VCSP.Solver
                 double baseCost = Config.PULLOUT_COST + (dht.Distance * Config.M_COST);
 
                 // TODO: Charge directly after depot?
-                adjFull[^2][i] = new Arc() { From = nodes[^2], To = tn, Deadhead = new() { ChargingActions = [], BaseCost = baseCost, DeadheadTemplate = dht } };
-                adj[^2].Add(new Arc() { From = nodes[^2], To = tn, Deadhead = new() { ChargingActions = [], BaseCost = baseCost, DeadheadTemplate = dht } });
+                LabelDeadhead dh = new() { ChargingActions = [], BaseCost = baseCost, DeadheadTemplate = dht };
+                adjFull[^2][i] = new Arc() { From = nodes[^2], To = tn, Deadhead = dh };
+                adj[^2].Add(new Arc() { From = nodes[^2], To = tn, Deadhead = dh });
             }
-            // depot end arcs
+            // trip -> depot end arcs
             for (int i = 0; i < nodes.Count - 2; i++)
             {
                 TripNode tn = (TripNode)nodes[i];
@@ -194,8 +195,19 @@ namespace E_VCSP.Solver
                 if (dht == null) throw new InvalidDataException("No travel possible from trip to depot");
                 double baseCost = dht.Distance * Config.M_COST;
                 // TODO: Charge directly before depot?
-                adjFull[i][^1] = new Arc() { To = nodes[^1], From = tn, Deadhead = new() { ChargingActions = [], BaseCost = baseCost, DeadheadTemplate = dht } };
-                adj[i].Add(new Arc() { To = nodes[^1], From = tn, Deadhead = new() { ChargingActions = [], BaseCost = baseCost, DeadheadTemplate = dht } });
+                LabelDeadhead dh = new() { ChargingActions = [], BaseCost = baseCost, DeadheadTemplate = dht };
+                adjFull[i][^1] = new Arc() { To = nodes[^1], From = tn, Deadhead = dh };
+                adj[i].Add(new Arc() { To = nodes[^1], From = tn, Deadhead = dh });
+            }
+            // depot -> depot arc
+            {
+                DeadheadTemplate? dht = locationDHTMapping[depot.Index][depot.Index];
+                if (dht == null) throw new InvalidDataException("No travel possible from depot to depot");
+                double baseCost = dht.Distance * Config.M_COST;
+                // TODO: Charge directly before depot?
+                LabelDeadhead dh = new() { ChargingActions = [], BaseCost = baseCost, DeadheadTemplate = dht };
+                adjFull[^2][^1] = new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh };
+                adj[^2].Add(new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh });
             }
 
             // Trip to trip arcs
@@ -238,8 +250,10 @@ namespace E_VCSP.Solver
                         });
                     }
 
-                    adjFull[i][j] = new Arc() { To = tn2, From = tn1, Deadhead = new() { ChargingActions = chargingActions, BaseCost = baseCost, DeadheadTemplate = dht } };
-                    adj[i].Add(new Arc() { To = tn2, From = tn1, Deadhead = new() { ChargingActions = chargingActions, BaseCost = baseCost, DeadheadTemplate = dht } });
+                    LabelDeadhead dh = new() { ChargingActions = chargingActions, BaseCost = baseCost, DeadheadTemplate = dht };
+
+                    adjFull[i][j] = new Arc() { To = tn2, From = tn1, Deadhead = dh };
+                    adj[i].Add(new Arc() { To = tn2, From = tn1, Deadhead = dh });
                 }
             }
         }
@@ -255,6 +269,7 @@ namespace E_VCSP.Solver
                     Deadhead = dhTo,
                     EndTime = ((TripNode)nodes[dhTo.DeadheadTemplate.To.Index]).Trip.StartTime,
                     StartTime = ((TripNode)nodes[dhTo.DeadheadTemplate.To.Index]).Trip.StartTime - dhTo.DeadheadTemplate.Duration,
+                    Cost = dhTo.BaseCost,
                 };
 
                 LabelDeadhead? dhFrom = adjFull[i][^1]?.Deadhead;
@@ -264,6 +279,7 @@ namespace E_VCSP.Solver
                     Deadhead = dhFrom,
                     StartTime = ((TripNode)nodes[dhFrom.DeadheadTemplate.From.Index]).Trip.EndTime,
                     EndTime = ((TripNode)nodes[dhFrom.DeadheadTemplate.To.Index]).Trip.EndTime + dhFrom.DeadheadTemplate.Duration,
+                    Cost = dhFrom.BaseCost,
                 };
 
                 Trip t = ((TripNode)nodes[i]).Trip;
@@ -272,6 +288,7 @@ namespace E_VCSP.Solver
                     Trip = t,
                     EndTime = t.EndTime,
                     StartTime = t.StartTime,
+                    Cost = 0,
                 };
 
                 VehicleTask vt = new([toTrip, trip, fromTrip]);
@@ -554,6 +571,7 @@ namespace E_VCSP.Solver
                         Trip = instance.Trips[index],
                         EndTime = instance.Trips[index].EndTime,
                         StartTime = instance.Trips[index].StartTime,
+                        Cost = 0,
                     });
                 }
 
@@ -581,6 +599,7 @@ namespace E_VCSP.Solver
                     Deadhead = dh,
                     StartTime = startTime,
                     EndTime = endTime,
+                    Cost = dh.BaseCost, // TODO: charging goed meerekenen
                 });
             }
 
@@ -625,27 +644,28 @@ namespace E_VCSP.Solver
             // Add max vehicles constraint
             model.AddConstr(maxVehicles <= Config.MAX_VEHICLES, "max_vehicles");
 
-
             model.Optimize();
 
             bool shouldStop = false;
             int currIts = 1;
+            ShortestPathLS spls = new(instance, model, adjFull);
+
             while (currIts < Config.MAX_COL_GEN_ITS && !shouldStop && model.Status != GRB.Status.INFEASIBLE)
             {
-                // Generate new column with shortest labeled pat
-                (double minCosts, VehicleTask vehicleTask) = getVehicleTaskLabeling();
+                spls.Reset();
+                VehicleTask vehicleTask = spls.getVehicleTaskLS();
 
                 // Add column to model 
-                if (minCosts < 0)
-                {
-                    tasks.Add(vehicleTask);
-                    GRBConstr[] constrs = model.GetConstrs().Where((_, i) => vehicleTask.Covers.Contains(i)).ToArray();
-                    GRBColumn col = new();
-                    col.AddTerms(constrs.Select(_ => 1.0).ToArray(), constrs);
-                    string name = $"vt_{tasks.Count - 1}";
-                    model.AddVar(0, 1, vehicleTask.Cost, GRB.CONTINUOUS, col, name);
-                    varTaskMapping[name] = tasks[^1];
-                }
+                //if (vehicleTask.Cost < 0)
+                //{
+                tasks.Add(vehicleTask);
+                GRBConstr[] constrs = model.GetConstrs().Where((_, i) => vehicleTask.Covers.Contains(i)).ToArray();
+                GRBColumn col = new();
+                col.AddTerms(constrs.Select(_ => 1.0).ToArray(), constrs);
+                string name = $"vt_{tasks.Count - 1}";
+                model.AddVar(0, 1, vehicleTask.Cost, GRB.CONTINUOUS, col, name);
+                varTaskMapping[name] = tasks[^1];
+                //}
 
                 // Continue.......
                 model.Optimize();

@@ -39,7 +39,8 @@
         internal static double KWH_COST = 0.32;
         internal static double M_COST = 0.00001; // TODO: actual value
         internal static double PULLOUT_COST = 10; // Costs to deploy a vehicle at the beginning of the day.
-        internal static int MAX_VEHICLES = 6; // Maximum number of vehicles that can be used in the solution.
+        internal static double IDLE_COST = 0; // Cost per unit of time for being idle.
+        internal static int MAX_VEHICLES = 60; // Maximum number of vehicles that can be used in the solution.
         internal static int DISCRETE_FACTOR = 5;
         internal static int MIN_CHARGE_TIME = 300;
 

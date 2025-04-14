@@ -9,6 +9,9 @@ namespace E_VCSP.Objects
         internal List<Trip> Trips;
         internal List<VehicleType> VehicleTypes;
 
+        internal int DepotStartIndex = -1;
+        internal int DepotEndIndex = -1;
+
         public List<DeadheadTemplate> DeadheadTemplates;
 
         internal Instance(string path)
@@ -54,6 +57,9 @@ namespace E_VCSP.Objects
                     Id = $"dht-self{DeadheadTemplates.Count}"
                 });
             }
+
+            DepotStartIndex = Trips.Count;
+            DepotEndIndex = Trips.Count + 1;
         }
     }
 }
