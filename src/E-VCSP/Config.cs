@@ -31,26 +31,29 @@
 
         // Nodes
         internal static Header NODES = new();
-        internal static int NODE_MIN_WIDTH = 75;
+        internal static int MIN_NODE_TIME = 300;
+        internal static int MIN_NODE_WIDTH = 75;
         internal static int NODE_HEIGHT = 40;
-        internal static int DUMMY_NODE_TIME = 300;
 
         internal static Header DATA = new();
         internal static double KWH_COST = 0.32;
         internal static double M_COST = 0.00001; // TODO: actual value
         internal static double PULLOUT_COST = 10; // Costs to deploy a vehicle at the beginning of the day.
         internal static double IDLE_COST = 0; // Cost per unit of time for being idle.
-        internal static int MAX_VEHICLES = 60; // Maximum number of vehicles that can be used in the solution.
+        internal static int MAX_VEHICLES = 6; // Maximum number of vehicles that can be used in the solution.
+        internal static int MAX_VEHICLES_OVER_COST = 1000; // Cost per vehicle of going over.
         internal static int DISCRETE_FACTOR = 5;
         internal static int MIN_CHARGE_TIME = 300;
 
         internal static Header SOLVER = new();
         internal static bool USE_COLUMN_GENERATION = true;
-        internal static int MAX_COL_GEN_ITS = 20;
+        internal static int MAX_COL_GEN_ITS = 1000;
         internal static double LS_STARTING_T = 2;
         internal static double LS_ENDING_T = 0.01;
         internal static double LS_COOLING_RATE = 0.95;
         internal static double LS_ITERATIONS = 10_000;
+        internal static double LS_OVERCHARGE_PENALTY = 0.5;
+        internal static double LS_UNDERCHARGE_PENALTY = 0.5;
         internal static double COL_GEN_GEQ_THRESHOLD = 0.1;
         internal static bool DETERMINE_IIS = false;
     }

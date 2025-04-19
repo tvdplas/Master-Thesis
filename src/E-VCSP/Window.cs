@@ -158,7 +158,7 @@ namespace E_VCSP
             if (activeFolder == "No folder selected") return;
 
             instance = new(activeFolder);
-            solver = Config.USE_COLUMN_GENERATION ? new EVSPLabeling(instance) : new EVSPDiscrete(instance);
+            solver = Config.USE_COLUMN_GENERATION ? new EVSPCG(instance) : new EVSPDiscrete(instance);
             if (instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN && solver is EVSPDiscrete sd)
             {
                 graphViewer.Graph = sd.DGraph.GenerateDiscreteGraph();

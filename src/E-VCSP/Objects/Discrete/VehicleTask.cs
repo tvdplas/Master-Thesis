@@ -8,6 +8,8 @@ namespace E_VCSP.Objects.Discrete
         internal required double Cost;
         internal required int StartTime;
         internal required int EndTime;
+        internal double? SoCAtStart;
+        internal double? SoCAtEnd;
     }
 
     internal class VETrip : VehicleElement
@@ -23,6 +25,10 @@ namespace E_VCSP.Objects.Discrete
     {
         internal required LabelDeadhead Deadhead;
 
+        internal int SelectedAction = -1;
+        internal int ChargeTime = 0;
+        internal double ChargeGained = 0;
+
         public override string ToString()
         {
             return $"VE DH {Deadhead.DeadheadTemplate.Id}";
@@ -30,9 +36,11 @@ namespace E_VCSP.Objects.Discrete
     }
     internal class VEIdle : VehicleElement
     {
+        internal required Location Location;
+
         public override string ToString()
         {
-            return $"VE Idle";
+            return $"VE Idle {Location.Id}";
         }
     }
     internal class VEDepot : VehicleElement

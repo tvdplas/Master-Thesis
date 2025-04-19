@@ -9,32 +9,61 @@ namespace E_VCSP.Formatting
     internal static class GraphElement
     {
         static Random r = new();
-        internal static Node ScheduleNode(int startTime, int endTime, string content, Color color, int offset)
+
+        internal static Node? ScheduleNode(int startTime, int endTime, string content, Color color, int offset)
         {
-            Node node = new Node($"{startTime}-{endTime}-{content}-{r.Next()}")
+            // No node displayed
+            if ((endTime - startTime) / Config.MIN_NODE_TIME * Config.MIN_NODE_WIDTH < 5)
             {
-                Attr = {
+                return null;
+            }
+            // Node with no text
+            else if (endTime - startTime < Config.MIN_NODE_TIME)
+            {
+                return new Node($"{startTime}-{endTime}-{content}-{r.Next()}")
+                {
+                    Attr = {
+                        FillColor = color,
+                    },
+                    UserData = (startTime, endTime),
+                    NodeBoundaryDelegate = (Node node) =>
+                    {
+                        // We assume that the minimum amount of time represented is 5 min
+                        // So everything must scale according to this 
+                        double widthPerSecond = Config.MIN_NODE_WIDTH / 300.0;
+                        double width = (endTime - startTime) * widthPerSecond;
+                        double height = Config.NODE_HEIGHT;
+
+                        return CurveFactory.CreateRectangle(width, height, new(0, 0));
+                    },
+                };
+            }
+            // Normal node
+            else
+            {
+                return new Node($"{startTime}-{endTime}-{content}-{r.Next()}")
+                {
+                    Attr = {
                     LabelMargin = 5,
                     FillColor = color,
                 },
-                Label = {
-                    FontSize = content.Length > 0 ? Math.Min(13, Math.Max(4, (endTime - startTime) * (Config.NODE_MIN_WIDTH / 12000.0))) : 12,
+                    Label = {
+                    FontSize = content.Length > 0 ? Math.Min(13, Math.Max(4, (endTime - startTime) * (Config.MIN_NODE_WIDTH / 12000.0))) : 12,
                 },
-                UserData = (startTime, endTime),
-                NodeBoundaryDelegate = (Node node) =>
-                {
-                    // We assume that the minimum amount of time represented is 5 min
-                    // So everything must scale according to this 
-                    double widthPerSecond = Config.NODE_MIN_WIDTH / 300.0;
-                    double width = (endTime - startTime) * widthPerSecond;
-                    double height = Config.NODE_HEIGHT;
+                    LabelText = $"{content}\n{Formatting.Time.HHMMSS(startTime)}-{Formatting.Time.HHMMSS(endTime)}",
+                    UserData = (startTime, endTime),
+                    NodeBoundaryDelegate = (Node node) =>
+                    {
+                        // We assume that the minimum amount of time represented is 5 min
+                        // So everything must scale according to this 
+                        double widthPerSecond = Config.MIN_NODE_WIDTH / 300.0;
+                        double width = (endTime - startTime) * widthPerSecond;
+                        double height = Config.NODE_HEIGHT;
 
-                    return CurveFactory.CreateRectangle(width, height, new(0, 0));
-                },
-                LabelText = $"{content}\n{Formatting.Time.HHMMSS(startTime)}-{Formatting.Time.HHMMSS(endTime)}",
-            };
-
-            return node;
+                        return CurveFactory.CreateRectangle(width, height, new(0, 0));
+                    },
+                };
+            }
         }
         internal static Node TripNode(DTrip t)
         {
@@ -45,7 +74,7 @@ namespace E_VCSP.Formatting
                 },
                 NodeBoundaryDelegate = (Node node) =>
                 {
-                    double widthPerSecond = Config.NODE_MIN_WIDTH / 300.0;
+                    double widthPerSecond = Config.MIN_NODE_WIDTH / 300.0;
                     double width = t.Trip.Duration * widthPerSecond;
                     double height = Config.NODE_HEIGHT;
 

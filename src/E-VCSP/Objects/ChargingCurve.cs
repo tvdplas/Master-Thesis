@@ -70,7 +70,7 @@
             while (timeRemaining > 0 && currSoC < 100)
             {
                 // Get the part of the charging curve which is currently applicable.
-                CurvePiece? p = Pieces.Find(piece => piece.MinSoC <= currSoC && piece.MaxSoC > currSoC);
+                CurvePiece? p = Pieces.FindLast(piece => piece.MaxSoC >= currSoC);
                 if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
 
                 // Determine amount of time to get from current SoC to the piece max SoC

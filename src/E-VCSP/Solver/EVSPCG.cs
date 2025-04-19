@@ -4,6 +4,7 @@ using E_VCSP.Objects.Discrete;
 using Gurobi;
 using Microsoft.Msagl.Drawing;
 using Color = Microsoft.Msagl.Drawing.Color;
+using Node = Microsoft.Msagl.Drawing.Node;
 
 namespace E_VCSP.Solver
 {
@@ -98,7 +99,7 @@ namespace E_VCSP.Solver
     }
 
 
-    internal class EVSPLabeling : Solver
+    internal class EVSPCG : Solver
     {
         private Instance instance;
 
@@ -118,7 +119,7 @@ namespace E_VCSP.Solver
         private List<List<SPLabel>> allLabels = new();
         private List<Front> activeLabels = new();
 
-        internal EVSPLabeling(Instance instance)
+        internal EVSPCG(Instance instance)
         {
             this.instance = instance;
             vt = instance.VehicleTypes[0];
@@ -302,7 +303,7 @@ namespace E_VCSP.Solver
             int[] covered = new int[instance.Trips.Count];
             foreach (GRBVar v in model.GetVars())
             {
-                if (v.X >= Config.COL_GEN_GEQ_THRESHOLD)
+                if (v.VarName.StartsWith("vt_") && v.X >= Config.COL_GEN_GEQ_THRESHOLD)
                 {
                     VehicleTask dvt = varTaskMapping[v.VarName];
                     Console.WriteLine($"Reduced costs: {v.RC}");
@@ -332,84 +333,87 @@ namespace E_VCSP.Solver
                 var task = tasks[i];
                 List<Node> pathNodes = new();
                 int startTime = task.Elements[0].StartTime, endTime = task.Elements[^1].EndTime;
+                var add = (Node? node) =>
+                {
+                    if (node != null)
+                    {
+                        graph.AddNode(node);
+                        pathNodes.Add(node);
+                    }
+                };
 
                 foreach (var element in task.Elements)
                 {
-                    int currTime = element.StartTime;
+                    string SoCAtStart = element.SoCAtStart != null ? ((int)element.SoCAtStart).ToString() : "";
+                    string SoCAtEnd = element.SoCAtEnd != null ? ((int)element.SoCAtEnd).ToString() : "";
 
+                    if (element is VEDepot) continue;
                     if (element is VETrip dvet)
                     {
                         Trip trip = dvet.Trip;
                         var node = Formatting.GraphElement.ScheduleNode(
-                            currTime,
-                            currTime + trip.Duration,
-                            $"{trip.From} -> {trip.To} ({trip.Route})",
+                            element.StartTime,
+                            element.EndTime,
+                            $"{trip.From}@{SoCAtStart} -> {trip.To}@{SoCAtEnd} ({trip.Route})",
                             Color.LightBlue,
                         i);
-                        graph.AddNode(node);
-                        pathNodes.Add(node);
+                        add(node);
+                    }
+                    if (element is VEIdle idle)
+                    {
+                        var node = Formatting.GraphElement.ScheduleNode(
+                            element.StartTime,
+                            element.EndTime,
+                            $"idle {idle.Location.Id}@{SoCAtStart}",
+                            Color.White,
+                        i);
+                        add(node);
                     }
                     if (element is VEDeadhead dved)
                     {
-                        //Deadhead ddh = dved.Deadhead;
-                        //if (ddh.DrivingTimes.Count >= 1)
-                        //{
-                        //    string textFrom = ddh.From is DTrip ppf ? ppf.Trip.To.Id : ddh.From.Id;
-                        //    string textTo = ddh.To is DTrip ppt ? ppt.Trip.From.Id : ddh.To.Id;
+                        LabelDeadhead ddh = dved.Deadhead;
 
-                        //    var node = Formatting.GraphElement.ScheduleNode(
-                        //        currTime,
-                        //        currTime + ddh.DrivingTimes[0],
-                        //        ddh.DrivingTimes.Count == 1 ? $"{textFrom} -> {textTo}" : $"{textFrom} -> charger",
-                        //        Color.Blue,
-                        //        i
-                        //    );
-                        //    graph.AddNode(node);
-                        //    pathNodes.Add(node);
-                        //    currTime += ddh.DrivingTimes[0];
-                        //}
-                        //if (ddh.ChargingTime > 0)
-                        //{
-                        //    var node = Formatting.GraphElement.ScheduleNode(
-                        //        currTime,
-                        //        currTime + ddh.ChargingTime,
-                        //        $"charge {Formatting.Time.HHMMSS(ddh.ChargingTime)} / {ddh.ChargeGained:0.#}%",
-                        //        Color.Yellow,
-                        //        i
-                        //    );
-                        //    graph.AddNode(node);
-                        //    pathNodes.Add(node);
-                        //    currTime += ddh.ChargingTime;
-                        //}
-                        //if (ddh.DrivingTimes.Count == 2)
-                        //{
-                        //    string text = "charger -> " + (ddh.To is DTrip ppt ? ppt.Trip.From.Id : ddh.To.Id);
-                        //    var node = Formatting.GraphElement.ScheduleNode(
-                        //        currTime,
-                        //        currTime + ddh.DrivingTimes[1],
-                        //        text,
-                        //        Color.Blue,
-                        //        i
-                        //    );
-                        //    graph.AddNode(node);
-                        //    pathNodes.Add(node);
-                        //    currTime += ddh.DrivingTimes[1];
-                        //}
-                        //if (ddh.IdleTime > 0)
-                        //{
-                        //    string text = "idle @ " + (ddh.To is DTrip ppt ? ppt.Trip.From.Id : ddh.To.Id);
-                        //    var node = Formatting.GraphElement.ScheduleNode(
-                        //        currTime,
-                        //        currTime + ddh.IdleTime,
-                        //        text,
-                        //        Color.LightGray,
-                        //        i
-                        //    );
-                        //    graph.AddNode(node);
-                        //    pathNodes.Add(node);
-                        //    currTime += ddh.IdleTime;
-                        //}
-
+                        if (dved.SelectedAction == -1)
+                        {
+                            var node = Formatting.GraphElement.ScheduleNode(
+                                element.StartTime,
+                                element.EndTime,
+                                $"{ddh.DeadheadTemplate.From}@{SoCAtStart} -> {ddh.DeadheadTemplate.To}@{SoCAtEnd} ",
+                                Color.LightGreen,
+                            i);
+                            add(node);
+                        }
+                        else
+                        {
+                            ChargingAction ca = ddh.ChargingActions[dved.SelectedAction];
+                            int currTime = element.StartTime;
+                            double currSoC = element.SoCAtStart ?? -10000000;
+                            var toCharger = Formatting.GraphElement.ScheduleNode(
+                                currTime,
+                                currTime + ca.DrivingTimeTo,
+                                $"{ddh.DeadheadTemplate.From}@{(int)currSoC} -> {ca.ChargeLocation}@{(int)(currSoC - ca.ChargeUsedTo)}",
+                                Color.GreenYellow,
+                            i);
+                            currTime += ca.DrivingTimeTo;
+                            currSoC -= ca.ChargeUsedTo;
+                            var charge = Formatting.GraphElement.ScheduleNode(
+                                currTime,
+                                currTime + dved.ChargeTime,
+                                $"{ca.ChargeLocation} {(int)currSoC}% -> {(int)(currSoC + dved.ChargeGained)}%",
+                                Color.Yellow,
+                            i);
+                            currTime += dved.ChargeTime;
+                            currSoC += dved.ChargeGained;
+                            var fromCharger = Formatting.GraphElement.ScheduleNode(
+                                currTime,
+                                currTime + ca.DrivingTimeFrom,
+                                $"{ca.ChargeLocation}@{(int)currSoC} -> {ddh.DeadheadTemplate.To}@{(int)(currSoC - ca.ChargeUsedFrom)}",
+                                Color.GreenYellow,
+                            i);
+                            add(toCharger);
+                            add(charge);
+                            add(fromCharger);
+                        }
                     }
                 }
                 taskNodes.Add((startTime, endTime, pathNodes));
@@ -642,7 +646,8 @@ namespace E_VCSP.Solver
             }
 
             // Add max vehicles constraint
-            model.AddConstr(maxVehicles <= Config.MAX_VEHICLES, "max_vehicles");
+            GRBVar vehicleCountSlack = model.AddVar(0, instance.Trips.Count - Config.MAX_VEHICLES, Config.MAX_VEHICLES_OVER_COST, GRB.CONTINUOUS, "vehicle_count_slack");
+            model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
 
             model.Optimize();
 
@@ -671,6 +676,8 @@ namespace E_VCSP.Solver
                 model.Optimize();
                 currIts++;
             }
+
+            Console.Write($"Costs: {model.ObjVal}, vehicle slack: {model.GetVarByName("vehicle_count_slack").X}");
 
             if (model.Status == GRB.Status.INFEASIBLE)
             {
