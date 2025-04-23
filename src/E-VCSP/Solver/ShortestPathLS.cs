@@ -12,71 +12,120 @@ namespace E_VCSP.Solver
         internal double SoCAtStart;
         internal double SoCAtEnd;
 
-        private static double RawSoCDeficit(double SoCAtStart, double SoCAtEnd) =>
-            ShortestPathLS.vehicleType!.MinCharge - Math.Min(SoCAtStart, SoCAtEnd);
-
-
-        internal static double SoCDeficit(double SoCAtStart, double SoCAtEnd) =>
-            Math.Max(RawSoCDeficit(SoCAtStart, SoCAtEnd), 0);
-
-        internal double SoCDeficit() => SoCDeficit(SoCAtStart, SoCAtEnd);
-
-        private static double RawSoCSurplus(double SoCAtStart, double SoCAtEnd) =>
-            Math.Max(SoCAtStart, SoCAtEnd) - ShortestPathLS.vehicleType!.MaxCharge;
-
-        internal static double SoCSurplus(double SoCAtStart, double SoCAtEnd) =>
-            Math.Max(RawSoCSurplus(SoCAtStart, SoCAtEnd), 0);
-
-        internal double SoCSurplus() => SoCSurplus(SoCAtStart, SoCAtEnd);
-
-        internal void UpdateSoC(double SoCDelta, bool propegateForward = true)
+        /// <summary>
+        /// Determine the problems in this and all following nodes in the task.
+        /// </summary>
+        /// <returns>Array of peaks &gt; maxSoC and valleys &lt; minSoC. Each peak / valley determined by maximum error at a charging location.</returns>
+        internal (double chargingCost, List<double> peaks, List<double> valleys) SoCError()
         {
-            SoCAtStart += SoCDelta;
-            SoCAtEnd += SoCDelta;
-
-            if (propegateForward && Next != null) Next.UpdateSoC(SoCDelta);
-        }
-
-        internal (double SoCDeficit, double SoCSurplus) PreviewSoCUpdate(double SoCDelta, bool propegateForward = true)
-        {
-            double origStart = SoCAtStart;
-            double origEnd = SoCAtEnd;
-            SoCAtStart += SoCDelta;
-            SoCAtEnd += SoCDelta;
-            double thisSoCDeficit = SoCDeficit();
-            double thisSoCSurplus = SoCSurplus();
-            SoCAtStart = origStart;
-            SoCAtEnd = origEnd;
-
-            if (propegateForward && Next != null)
+            double chargingCost = CalcSoCValues();
+            List<double> peaks = new(), valleys = new();
+            LLNode? curr = this;
+            while (curr != null)
             {
-                (double SoCDeficit, double SoCSurplus) = Next.PreviewSoCUpdate(SoCDelta);
-                thisSoCDeficit += SoCDeficit;
-                thisSoCSurplus += SoCSurplus;
+                // Peaks / valleys may occur at charging stations
+                if (curr.VehicleElement is VEDeadhead ved && ved.SelectedAction != -1)
+                {
+                    ChargingAction ca = ved.Deadhead.ChargingActions[ved.SelectedAction];
+                    double SoCBeforeCharge = curr.SoCAtStart - ca.ChargeUsedTo;
+                    if (SoCBeforeCharge < ShortestPathLS.vehicleType!.MinCharge)
+                        valleys.Add(ShortestPathLS.vehicleType!.MinCharge - SoCBeforeCharge);
+
+                    ChargingCurve cc = ca.ChargeLocation.ChargingCurves[ShortestPathLS.vehicleType!.Id];
+                    var chargeResult = cc.MaxChargeGained(SoCBeforeCharge, ved.ChargeTime, true);
+                    double SoCAfterCharge = SoCBeforeCharge + chargeResult.SoCGained;
+
+                    if (SoCAfterCharge > ShortestPathLS.vehicleType!.MaxCharge)
+                        peaks.Add(SoCBeforeCharge - ShortestPathLS.vehicleType!.MaxCharge);
+                }
+
+                // Valley may also occur at the final depot visit
+                if (curr.Next == null)
+                {
+                    if (curr.SoCAtEnd < ShortestPathLS.vehicleType!.MinCharge)
+                        valleys.Add(ShortestPathLS.vehicleType!.MinCharge - curr.SoCAtEnd);
+                }
+
+                curr = curr.Next;
             }
 
-            return (thisSoCDeficit, thisSoCSurplus);
+            return (chargingCost, peaks, valleys);
         }
 
+        /// <summary>
+        /// Set the SoC values of the rest of the trip. Uses <see cref="SoCAtEnd"/> of <c>this</c> as base for propegation. 
+        /// </summary>
+        /// <returns>Charge costs over the rest of the trip</returns>
+        internal double CalcSoCValues()
+        {
+            LLNode? curr = this;
+
+            double chargeCosts = 0;
+            while (curr != null)
+            {
+                if (curr.Next == null) break;
+                if (curr.Next.VehicleElement is VEDeadhead ved && ved.SelectedAction != -1)
+                {
+                    // Recalculate amount of SoC gained as charge gained may depend on charge at start of action
+                    ChargingAction ca = ved.Deadhead.ChargingActions[ved.SelectedAction];
+                    ChargingCurve cc = ca.ChargeLocation.ChargingCurves[ShortestPathLS.vehicleType!.Id];
+                    var chargeResult = cc.MaxChargeGained(curr.Next.SoCAtStart - ca.ChargeUsedTo, ved.ChargeTime, true);
+                    ved.ChargeCost = chargeResult.Cost;
+                    chargeCosts += chargeResult.Cost;
+                    double chargeSoCGained = chargeResult.SoCGained;
+                    double SoCDiff = chargeSoCGained - (ca.ChargeUsedFrom + ca.ChargeUsedTo);
+                    curr.Next.VehicleElement.SoCDiff = SoCDiff;
+                }
+
+                curr.Next.SoCAtStart = curr.SoCAtEnd;
+                curr.Next.SoCAtEnd = curr.Next.SoCAtStart + curr.Next.VehicleElement.SoCDiff;
+                curr = curr.Next;
+            }
+
+            return chargeCosts;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns>Node that was removed</returns>
+        /// <exception cref="InvalidOperationException"></exception>
         internal LLNode? RemoveAfter()
         {
             if (Next == null) throw new InvalidOperationException("Can't remove with no next");
 
-            // Find SoC diff in next to propegate
-            double diff = -(Next.SoCAtEnd - Next.SoCAtStart);
-
+            LLNode? oldNext = Next;
             LLNode? newNext = Next.Next;
             Next = newNext;
             if (newNext != null)
             {
                 newNext.Prev = this;
-                newNext.UpdateSoC(diff);
             }
 
-            return Next;
+            return oldNext;
         }
 
-        internal LLNode AddAfter(LLNode node, double SoCDelta)
+        /// <summary>
+        /// Removes <paramref name="count"/> nodes after <c>this</c>. Does <b>not</b> update structure of removed nodes.
+        /// </summary>
+        /// <param name="count">Amount of nodes to remove</param>
+        /// <returns>List of removed nodes</returns>
+        internal List<LLNode?> RemoveAfter(int count)
+        {
+            List<LLNode?> removedNodes = new(count);
+            LLNode? curr = Next;
+            for (int i = 0; i < count; i++)
+            {
+                removedNodes.Add(curr);
+                curr = curr.Next;
+            }
+            this.Next = curr;
+            if (curr != null) curr.Prev = this;
+
+            return removedNodes;
+        }
+
+        internal LLNode AddAfter(LLNode node)
         {
             if (node == null) throw new ArgumentNullException("Cant explicitely add null node");
 
@@ -86,7 +135,6 @@ namespace E_VCSP.Solver
             if (this.Next != null)
             {
                 this.Next.Prev = node;
-                this.Next.UpdateSoC(SoCDelta);
             }
 
             // Update ordering
@@ -94,24 +142,21 @@ namespace E_VCSP.Solver
             node.Prev = this;
             this.Next = node;
 
-            // Set correct SoC in added node
-            node.SoCAtStart = this.SoCAtEnd;
-            node.SoCAtEnd = this.SoCAtEnd + SoCDelta;
             return node;
         }
 
-        internal LLNode AddAfter(VehicleElement ve, double SoCDelta)
+        internal LLNode AddAfter(VehicleElement ve)
         {
-            return AddAfter(new LLNode() { VehicleElement = ve }, SoCDelta);
+            return AddAfter(new LLNode() { VehicleElement = ve });
         }
 
         public override string ToString()
         {
             LLNode? curr = this;
             int prev = 0, next = 0;
-            while (curr != null) { prev++; curr = curr.Prev; }
-            curr = this;
-            while (curr != null) { prev++; curr = curr.Next; }
+            //while (curr != null) { prev++; curr = curr.Prev; }
+            //curr = this;
+            //while (curr != null) { prev++; curr = curr.Next; }
 
             return $"{VehicleElement} (<{prev}, >{next})";
         }
@@ -136,7 +181,7 @@ namespace E_VCSP.Solver
         private double alpha;
         private int Q;
         private List<List<Arc?>> adjFull = new();
-        internal static VehicleType? vehicleType = null;
+        internal static VehicleType? vehicleType;
 
         private Random random = new();
 
@@ -175,7 +220,8 @@ namespace E_VCSP.Solver
                     StartTime = startTime - Config.MIN_NODE_TIME,
                     EndTime = startTime,
                     Location = depot,
-                    Cost = 0,
+                    SoCDiff = 0,
+                    DrivingCost = 0,
                 },
                 SoCAtStart = vehicleType.StartCharge,
                 SoCAtEnd = vehicleType.StartCharge,
@@ -187,8 +233,9 @@ namespace E_VCSP.Solver
                 Deadhead = depotDepotArc.Deadhead,
                 StartTime = startTime,
                 EndTime = startTime + depotDepotArc.Deadhead.DeadheadTemplate.Duration,
-                Cost = depotDepotArc.Deadhead.BaseCost,
-            }, -depotDepotArc.Deadhead.DeadheadTemplate.Distance * vehicleType.DriveUsage);
+                DrivingCost = depotDepotArc.Deadhead.BaseDrivingCost,
+                SoCDiff = -depotDepotArc.Deadhead.DeadheadTemplate.Distance * vehicleType.DriveUsage
+            });
 
             // Idle at ending depot
             int idleTime = endTime - depotDepotDH.VehicleElement.EndTime;
@@ -197,8 +244,9 @@ namespace E_VCSP.Solver
                 Location = depot,
                 StartTime = depotDepotDH.VehicleElement.EndTime,
                 EndTime = endTime,
-                Cost = idleTime * Config.IDLE_COST
-            }, 0);
+                DrivingCost = idleTime * Config.IDLE_COST,
+                SoCDiff = 0,
+            });
 
             // Depot end; 
             LLNode depotEnd = idle.AddAfter(new VEDepot()
@@ -206,10 +254,12 @@ namespace E_VCSP.Solver
                 StartTime = endTime,
                 EndTime = endTime + Config.MIN_NODE_TIME,
                 Location = depot,
-                Cost = 0
-            }, 0);
+                DrivingCost = 0,
+                SoCDiff = 0,
+            });
 
             head = depotStart;
+            head.CalcSoCValues();
             return head;
         }
 
@@ -253,7 +303,7 @@ namespace E_VCSP.Solver
             inactiveTrips[^1] = selectedTrip; // Order doesn't matter, simply preparing for removal
             Trip t = instance.Trips[selectedTrip];
 
-            // Find VE (trip / depot) that prevedes selected trip
+            // Find VE (trip / depot) that precedes selected trip
             LLNode? curr = head, prev = head;
             while (curr != null)
             {
@@ -261,7 +311,7 @@ namespace E_VCSP.Solver
                     prev = curr;
                 curr = curr.Next;
             }
-            if (prev == null) throw new Exception("HUH");
+            if (prev == null) throw new Exception("No previous trip/depot found for addition target");
 
             // Find next target
             curr = prev.Next;
@@ -275,12 +325,11 @@ namespace E_VCSP.Solver
                 }
                 curr = curr.Next;
             }
-            if (next == null) throw new Exception("HUH2");
+            if (next == null) throw new Exception("No next trip / depot found for addition target");
 
             // Check driving time feasibility between prev -> t -> next
             int prevAdjIndex = prev.VehicleElement is VETrip prevt ? prevt.Trip.Index : instance.DepotStartIndex;
             int nextAdjIndex = next.VehicleElement is VETrip nextt ? nextt.Trip.Index : instance.DepotEndIndex;
-
             Arc? prevToTrip = adjFull[prevAdjIndex][t.Index];
             Arc? tripToNext = adjFull[t.Index][nextAdjIndex];
             if (prevToTrip == null || tripToNext == null)
@@ -292,15 +341,16 @@ namespace E_VCSP.Solver
 
             // Check SAA feasibiltiy
             double costDiff = 0;
+
             // Deadhead + idle removal.
             VEDeadhead dhToReplace = prev.Next.VehicleElement as VEDeadhead;
             VEIdle idleToReplace = prev.Next.Next.VehicleElement as VEIdle;
-            costDiff -= dhToReplace!.Cost;
-            costDiff -= idleToReplace!.Cost;
+            costDiff -= dhToReplace!.DrivingCost;
+            costDiff -= idleToReplace!.DrivingCost;
 
             // Added deadheads 
-            costDiff += prevToTrip.Deadhead.BaseCost;
-            costDiff += tripToNext.Deadhead.BaseCost;
+            costDiff += prevToTrip.Deadhead.BaseDrivingCost;
+            costDiff += tripToNext.Deadhead.BaseDrivingCost;
 
             // idle times
             int prevToTripIdle = t.StartTime - (prev.VehicleElement.EndTime + prevToTrip.Deadhead.DeadheadTemplate.Duration);
@@ -311,102 +361,83 @@ namespace E_VCSP.Solver
             // reduced cost of trip
             costDiff -= reducedCostsTrips[t.Index];
 
-            // Battery; Determine overall SoC diff over the entire inserted trip -> do a SoC update preview at 
-            // end target. For inserted trip itself, determine SoC diffs by hand. 
+            // Old SoC related costs
+            (double currChargingCost, var currPeaks, var currValleys) = prev!.SoCError();
+            costDiff -= currChargingCost;
+            costDiff -= (currPeaks.Count * Config.LS_OVERCHARGE_PENALTY_FIX + currPeaks.Sum() * Config.LS_OVERCHARGE_PENALTY_VAR) / T;
+            costDiff -= (currValleys.Count * Config.LS_UNDERCHARGE_PENALTY_FIX + currValleys.Sum() * Config.LS_UNDERCHARGE_PENALTY_VAR) / T;
 
-            double insertedUsage = (
-                // dh1 -> no idle usage -> trip -> dh2 -> no idle usage -> 
-                prevToTrip.Deadhead.DeadheadTemplate.Distance + t.Distance + tripToNext.Deadhead.DeadheadTemplate.Distance
-            ) * vehicleType!.DriveUsage;
-            double originalUsage = next.SoCAtStart - prev.SoCAtEnd;
-            double usageDiff = originalUsage - insertedUsage;
-
-            // New deficit and surplus for rest of route
-            (double newDeficit, double newSurplus) = next.PreviewSoCUpdate(usageDiff);
-
-            // Previous deficit/surplus for entire affected route
-            (double oldDeficit, double oldSurplus) = prev.Next.PreviewSoCUpdate(0);
-
-            // Manually calculate deficit/surplus for the inserted part
-            double currSoC = prev.SoCAtEnd;
-            List<double> usages = [
-                prevToTrip.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage,
-                0,
-                t.Distance * vehicleType!.DriveUsage,
-                0,
-                prevToTrip.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage,
-            ];
-            foreach (double usage in usages)
-            {
-                newDeficit += LLNode.SoCDeficit(currSoC, currSoC - usage);
-                newSurplus += LLNode.SoCSurplus(currSoC, currSoC - usage);
-                currSoC -= usage;
-            }
-
-            double deficitDiff = newDeficit - oldDeficit;
-            double surplusDiff = newSurplus - oldSurplus;
-
-            costDiff += deficitDiff * Config.LS_UNDERCHARGE_PENALTY;
-            costDiff += surplusDiff * Config.LS_OVERCHARGE_PENALTY;
-
-            // TODO: reduced cost of block
-
-            if (!accept(costDiff))
-            {
-                return LSOpResult.Decline;
-            }
-
-            // Perform actual operation 
-            // Update active trip arrays
-            inactiveTrips.RemoveAt(inactiveTrips.Count - 1);
-            activeTrips.Add(selectedTrip);
-
+            // Place elements in current task so SoC effects can be determined
             // old situation: prev -> dh -> idle -> next
-            prev.Next.RemoveAfter(); // idle
-            prev.RemoveAfter(); // dh
+            var removedNodes = prev.RemoveAfter(2);
+            LLNode dh = removedNodes[0];
+            LLNode idle = removedNodes[1];
 
             // Situation after remove: prev -> next
             // Target situation: prev -> dh1 -> idle1 -> t -> dh2 -> idle2 -> next
             LLNode dh1 = prev.AddAfter(new VEDeadhead()
             {
-                Cost = prevToTrip.Deadhead.BaseCost,
+                DrivingCost = prevToTrip.Deadhead.BaseDrivingCost,
                 Deadhead = prevToTrip.Deadhead,
                 StartTime = prev.VehicleElement.EndTime,
                 EndTime = prev.VehicleElement.EndTime + prevToTrip.Deadhead.DeadheadTemplate.Duration,
-            }, -prevToTrip.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage);
+                SoCDiff = -prevToTrip.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage,
+            });
             LLNode idle1 = dh1.AddAfter(new VEIdle()
             {
                 Location = t.From,
-                Cost = 0,
+                DrivingCost = 0,
                 StartTime = dh1.VehicleElement.EndTime,
                 EndTime = t.StartTime,
-            }, 0);
+                SoCDiff = 0,
+            });
             LLNode trip = idle1.AddAfter(new VETrip()
             {
-                Cost = reducedCostsTrips[t.Index],
+                DrivingCost = reducedCostsTrips[t.Index],
                 StartTime = t.StartTime,
                 EndTime = t.EndTime,
                 Trip = t,
-            }, -t.Distance * vehicleType!.DriveUsage);
+                SoCDiff = -t.Distance * vehicleType!.DriveUsage,
+            });
             LLNode dh2 = trip.AddAfter(new VEDeadhead()
             {
-                Cost = tripToNext.Deadhead.BaseCost,
+                DrivingCost = tripToNext.Deadhead.BaseDrivingCost,
                 Deadhead = tripToNext.Deadhead,
                 StartTime = t.EndTime,
                 EndTime = t.EndTime + tripToNext.Deadhead.DeadheadTemplate.Duration,
-            }, -tripToNext.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage);
+                SoCDiff = -tripToNext.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage,
+            });
             LLNode idle2 = dh2.AddAfter(new VEIdle()
             {
                 Location = tripToNext.Deadhead.DeadheadTemplate.To,
-                Cost = 0,
+                DrivingCost = 0,
                 StartTime = dh2.VehicleElement.EndTime,
                 EndTime = next.VehicleElement.StartTime,
-            }, 0);
+                SoCDiff = -tripToNext.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage,
+            });
 
-            if (idle2.Next != next) throw new InvalidOperationException("Something went wrong with insertion");
+            // New SoC related costs
+            (double newChargingCost, var newPeaks, var newValleys) = prev!.SoCError();
+            costDiff += newChargingCost;
+            costDiff += (newPeaks.Count * Config.LS_OVERCHARGE_PENALTY_FIX + newPeaks.Sum() * Config.LS_OVERCHARGE_PENALTY_VAR) / T;
+            costDiff += (newValleys.Count * Config.LS_UNDERCHARGE_PENALTY_FIX + newValleys.Sum() * Config.LS_UNDERCHARGE_PENALTY_VAR) / T;
 
-            if (costDiff < 0) return LSOpResult.Improvement;
-            return LSOpResult.Accept;
+            // TODO: reduced cost of block 
+
+            if (!accept(costDiff))
+            {
+                // revert changes in list; can simply be done by connecting prev back to dh and next to idle and resetting soc. 
+                prev.Next = dh;
+                next.Prev = idle;
+                prev.CalcSoCValues();
+                return LSOpResult.Decline;
+            }
+
+            // Finalize operation
+            inactiveTrips.RemoveAt(inactiveTrips.Count - 1);
+            activeTrips.Add(selectedTrip);
+
+            return (costDiff < 0) ? LSOpResult.Improvement : LSOpResult.Accept;
         }
 
         private LSOpResult removeTrip()
@@ -450,83 +481,76 @@ namespace E_VCSP.Solver
             double costDiff = 0;
 
             // Old drive
-            costDiff -= curr.Prev.Prev.VehicleElement.Cost;
-            costDiff -= curr.Prev.VehicleElement.Cost;
-            costDiff -= curr.VehicleElement.Cost;
-            costDiff -= curr.Next.VehicleElement.Cost;
-            costDiff -= curr.Next.Next.VehicleElement.Cost;
+            costDiff -= curr.Prev.Prev.VehicleElement.DrivingCost;
+            costDiff -= curr.Prev.VehicleElement.DrivingCost;
+            costDiff -= curr.VehicleElement.DrivingCost;
+            costDiff -= curr.Next.VehicleElement.DrivingCost;
+            costDiff -= curr.Next.Next.VehicleElement.DrivingCost;
 
             // New drive
-            costDiff += arc.Deadhead.BaseCost;
+            costDiff += arc.Deadhead.BaseDrivingCost;
             int idleTime = next.VehicleElement.StartTime - (prev.VehicleElement.EndTime + arc.Deadhead.DeadheadTemplate.Duration);
             costDiff += idleTime * Config.IDLE_COST;
 
-            // Charge penalties
-            double insertedUsage = arc.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage;
-            double originalUsage = next.SoCAtStart - prev.SoCAtEnd;
-            double usageDiff = originalUsage - insertedUsage;
+            // Old SoC related costs
+            (double currChargingCost, var currPeaks, var currValleys) = prev!.SoCError();
+            costDiff -= currChargingCost;
+            costDiff -= (currPeaks.Count * Config.LS_OVERCHARGE_PENALTY_FIX + currPeaks.Sum() * Config.LS_OVERCHARGE_PENALTY_VAR) / T;
+            costDiff -= (currValleys.Count * Config.LS_UNDERCHARGE_PENALTY_FIX + currValleys.Sum() * Config.LS_UNDERCHARGE_PENALTY_VAR) / T;
 
-            // New deficit and surplus for rest of route
-            (double newDeficit, double newSurplus) = next.PreviewSoCUpdate(usageDiff);
-            // Previous deficit/surplus for entire affected route
-            (double oldDeficit, double oldSurplus) = prev.Next!.PreviewSoCUpdate(0);
-
-            double currSoC = prev.SoCAtEnd;
-            List<double> usages = [
-                arc.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage,
-                0,
-            ];
-            foreach (double usage in usages)
-            {
-                newDeficit += LLNode.SoCDeficit(currSoC, currSoC - usage);
-                newSurplus += LLNode.SoCSurplus(currSoC, currSoC - usage);
-                currSoC -= usage;
-            }
-
-            double deficitDiff = newDeficit - oldDeficit;
-            double surplusDiff = newSurplus - oldSurplus;
-
-            costDiff += deficitDiff * Config.LS_UNDERCHARGE_PENALTY;
-            costDiff += surplusDiff * Config.LS_OVERCHARGE_PENALTY;
-
-            if (!accept(costDiff))
-            {
-                return LSOpResult.Decline;
-            }
-
-            // Actually perform removal
-            activeTrips.RemoveAt(activeTrips.Count - 1);
-            inactiveTrips.Add(selectedTrip);
-
-            for (int i = 0; i < 5; i++) prev.RemoveAfter();
-            if (prev.Next != next) throw new InvalidOperationException("Invalid removals");
-
+            // perform op to get charge costs
+            // Situation before: prev -> dh1 -> idle1 -> trip -> dh2 -> idle2 -> next
+            var removedNodes = prev.RemoveAfter(5);
+            LLNode dh1 = removedNodes[0];
+            LLNode idle2 = removedNodes[4];
+            // Situation after: prev -> next
             LLNode dh = prev.AddAfter(new VEDeadhead()
             {
-                Cost = arc.Deadhead.BaseCost,
+                DrivingCost = arc.Deadhead.BaseDrivingCost,
                 StartTime = prev.VehicleElement.EndTime,
                 EndTime = prev.VehicleElement.EndTime + arc.Deadhead.DeadheadTemplate.Duration,
                 Deadhead = arc.Deadhead,
-            }, -arc.Deadhead.DeadheadTemplate.Distance * vehicleType.DriveUsage);
-
+                SoCDiff = -arc.Deadhead.DeadheadTemplate.Distance * vehicleType.DriveUsage,
+            });
             LLNode idle = dh.AddAfter(new VEIdle()
             {
                 Location = arc.Deadhead.DeadheadTemplate.To,
-                Cost = idleTime * Config.IDLE_COST,
+                DrivingCost = idleTime * Config.IDLE_COST,
                 StartTime = dh.VehicleElement.EndTime,
                 EndTime = next.VehicleElement.StartTime,
-            }, 0);
-            if (idle.Next != next) throw new InvalidOperationException("Invalid addition of dh/idle");
+                SoCDiff = 0,
+            });
+            // Situation after: prev -> dh -> idle -> next
 
-            if (costDiff < 0) return LSOpResult.Improvement;
-            return LSOpResult.Accept;
+
+            // New SoC related costs
+            (double newChargingCost, var newPeaks, var newValleys) = prev!.SoCError();
+            costDiff += newChargingCost;
+            costDiff += (newPeaks.Count * Config.LS_OVERCHARGE_PENALTY_FIX + newPeaks.Sum() * Config.LS_OVERCHARGE_PENALTY_VAR) / T;
+            costDiff += (newValleys.Count * Config.LS_UNDERCHARGE_PENALTY_FIX + newValleys.Sum() * Config.LS_UNDERCHARGE_PENALTY_VAR) / T;
+
+
+            if (!accept(costDiff))
+            {
+                // revert op
+                prev.Next = dh1;
+                next.Prev = idle2;
+                prev.CalcSoCValues();
+
+                return LSOpResult.Decline;
+            }
+
+            // Finalize operation
+            activeTrips.RemoveAt(activeTrips.Count - 1);
+            inactiveTrips.Add(selectedTrip);
+
+            return (costDiff < 0) ? LSOpResult.Improvement : LSOpResult.Accept;
         }
-
 
         private LSOpResult changeChargeAction()
         {
             // List all trips that currently have charging actions available
-            LLNode curr = head;
+            LLNode? curr = head;
             List<LLNode> chargeTargets = new();
             while (curr != null)
             {
@@ -540,89 +564,177 @@ namespace E_VCSP.Solver
             if (chargeTargets.Count == 0) return LSOpResult.Invalid;
 
             LLNode target = chargeTargets[random.Next(chargeTargets.Count)];
-
             VEDeadhead dh = (VEDeadhead)target.VehicleElement;
 
-            int newAction = dh.SelectedAction;
-            while (newAction == dh.SelectedAction)
+            // Chose new action
+            int currAction = dh.SelectedAction;
+            int newAction = currAction;
+            while (newAction == currAction)
                 newAction = random.Next(-1, dh.Deadhead.ChargingActions.Count);
-
             ChargingAction? action = newAction == -1 ? null : dh.Deadhead.ChargingActions[newAction];
 
-            // Either no charge / half of it (approx)
+            // Determine new charge
+            int currChargeTime = dh.ChargeTime;
             int newChargeTime = action == null ? 0 : Math.Max(action.TimeAtLocation / 2, Config.MIN_CHARGE_TIME);
-            if (newChargeTime > (action?.TimeAtLocation ?? double.PositiveInfinity))
-                throw new InvalidDataException("Cant charge for longer than is available");
             int newTotalTime = action == null
                 ? dh.Deadhead.DeadheadTemplate.Duration
                 : action.DrivingTimeTo + action.DrivingTimeFrom + newChargeTime;
-            double currSoCDiff = target.SoCAtEnd - target.SoCAtStart;
-            double newSoCDiff = 0;
-            double chargeGained = 0;
-            if (action == null) newSoCDiff = -dh.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage;
-            else
+
+            double newChargeGained = 0;
+            double newDrivingCost = dh.Deadhead.BaseDrivingCost;
+            double currSoCDiff = dh.SoCDiff;
+            double newSoCDiff = -dh.Deadhead.DeadheadTemplate.Distance * vehicleType!.DriveUsage;
+            if (action != null)
             {
                 double SoCAtCharger = target.SoCAtStart - action.ChargeUsedTo;
-                chargeGained = action.ChargeLocation.ChargingCurves[vehicleType.Id]
-                    .MaxChargeGained(SoCAtCharger, newChargeTime).SoCGained;
-                newSoCDiff = chargeGained - (action.ChargeUsedTo + action.ChargeUsedFrom);
+                newChargeGained = action.ChargeLocation.ChargingCurves[vehicleType.Id]
+                    .MaxChargeGained(SoCAtCharger, newChargeTime, true).SoCGained;
+                newDrivingCost = action.DrivingCost;
+                newSoCDiff = newChargeGained - (action.ChargeUsedFrom + action.ChargeUsedTo);
             }
 
-            // All changes are local; changes are soc at end and driving costs. 
             double costDiff = 0;
-            costDiff -= dh.Cost;
 
-            double newCost = 0;
-            // Charging costs
-            newCost += (action == null) ? 0 : chargeGained * Config.KWH_COST;
-            // Travel costs 
-            newCost += (action == null) ? dh.Deadhead.BaseCost : action.DrivingCost;
-            costDiff += newCost;
+            costDiff -= dh.DrivingCost;
+            costDiff += newDrivingCost;
 
-            // TODO: idle costs
-            // TODO: eigenlijk moet je hier ook herberekening doen van de hoeveelheid charge die gepakt wordt
-            // bij laadstations hierna. 
-            double usageDiff = currSoCDiff - newSoCDiff;
-            (double newDeficit, double newSurplus) = target.Next!.PreviewSoCUpdate(usageDiff);
-            // Previous deficit/surplus for entire affected route
-            (double oldDeficit, double oldSurplus) = target.Next!.PreviewSoCUpdate(0);
-            double deficitDiff = newDeficit - oldDeficit;
-            double surplusDiff = newSurplus - oldSurplus;
-            costDiff += deficitDiff * Config.LS_UNDERCHARGE_PENALTY;
-            costDiff += surplusDiff * Config.LS_OVERCHARGE_PENALTY;
+            // Old SoC related costs
+            (double currChargingCost, var currPeaks, var currValleys) = target.Prev!.SoCError();
+            costDiff -= currChargingCost;
+            costDiff -= (currPeaks.Count * Config.LS_OVERCHARGE_PENALTY_FIX + currPeaks.Sum() * Config.LS_OVERCHARGE_PENALTY_VAR) / T;
+            costDiff -= (currValleys.Count * Config.LS_UNDERCHARGE_PENALTY_FIX + currValleys.Sum() * Config.LS_UNDERCHARGE_PENALTY_VAR) / T;
+
+            // perform op
+            dh.SelectedAction = newAction;
+            dh.ChargeTime = newChargeTime;
+            dh.SoCDiff = newSoCDiff;
+
+            // New SoC related costs
+            (double newChargingCost, var newPeaks, var newValleys) = target.Prev!.SoCError();
+            costDiff += newChargingCost;
+            costDiff += (newPeaks.Count * Config.LS_OVERCHARGE_PENALTY_FIX + newPeaks.Sum() * Config.LS_OVERCHARGE_PENALTY_VAR) / T;
+            costDiff += (newValleys.Count * Config.LS_UNDERCHARGE_PENALTY_FIX + newValleys.Sum() * Config.LS_UNDERCHARGE_PENALTY_VAR) / T;
+
+            // TODO: idle costs moeten eigenlijk ook meegenomen worden aangezien de dh tijd verandert
 
             if (!accept(costDiff))
             {
+                // Revert operation
+                dh.SelectedAction = currAction;
+                dh.ChargeTime = currChargeTime;
+                dh.SoCDiff = currSoCDiff;
+                target.Prev.CalcSoCValues();
+
                 return LSOpResult.Decline;
             }
 
-            // Perform action; Update costs, used index, used time, SoC
-            dh.Cost = newCost;
-            dh.SelectedAction = newAction;
-            dh.ChargeTime = newChargeTime;
-            dh.ChargeGained = chargeGained;
+            // Finalize operation with everything not needed for SoC calculations
+            dh.DrivingCost = newDrivingCost;
+            dh.ChargeGained = newChargeGained;
             dh.EndTime = dh.StartTime + newTotalTime;
-            target.SoCAtEnd = target.SoCAtStart + newSoCDiff;
             target.Next.VehicleElement.StartTime = dh.EndTime;
-            target.Next.UpdateSoC(usageDiff); // with propegation
 
             return costDiff < 0 ? LSOpResult.Improvement : LSOpResult.Accept;
         }
 
         private LSOpResult changeChargeTime(LLNode target, int chargeTimeDiff)
         {
-            throw new NotImplementedException("");
+            VEDeadhead ved = target.VehicleElement as VEDeadhead;
+            ChargingAction action = ved.Deadhead.ChargingActions[ved.SelectedAction];
+
+            int currChargeTime = ved.ChargeTime;
+            int newChargeTime = ved.ChargeTime + chargeTimeDiff;
+            double currSoCDiff = ved.SoCDiff;
+            double SoCAtCharger = target.SoCAtStart - action.ChargeUsedTo;
+            double newChargeGained = action.ChargeLocation.ChargingCurves[vehicleType.Id]
+                .MaxChargeGained(SoCAtCharger, newChargeTime, true).SoCGained;
+            double newSoCDiff = newChargeGained - (action.ChargeUsedFrom + action.ChargeUsedTo);
+
+            double costDiff = 0;
+
+            // Old SoC related costs
+            (double currChargingCost, var currPeaks, var currValleys) = target.Prev!.SoCError();
+            costDiff -= currChargingCost;
+            costDiff -= (currPeaks.Count * Config.LS_OVERCHARGE_PENALTY_FIX + currPeaks.Sum() * Config.LS_OVERCHARGE_PENALTY_VAR) / T;
+            costDiff -= (currValleys.Count * Config.LS_UNDERCHARGE_PENALTY_FIX + currValleys.Sum() * Config.LS_UNDERCHARGE_PENALTY_VAR) / T;
+
+            // perform op
+            ved.ChargeTime = newChargeTime;
+            ved.SoCDiff = newSoCDiff;
+
+            // New SoC related costs
+            (double newChargingCost, var newPeaks, var newValleys) = target.Prev!.SoCError();
+            costDiff += newChargingCost;
+            costDiff += (newPeaks.Count * Config.LS_OVERCHARGE_PENALTY_FIX + newPeaks.Sum() * Config.LS_OVERCHARGE_PENALTY_VAR) / T;
+            costDiff += (newValleys.Count * Config.LS_UNDERCHARGE_PENALTY_FIX + newValleys.Sum() * Config.LS_UNDERCHARGE_PENALTY_VAR) / T;
+
+            if (!accept(costDiff))
+            {
+                // Revert operation
+                ved.ChargeTime = currChargeTime;
+                ved.SoCDiff = currSoCDiff;
+                target.Prev.CalcSoCValues();
+
+                return LSOpResult.Decline;
+            }
+
+            ved.ChargeGained = newChargeGained;
+            ved.EndTime += chargeTimeDiff;
+            target.Next.VehicleElement.StartTime = ved.EndTime;
+
+            return costDiff < 0 ? LSOpResult.Improvement : LSOpResult.Accept;
         }
 
         private LSOpResult increaseChargeTime()
         {
-            throw new NotImplementedException("");
+            List<LLNode?> targets = new();
+            // Find node which can be increased
+            LLNode? curr = head;
+            while (curr != null)
+            {
+                if (curr.VehicleElement is VEDeadhead dh
+                    && dh.SelectedAction != -1 &&
+                    dh.ChargeTime < dh.Deadhead.ChargingActions[dh.SelectedAction].TimeAtLocation
+                )
+                {
+                    targets.Add(curr);
+                }
 
+                curr = curr.Next;
+            }
+
+            if (targets.Count == 0) return LSOpResult.Invalid;
+
+            LLNode target = targets[random.Next(targets.Count)];
+            VEDeadhead ved = target.VehicleElement as VEDeadhead;
+            int increase = random.Next(ved.Deadhead.ChargingActions[ved.SelectedAction].TimeAtLocation - ved.ChargeTime);
+            return changeChargeTime(target, increase);
         }
 
         private LSOpResult decreaseChargeTime()
         {
-            throw new NotImplementedException("");
+            List<LLNode?> targets = new();
+            // Find node which can be increased
+            LLNode? curr = head;
+            while (curr != null)
+            {
+                if (curr.VehicleElement is VEDeadhead dh
+                    && dh.SelectedAction != -1 &&
+                    dh.ChargeTime > Config.MIN_CHARGE_TIME
+                )
+                {
+                    targets.Add(curr);
+                }
+
+                curr = curr.Next;
+            }
+
+            if (targets.Count == 0) return LSOpResult.Invalid;
+
+            LLNode target = targets[random.Next(targets.Count)];
+            VEDeadhead ved = target.VehicleElement as VEDeadhead;
+            int decrease = random.Next(ved.ChargeTime - Config.MIN_CHARGE_TIME);
+            return changeChargeTime(target, -decrease);
         }
 
         private bool accept(double deltaScore)
@@ -631,17 +743,21 @@ namespace E_VCSP.Solver
             return Math.Exp(-deltaScore / T) > random.NextDouble();
         }
 
-        internal VehicleTask getVehicleTaskLS()
+        internal (double reducedCost, VehicleTask vehicleTask) getVehicleTaskLS()
         {
             List<(Func<LSOpResult> operation, double chance)> operations = [
-                (addTrip, 1.0),
-                (removeTrip, 0.05),
-                (changeChargeAction, 0.2),
+                (addTrip, Config.LS_ADD_TRIP),
+                (removeTrip, Config.LS_REM_TRIP),
+                (changeChargeAction, Config.LS_CHANGE_CHARGE),
+                (increaseChargeTime, Config.LS_INC_CHARGE),
+                (decreaseChargeTime, Config.LS_DEC_CHARGE),
             ];
             List<(string name, List<int> counts)> results = [
                 ("addTrip", [.. new int[(int)LSOpResult.Count]]),
                 ("removeTrip", [.. new int[(int)LSOpResult.Count]]),
                 ("changeChargeAction", [.. new int[(int)LSOpResult.Count]]),
+                ("increaseChargeTime", [.. new int[(int)LSOpResult.Count]]),
+                ("decreaseChargeTime", [.. new int[(int)LSOpResult.Count]]),
             ];
             List<double> sums = [operations[0].chance];
 
@@ -659,6 +775,12 @@ namespace E_VCSP.Solver
                 results[operationIndex].counts[(int)res]++;
             }
 
+            var socError = head.SoCError();
+            if (socError.peaks.Count > 0 || socError.valleys.Count > 0)
+            {
+                Console.WriteLine("SoC error found in finished vehicle task");
+            }
+
             if (Config.CONSOLE_LS)
             {
                 foreach (var result in results)
@@ -672,13 +794,14 @@ namespace E_VCSP.Solver
             }
 
             LLNode? curr = head;
+            head.CalcSoCValues();
             List<VehicleElement> elements = new();
             while (curr != null)
             {
                 VehicleElement ve = curr.VehicleElement;
-                ve.SoCAtStart = curr.SoCAtStart;
-                ve.SoCAtEnd = curr.SoCAtEnd;
-                if (ve is VETrip) ve.Cost = 0;
+                ve.StartSoCInTask = curr.SoCAtStart;
+                ve.EndSoCInTask = curr.SoCAtEnd;
+                if (ve is VETrip) ve.DrivingCost = 0;
                 elements.Add(ve);
 
                 if (curr.Next != null && curr.SoCAtEnd != curr.Next.SoCAtStart)
@@ -691,7 +814,15 @@ namespace E_VCSP.Solver
 
             if (Config.CONSOLE_LS) Console.WriteLine($"Vehicle task found with {elements.Count} elements");
 
-            return new VehicleTask(elements);
+            VehicleTask vehicleTask = new VehicleTask(elements);
+            double reducedCost = vehicleTask.Cost;
+            foreach (int coveredTripIndex in vehicleTask.Covers)
+            {
+                reducedCost -= reducedCostsTrips[coveredTripIndex];
+                // TODO: blocks;
+            }
+
+            return (reducedCost, vehicleTask);
         }
 
     }

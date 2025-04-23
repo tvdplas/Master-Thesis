@@ -1,4 +1,6 @@
-﻿namespace E_VCSP.Objects
+﻿using System.Runtime.CompilerServices;
+
+namespace E_VCSP.Objects
 {
     internal class ChargeResult
     {
@@ -19,6 +21,7 @@
             internal double Rate;
         }
 
+        // Sorted list of curve pieces
         private List<CurvePiece> Pieces;
         public double CostPerPercentage;
 
@@ -57,24 +60,51 @@
         }
 
         /// <summary>
+        /// Get piece corresponding to current SoC
+        /// </summary>
+        /// <param name="currSoC">Current SoC</param>
+        /// <param name="expand">Allow expansion</param>
+        /// <returns>Piece if one exists</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        CurvePiece? getPiece(double currSoC, bool expand)
+        {
+            CurvePiece? p = expand ? Pieces[^1] : null;
+            for (int i = 0; i < Pieces.Count; i++)
+            {
+                if (currSoC <= Pieces[i].MaxSoC)
+                {
+                    p = Pieces[i];
+                    break;
+                }
+            }
+
+            return p;
+        }
+
+        /// <summary>
         /// Returns the maximum amount of percentage gained, along with the time used in order to get this percentage.
         /// Additionally, returns the time used in order to achieve this SoC; will only be lower than time provided if battery is full
         /// </summary>
         /// <param name="startSoC">SoC at start of charging operation</param>
         /// <param name="time">Time allowed for use in the operation</param>
+        /// <param name="expand">Expand charging curve to allow for &lt; 0 and &gt; 100% by taking closes linepiece.</param>
         /// <returns>Tuple with maxSoCGained, timetaken and total cost if charging actions is performed fully</returns>
-        public ChargeResult MaxChargeGained(double startSoC, int time)
+        public ChargeResult MaxChargeGained(double startSoC, int time, bool expand)
         {
             int timeRemaining = time;
             double currSoC = startSoC;
-            while (timeRemaining > 0 && currSoC < 100)
+
+            if (!expand && startSoC < 0) throw new InvalidDataException("Cannot start charging with SoC < 0. Did you forget to enable expansion?");
+
+            while (timeRemaining > 0 && (expand || currSoC < 100))
             {
                 // Get the part of the charging curve which is currently applicable.
-                CurvePiece? p = Pieces.FindLast(piece => piece.MaxSoC >= currSoC);
+                CurvePiece? p = getPiece(currSoC, expand);
                 if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
 
                 // Determine amount of time to get from current SoC to the piece max SoC
-                int timeToMax = (int)Math.Ceiling((p.MaxSoC - currSoC) / (1.0 * p.Rate));
+                double maxSoCInPiece = expand && p.MaxSoC == 100 ? 1_000_000 : p.MaxSoC;
+                int timeToMax = (int)Math.Ceiling((maxSoCInPiece - currSoC) / (1.0 * p.Rate));
                 int usableTime = Math.Min(timeRemaining, timeToMax);
                 double gainableSoC = usableTime * p.Rate;
                 currSoC += gainableSoC;
@@ -95,23 +125,26 @@
         /// <param name="startSoC">SoC that vehicle starts at</param>
         /// <param name="targetSoC">Target SoC</param>
         /// <returns>Charge result representing the requested charge</returns>
-        public ChargeResult ChargeCosts(double startSoC, double targetSoC)
+        public ChargeResult ChargeCosts(double startSoC, double targetSoC, bool expand)
         {
             double currSoC = startSoC;
             int currTime = 0;
 
+            if (!expand && (startSoC < 0 || startSoC > 100 || targetSoC < 0 || targetSoC > 100))
+                throw new InvalidDataException("SoC out of bounds. Did you forget to enable expansion?");
+
             while (currSoC < targetSoC)
             {
-                CurvePiece? p = null;
-                for (int i = 0; i < Pieces.Count; i++) if (Pieces[i].MinSoC <= currSoC && Pieces[i].MaxSoC >= currSoC)
-                    {
-                        p = Pieces[i];
-                        break;
-                    }
-                if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
+                // First piece that fits; default to last (slowest)
+                CurvePiece? p = getPiece(currSoC, expand);
+                if (p == null) throw new InvalidDataException("No piece found");
+
+                double maxSoCInPiece = expand && currSoC >= 100
+                    ? 1_000_000
+                    : p.MaxSoC;
 
                 // Charge until end of piece or until desired SoC is reached
-                double SoCChargedInPiece = Math.Min(targetSoC - currSoC, p.MaxSoC - currSoC);
+                double SoCChargedInPiece = Math.Min(targetSoC - currSoC, maxSoCInPiece - currSoC);
                 int timeUsed = (int)Math.Ceiling(SoCChargedInPiece / p.Rate);
                 currSoC += SoCChargedInPiece;
                 currTime += timeUsed;

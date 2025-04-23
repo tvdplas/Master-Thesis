@@ -5,11 +5,14 @@ namespace E_VCSP.Objects.Discrete
 
     internal class VehicleElement
     {
-        internal required double Cost;
+        internal required double DrivingCost;
+        internal required double SoCDiff;
         internal required int StartTime;
         internal required int EndTime;
-        internal double? SoCAtStart;
-        internal double? SoCAtEnd;
+
+        // Only filled in once element is part of finalized task.
+        internal double? StartSoCInTask;
+        internal double? EndSoCInTask;
     }
 
     internal class VETrip : VehicleElement
@@ -28,6 +31,7 @@ namespace E_VCSP.Objects.Discrete
         internal int SelectedAction = -1;
         internal int ChargeTime = 0;
         internal double ChargeGained = 0;
+        internal double ChargeCost = 0;
 
         public override string ToString()
         {
@@ -61,7 +65,15 @@ namespace E_VCSP.Objects.Discrete
         {
             get
             {
-                return Elements.Sum(e => e.Cost);
+                return Elements.Sum(e =>
+                {
+                    double cost = e.DrivingCost;
+
+                    if (e is VEDeadhead ved && ved.ChargeGained > 0)
+                        cost += ved.ChargeCost;
+
+                    return cost;
+                });
             }
         }
 

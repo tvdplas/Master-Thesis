@@ -109,7 +109,7 @@ namespace E_VCSP.Objects.Discrete
                         if (SoCAtCharge < vh.MinCharge) continue;
 
                         ChargingCurve cc = chargeLoc.ChargingCurves[vh.Id];
-                        ChargeResult cr = cc.MaxChargeGained(SoCAtCharge, idleTime);
+                        ChargeResult cr = cc.MaxChargeGained(SoCAtCharge, idleTime, false);
 
                         // Now, check if the charge is actually compatible; In order to do so, we need to check if we can use some partial charge such that our target SOC is reached.
                         double SoCDiff = dt2.StartingSoC - (SoCAtCharge - (dht_fromCharge.Distance * vh.DriveUsage));
@@ -117,7 +117,7 @@ namespace E_VCSP.Objects.Discrete
                         if (alpha >= 0 && alpha <= 1)
                         {
                             // A feasible charge schedule was found; we now rerun the charge sequence in order to get costs
-                            ChargeResult crUsed = cc.ChargeCosts(SoCAtCharge, SoCAtCharge + SoCDiff);
+                            ChargeResult crUsed = cc.ChargeCosts(SoCAtCharge, SoCAtCharge + SoCDiff, false);
 
                             if (crUsed.TimeUsed < Config.MIN_CHARGE_TIME) continue;
 

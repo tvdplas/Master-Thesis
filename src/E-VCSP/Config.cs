@@ -19,11 +19,14 @@
 
     internal static class Config
     {
+        internal static Header PROGRAM = new();
+        internal static int THREADS = 10;
+
         // Graph display
         internal static Header DEBUG = new();
-        internal static bool CONSOLE_GUROBI = true;
-        internal static bool CONSOLE_LABELING = true;
-        internal static bool CONSOLE_LS = true;
+        internal static bool CONSOLE_GUROBI = false;
+        internal static bool CONSOLE_LABELING = false;
+        internal static bool CONSOLE_LS = false;
 
         // General layout
         internal static Header GRAPH_LAYOUT = new();
@@ -48,12 +51,20 @@
         internal static Header SOLVER = new();
         internal static bool USE_COLUMN_GENERATION = true;
         internal static int MAX_COL_GEN_ITS = 1000;
+        internal static int LS_OPT_IT_THRESHOLD = 10;
         internal static double LS_STARTING_T = 2;
         internal static double LS_ENDING_T = 0.01;
         internal static double LS_COOLING_RATE = 0.95;
         internal static double LS_ITERATIONS = 10_000;
-        internal static double LS_OVERCHARGE_PENALTY = 0.5;
-        internal static double LS_UNDERCHARGE_PENALTY = 0.5;
+        internal static double LS_OVERCHARGE_PENALTY_FIX = 5;
+        internal static double LS_OVERCHARGE_PENALTY_VAR = 0.5;
+        internal static double LS_UNDERCHARGE_PENALTY_FIX = 5;
+        internal static double LS_UNDERCHARGE_PENALTY_VAR = 0.5;
+        internal static double LS_ADD_TRIP = 1;
+        internal static double LS_REM_TRIP = 1;
+        internal static double LS_CHANGE_CHARGE = 2;
+        internal static double LS_INC_CHARGE = 4;
+        internal static double LS_DEC_CHARGE = 3;
         internal static double COL_GEN_GEQ_THRESHOLD = 0.1;
         internal static bool DETERMINE_IIS = false;
     }
