@@ -36,7 +36,7 @@ namespace E_VCSP.Solver
                     double SoCAfterCharge = SoCBeforeCharge + chargeResult.SoCGained;
 
                     if (SoCAfterCharge > ShortestPathLS.vehicleType!.MaxCharge)
-                        peaks.Add(SoCBeforeCharge - ShortestPathLS.vehicleType!.MaxCharge);
+                        peaks.Add(SoCAfterCharge - ShortestPathLS.vehicleType!.MaxCharge);
                 }
 
                 // Valley may also occur at the final depot visit
@@ -175,7 +175,7 @@ namespace E_VCSP.Solver
     {
         private Instance instance;
         private GRBModel model;
-        private List<double> reducedCostsTrips;
+        private List<double> reducedCostsTrips = new();
 
         private double T;
         private double alpha;
@@ -778,7 +778,8 @@ namespace E_VCSP.Solver
             var socError = head.SoCError();
             if (socError.peaks.Count > 0 || socError.valleys.Count > 0)
             {
-                Console.WriteLine("SoC error found in finished vehicle task");
+                int x = 0;
+                //Console.WriteLine("SoC error found in finished vehicle task");
             }
 
             if (Config.CONSOLE_LS)

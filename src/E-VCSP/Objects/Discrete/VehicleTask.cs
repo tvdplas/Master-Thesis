@@ -61,6 +61,7 @@ namespace E_VCSP.Objects.Discrete
     {
         internal List<int> Covers;
         internal List<VehicleElement> Elements;
+        internal int Index = -1;
         internal double Cost
         {
             get

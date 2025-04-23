@@ -194,11 +194,11 @@ namespace E_VCSP.Solver
 
             Graph graph = new();
 
-            List<(int startTime, int endTime, List<Node> nodes)> nodes = new();
+            List<(int startTime, int endTime, List<Node?> nodes)> nodes = new();
             for (int i = 0; i < paths.Count; i++)
             {
                 var path = paths[i];
-                List<Node> pathNodes = new();
+                List<Node?> pathNodes = new();
                 int startTime = int.MaxValue, endTime = int.MinValue;
 
                 foreach (var pathPart in path)
@@ -221,7 +221,7 @@ namespace E_VCSP.Solver
 
                     if (dtf != null)
                     {
-                        var node = Formatting.GraphElement.ScheduleNode(currTime, currTime + dtf.Trip.Duration, $"{dtf.Trip.From} -> {dtf.Trip.To} ({dtf.Trip.Route})", Color.LightBlue, i);
+                        var node = Formatting.GraphElement.ScheduleNode(currTime, currTime + dtf.Trip.Duration, $"{dtf.Trip.From} -> {dtf.Trip.To} ({dtf.Trip.Route})", Color.LightBlue);
                         graph.AddNode(node);
                         pathNodes.Add(node);
                         currTime += dtf.Trip.Duration;
@@ -236,9 +236,7 @@ namespace E_VCSP.Solver
                             currTime,
                             currTime + pathPart.DrivingTimes[0],
                             $"{textFrom} -> {textTo}",
-                            Color.Blue,
-                            i
-                        );
+                            Color.Blue);
                         graph.AddNode(node);
                         pathNodes.Add(node);
                         currTime += pathPart.DrivingTimes[0];
@@ -250,9 +248,7 @@ namespace E_VCSP.Solver
                             currTime,
                             currTime + pathPart.DrivingTimes[0],
                             $"{textFrom} -> charger",
-                            Color.Blue,
-                            i
-                        );
+                            Color.Blue);
                         graph.AddNode(node);
                         pathNodes.Add(node);
                         currTime += pathPart.DrivingTimes[0];
@@ -263,9 +259,7 @@ namespace E_VCSP.Solver
                             currTime,
                             currTime + pathPart.ChargingTime,
                             $"charge {Formatting.Time.HHMMSS(pathPart.ChargingTime)} / {pathPart.ChargeGained:0.#}%",
-                            Color.Yellow,
-                            i
-                        );
+                            Color.Yellow);
                         graph.AddNode(node);
                         pathNodes.Add(node);
                         currTime += pathPart.ChargingTime;
@@ -277,9 +271,7 @@ namespace E_VCSP.Solver
                             currTime,
                             currTime + pathPart.DrivingTimes[1],
                             text,
-                            Color.Blue,
-                            i
-                        );
+                            Color.Blue);
                         graph.AddNode(node);
                         pathNodes.Add(node);
                         currTime += pathPart.DrivingTimes[1];
@@ -291,9 +283,7 @@ namespace E_VCSP.Solver
                             currTime,
                             currTime + pathPart.IdleTime,
                             text,
-                            Color.LightGray,
-                            i
-                        );
+                            Color.LightGray);
                         graph.AddNode(node);
                         pathNodes.Add(node);
                         currTime += pathPart.IdleTime;
@@ -310,24 +300,24 @@ namespace E_VCSP.Solver
             for (int i = 0; i < nodes.Count; i++)
             {
                 (int s, int e, var ns) = nodes[i];
-                var align = Formatting.GraphElement.ScheduleNode(minTime - 300, minTime, "align" + i, Color.White, 0);
+                var align = GraphElement.ScheduleNode(minTime - 300, minTime, "align" + i, Color.White);
                 graph.AddNode(align);
                 ns.Insert(0, align);
 
                 if (minTime < s)
                 {
-                    var node = Formatting.GraphElement.ScheduleNode(minTime, s, "padding1" + i, Color.White, 0);
+                    var node = GraphElement.ScheduleNode(minTime, s, "padding1" + i, Color.White);
                     graph.AddNode(node);
                     ns.Insert(1, node);
                 }
                 if (maxTime > e)
                 {
-                    var node = Formatting.GraphElement.ScheduleNode(e, maxTime, "padding2" + i, Color.White, 0);
+                    var node = GraphElement.ScheduleNode(e, maxTime, "padding2" + i, Color.White);
                     graph.AddNode(node);
                     ns.Add(node);
                 }
 
-                var align2 = Formatting.GraphElement.ScheduleNode(minTime - 300, minTime, "align2" + i, Color.White, 0);
+                var align2 = GraphElement.ScheduleNode(minTime - 300, minTime, "align2" + i, Color.White);
                 graph.AddNode(align2);
                 ns.Add(align2);
             }
@@ -341,7 +331,7 @@ namespace E_VCSP.Solver
 
             // This library isn't really built for alining nodes in a single layer;
             // force by centering nodes at beginning and end of each task
-            List<Node> leftAlign = nodes.Select(x => x.nodes[0]).ToList(),
+            List<Node?> leftAlign = nodes.Select(x => x.nodes[0]).ToList(),
                        rightAlign = nodes.Select(x => x.nodes[^1]).ToList();
             for (int i = 0; i < leftAlign.Count - 1; i++) lc.AddUpDownVerticalConstraint(leftAlign[i], leftAlign[i + 1]);
             for (int i = 0; i < rightAlign.Count - 1; i++) lc.AddUpDownVerticalConstraint(rightAlign[i], rightAlign[i + 1]);

@@ -295,7 +295,10 @@ namespace E_VCSP.Solver
                     SoCDiff = -t.Duration * vt.DriveUsage,
                 };
 
-                VehicleTask vehicleTask = new([toTrip, trip, fromTrip]);
+                VehicleTask vehicleTask = new([toTrip, trip, fromTrip])
+                {
+                    Index = i,
+                };
                 tasks.Add(vehicleTask);
             }
         }
@@ -309,7 +312,6 @@ namespace E_VCSP.Solver
                 if (v.VarName.StartsWith("vt_") && v.X >= Config.COL_GEN_GEQ_THRESHOLD)
                 {
                     VehicleTask dvt = varTaskMapping[v.VarName];
-                    //Console.WriteLine($"Reduced costs: {v.RC}");
                     tasks.Add(dvt);
                     foreach (int i in dvt.Covers)
                     {
@@ -329,12 +331,12 @@ namespace E_VCSP.Solver
 
             Graph graph = new();
 
-            List<(int startTime, int endTime, List<Node> nodes)> taskNodes = new();
+            List<(int startTime, int endTime, List<Node?> nodes)> taskNodes = new();
 
             for (int i = 0; i < tasks.Count; i++)
             {
                 var task = tasks[i];
-                List<Node> pathNodes = new();
+                List<Node?> pathNodes = new();
                 int startTime = task.Elements[0].StartTime, endTime = task.Elements[^1].EndTime;
                 var add = (Node? node) =>
                 {
@@ -358,8 +360,7 @@ namespace E_VCSP.Solver
                             element.StartTime,
                             element.EndTime,
                             $"{trip.From}@{SoCAtStart} -> {trip.To}@{SoCAtEnd} ({trip.Route})",
-                            Color.LightBlue,
-                        i);
+                            Color.LightBlue);
                         add(node);
                     }
                     if (element is VEIdle idle)
@@ -368,8 +369,7 @@ namespace E_VCSP.Solver
                             element.StartTime,
                             element.EndTime,
                             $"idle {idle.Location.Id}@{SoCAtStart}",
-                            Color.White,
-                        i);
+                            Color.White);
                         add(node);
                     }
                     if (element is VEDeadhead dved)
@@ -382,8 +382,7 @@ namespace E_VCSP.Solver
                                 element.StartTime,
                                 element.EndTime,
                                 $"{ddh.DeadheadTemplate.From}@{SoCAtStart} -> {ddh.DeadheadTemplate.To}@{SoCAtEnd} ",
-                                Color.LightGreen,
-                            i);
+                                Color.LightGreen);
                             add(node);
                         }
                         else
@@ -395,24 +394,21 @@ namespace E_VCSP.Solver
                                 currTime,
                                 currTime + ca.DrivingTimeTo,
                                 $"{ddh.DeadheadTemplate.From}@{(int)currSoC} -> {ca.ChargeLocation}@{(int)(currSoC - ca.ChargeUsedTo)}",
-                                Color.GreenYellow,
-                            i);
+                                Color.GreenYellow);
                             currTime += ca.DrivingTimeTo;
                             currSoC -= ca.ChargeUsedTo;
                             var charge = Formatting.GraphElement.ScheduleNode(
                                 currTime,
                                 currTime + dved.ChargeTime,
                                 $"{ca.ChargeLocation} {(int)currSoC}% -> {(int)(currSoC + dved.ChargeGained)}%",
-                                Color.Yellow,
-                            i);
+                                Color.Yellow);
                             currTime += dved.ChargeTime;
                             currSoC += dved.ChargeGained;
                             var fromCharger = Formatting.GraphElement.ScheduleNode(
                                 currTime,
                                 currTime + ca.DrivingTimeFrom,
                                 $"{ca.ChargeLocation}@{(int)currSoC} -> {ddh.DeadheadTemplate.To}@{(int)(currSoC - ca.ChargeUsedFrom)}",
-                                Color.GreenYellow,
-                            i);
+                                Color.GreenYellow);
                             add(toCharger);
                             add(charge);
                             add(fromCharger);
@@ -428,24 +424,28 @@ namespace E_VCSP.Solver
             for (int i = 0; i < taskNodes.Count; i++)
             {
                 (int s, int e, var ns) = taskNodes[i];
-                var align = Formatting.GraphElement.ScheduleNode(minTime - 300, minTime, "align" + i, Color.White, 0);
+                var align = Formatting.GraphElement.ScheduleNode(
+                    minTime - 1000,
+                    minTime,
+                    $"VT {tasks[i].Index}\nCosts: {tasks[i].Cost}",
+                    Color.White);
                 graph.AddNode(align);
                 ns.Insert(0, align);
 
                 if (minTime < s)
                 {
-                    var node = Formatting.GraphElement.ScheduleNode(minTime, s, "padding1" + i, Color.White, 0);
+                    var node = Formatting.GraphElement.ScheduleNode(minTime, s, "padding1" + i, Color.White);
                     graph.AddNode(node);
                     ns.Insert(1, node);
                 }
                 if (maxTime > e)
                 {
-                    var node = Formatting.GraphElement.ScheduleNode(e, maxTime, "padding2" + i, Color.White, 0);
+                    var node = Formatting.GraphElement.ScheduleNode(e, maxTime, "padding2" + i, Color.White);
                     graph.AddNode(node);
                     ns.Add(node);
                 }
 
-                var align2 = Formatting.GraphElement.ScheduleNode(maxTime, maxTime + 300, "align2" + i, Color.White, 0);
+                var align2 = Formatting.GraphElement.ScheduleNode(maxTime, maxTime + 300, "align2" + i, Color.White);
                 graph.AddNode(align2);
                 ns.Add(align2);
             }
@@ -459,7 +459,7 @@ namespace E_VCSP.Solver
 
             // This library isn't really built for alining nodes in a single layer;
             // force by centering nodes at beginning and end of each task
-            List<Node> leftAlign = taskNodes.Select(x => x.nodes[0]).ToList(),
+            List<Node?> leftAlign = taskNodes.Select(x => x.nodes[0]).ToList(),
                        rightAlign = taskNodes.Select(x => x.nodes[^1]).ToList();
             for (int i = 0; i < leftAlign.Count - 1; i++) lc.AddUpDownVerticalConstraint(leftAlign[i], leftAlign[i + 1]);
             for (int i = 0; i < rightAlign.Count - 1; i++) lc.AddUpDownVerticalConstraint(rightAlign[i], rightAlign[i + 1]);
@@ -678,9 +678,15 @@ namespace E_VCSP.Solver
                     // Add column to model 
                     if (reducedCost < 0)
                     {
+                        // Reset non-reduced costs iterations
                         itsWithoutRC = 0;
 
+                        // Add vehicle task to set of active tasks
+                        int index = tasks.Count - 1;
+                        vehicleTask.Index = index;
                         tasks.Add(vehicleTask);
+
+                        // Create new column to add to model
                         var modelConstrs = model.GetConstrs();
                         GRBConstr[] constrs = modelConstrs.Where(
                             (_, i) => vehicleTask.Covers.Contains(i)    // Covers trip
@@ -688,10 +694,11 @@ namespace E_VCSP.Solver
                         ).ToArray();
                         GRBColumn col = new();
                         col.AddTerms(constrs.Select(_ => 1.0).ToArray(), constrs);
-                        string name = $"vt_{tasks.Count - 1}";
-                        var var = model.AddVar(0, 1, vehicleTask.Cost, GRB.CONTINUOUS, col, name);
+
+                        // Add column to model
+                        string name = $"vt_{index}";
+                        vars.Add(model.AddVar(0, 1, vehicleTask.Cost, GRB.CONTINUOUS, col, name));
                         varTaskMapping[name] = tasks[^1];
-                        vars.Add(var);
                     }
                     else
                     {
