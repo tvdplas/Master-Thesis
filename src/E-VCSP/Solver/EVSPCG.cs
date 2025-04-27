@@ -665,16 +665,20 @@ namespace E_VCSP.Solver
 
             while (currIts < Config.MAX_COL_GEN_ITS && !shouldStop && model.Status != GRB.Status.INFEASIBLE)
             {
-                Console.WriteLine($"Col gen round: {currIts}/{Config.MAX_COL_GEN_ITS} generated");
-                List<(double, VehicleTask)> generatedTasks = new();
+                //if (currIts / Config.MAX_COL_GEN_ITS)
+                //Console.WriteLine($"Col gen round: {currIts}/{Config.MAX_COL_GEN_ITS} generated");
+                (double, VehicleTask)?[] generatedTasks = new (double, VehicleTask)?[Config.THREADS];
                 Parallel.For(0, Config.THREADS, (i) =>
                 {
                     splss[i].Reset();
-                    generatedTasks.Add(splss[i].getVehicleTaskLS());
+                    generatedTasks[i] = splss[i].getVehicleTaskLS();
                 });
 
-                foreach ((double reducedCost, VehicleTask vehicleTask) in generatedTasks)
+                foreach (var task in generatedTasks)
                 {
+                    if (task == null) continue;
+                    (double reducedCost, VehicleTask vehicleTask) = ((double, VehicleTask))task;
+
                     // Add column to model 
                     if (reducedCost < 0)
                     {

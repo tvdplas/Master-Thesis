@@ -25,6 +25,11 @@ namespace E_VCSP.Objects
         private List<CurvePiece> Pieces;
         public double CostPerPercentage;
 
+        /// <summary>
+        /// Fake max of upper segment when extending is enabled
+        /// </summary>
+        private const int DUMMY_MAX_SOC = 50_000;
+
         public ChargingCurve(List<(int SoC, double rate)> rates, double totalCapacity)
         {
             if (rates.Count == 0)
@@ -91,10 +96,16 @@ namespace E_VCSP.Objects
         /// <returns>Tuple with maxSoCGained, timetaken and total cost if charging actions is performed fully</returns>
         public ChargeResult MaxChargeGained(double startSoC, int time, bool expand)
         {
+
             int timeRemaining = time;
             double currSoC = startSoC;
 
             if (!expand && startSoC < 0) throw new InvalidDataException("Cannot start charging with SoC < 0. Did you forget to enable expansion?");
+
+            if (currSoC > 100)
+            {
+                int x = 0;
+            }
 
             while (timeRemaining > 0 && (expand || currSoC < 100))
             {
@@ -103,11 +114,17 @@ namespace E_VCSP.Objects
                 if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
 
                 // Determine amount of time to get from current SoC to the piece max SoC
-                double maxSoCInPiece = expand && p.MaxSoC == 100 ? 1_000_000 : p.MaxSoC;
-                int timeToMax = (int)Math.Ceiling((maxSoCInPiece - currSoC) / (1.0 * p.Rate));
+                double maxSoCInPiece = expand && p.MaxSoC == 100 ? DUMMY_MAX_SOC : p.MaxSoC;
+                int timeToMax = (int)Math.Ceiling(Math.Max(maxSoCInPiece - currSoC, 0) / (1.0 * p.Rate));
+
+                if (timeToMax < 0)
+                {
+                    int y = 0;
+                }
+
                 int usableTime = Math.Min(timeRemaining, timeToMax);
                 double gainableSoC = usableTime * p.Rate;
-                currSoC += gainableSoC;
+                currSoC = Math.Min(gainableSoC, DUMMY_MAX_SOC); // numeric stability
                 timeRemaining -= usableTime;
             }
 
@@ -139,9 +156,7 @@ namespace E_VCSP.Objects
                 CurvePiece? p = getPiece(currSoC, expand);
                 if (p == null) throw new InvalidDataException("No piece found");
 
-                double maxSoCInPiece = expand && currSoC >= 100
-                    ? 1_000_000
-                    : p.MaxSoC;
+                double maxSoCInPiece = expand && currSoC >= 100 ? DUMMY_MAX_SOC : p.MaxSoC;
 
                 // Charge until end of piece or until desired SoC is reached
                 double SoCChargedInPiece = Math.Min(targetSoC - currSoC, maxSoCInPiece - currSoC);

@@ -13,7 +13,7 @@ namespace E_VCSP.Formatting
         internal static Node? ScheduleNode(int startTime, int endTime, string content, Color color)
         {
             // No node displayed
-            if ((endTime - startTime) / Config.MIN_NODE_TIME * Config.MIN_NODE_WIDTH < 5)
+            if ((endTime - startTime) / Config.MIN_NODE_TIME * Config.MIN_NODE_WIDTH < 2)
             {
                 return null;
             }

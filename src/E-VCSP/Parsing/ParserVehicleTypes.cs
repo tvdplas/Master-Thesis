@@ -36,6 +36,7 @@ namespace E_VCSP.Parsing
             VehicleType vh = new()
             {
                 Id = line[attributeIndexMapping["Id"]],
+                Index = index,
                 Capacity = Capacity,
                 DriveUsage = DriveUsage,
                 IdleUsage = IdleUsage,
@@ -51,10 +52,10 @@ namespace E_VCSP.Parsing
                     if (loc.CanCharge)
                     {
                         // Normalized to percentage gained per second
-                        loc.ChargingCurves[vh.Id] = new(
+                        loc.ChargingCurves[vh.Id] = (new(
                             [(100, double.Parse(line[attributeIndexMapping["ChargeSpeedUniform"]]) / 3600 / Capacity * 100)],
                             Capacity
-                        );
+                        ));
                     }
                 }
             }

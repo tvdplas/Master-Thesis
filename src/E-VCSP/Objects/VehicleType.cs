@@ -4,6 +4,7 @@
     internal class VehicleType
     {
         internal required string Id;
+        internal required int Index;
         internal double Capacity; // KWh
         internal double DriveUsage; // Usage per KM driven
         internal double IdleUsage; // Usage per second idle
