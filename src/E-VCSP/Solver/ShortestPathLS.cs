@@ -77,51 +77,36 @@ namespace E_VCSP.Solver
             double chargeCosts = 0;
             while (curr != null)
             {
-                if (curr.Next == null) break;
-                if (curr.Next.NodeType == LLNodeType.Deadhead)
+                if (curr.NodeType == LLNodeType.Deadhead)
                 {
-                    VEDeadhead ved = (VEDeadhead)curr.Next.VehicleElement;
+                    VEDeadhead ved = (VEDeadhead)curr.VehicleElement;
 
                     if (ved.SelectedAction != -1)
                     {
                         // Recalculate amount of SoC gained as charge gained may depend on charge at start of action
                         ChargingAction ca = ved.Deadhead.ChargingActions[ved.SelectedAction];
                         ChargingCurve cc = ca.ChargeLocation.ChargingCurves[ShortestPathLS.vehicleType!.Id];
-                        var chargeResult = cc.MaxChargeGained(curr.Next.SoCAtStart - ca.ChargeUsedTo, ved.ChargeTime, true);
+                        var chargeResult = cc.MaxChargeGained(curr.SoCAtStart - ca.ChargeUsedTo, ved.ChargeTime, true);
                         ved.ChargeCost = chargeResult.Cost;
                         chargeCosts += chargeResult.Cost;
                         double chargeSoCGained = chargeResult.SoCGained;
                         double SoCDiff = chargeSoCGained - (ca.ChargeUsedFrom + ca.ChargeUsedTo);
-                        curr.Next.VehicleElement.SoCDiff = SoCDiff;
+                        curr.VehicleElement.SoCDiff = SoCDiff;
                     }
                 }
 
-                curr.Next.SoCAtStart = curr.SoCAtEnd;
-                curr.Next.SoCAtEnd = curr.Next.SoCAtStart + curr.Next.VehicleElement.SoCDiff;
+                curr.SoCAtEnd = curr.SoCAtStart + curr.VehicleElement.SoCDiff;
+                if (curr.Next != null)
+                    curr.Next.SoCAtStart = curr.SoCAtEnd;
                 curr = curr.Next;
             }
 
-            return chargeCosts;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns>Node that was removed</returns>
-        /// <exception cref="InvalidOperationException"></exception>
-        internal LLNode? RemoveAfter()
-        {
-            if (Next == null) throw new InvalidOperationException("Can't remove with no next");
-
-            LLNode? oldNext = Next;
-            LLNode? newNext = Next.Next;
-            Next = newNext;
-            if (newNext != null)
+            if (chargeCosts > 0)
             {
-                newNext.Prev = this;
+                int x = 0;
             }
 
-            return oldNext;
+            return chargeCosts;
         }
 
         /// <summary>
@@ -578,7 +563,7 @@ namespace E_VCSP.Solver
             List<LLNode> chargeTargets = new();
             while (curr != null)
             {
-                if (curr.VehicleElement is VEDeadhead vedh && vedh.Deadhead.ChargingActions.Count > 0)
+                if (curr.NodeType == LLNodeType.Deadhead && ((VEDeadhead)curr.VehicleElement).Deadhead.ChargingActions.Count > 0)
                 {
                     chargeTargets.Add(curr);
                 }
@@ -858,6 +843,18 @@ namespace E_VCSP.Solver
                 if (curr.Next != null && curr.SoCAtEnd != curr.Next.SoCAtStart)
                 {
                     Console.WriteLine("invalid");
+                }
+
+                if (ve.StartSoCInTask > vehicleType.MaxCharge || ve.StartSoCInTask < vehicleType.MinCharge ||
+                    ve.EndSoCInTask > vehicleType.MaxCharge || ve.EndSoCInTask < vehicleType.MinCharge
+                )
+                {
+                    Console.WriteLine("Invalid");
+                }
+
+                if (ve is VEDeadhead ved && (ved.ChargeGained < 0 || ved.ChargeTime < 0))
+                {
+                    Console.WriteLine("Invalid");
                 }
 
                 curr = curr.Next;

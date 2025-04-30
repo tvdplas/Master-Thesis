@@ -102,12 +102,7 @@ namespace E_VCSP.Objects
 
             if (!expand && startSoC < 0) throw new InvalidDataException("Cannot start charging with SoC < 0. Did you forget to enable expansion?");
 
-            if (currSoC > 100)
-            {
-                int x = 0;
-            }
-
-            while (timeRemaining > 0 && (expand || currSoC < 100))
+            while (timeRemaining > 0 && (currSoC < (expand ? DUMMY_MAX_SOC : 100)))
             {
                 // Get the part of the charging curve which is currently applicable.
                 CurvePiece? p = getPiece(currSoC, expand);
@@ -117,15 +112,21 @@ namespace E_VCSP.Objects
                 double maxSoCInPiece = expand && p.MaxSoC == 100 ? DUMMY_MAX_SOC : p.MaxSoC;
                 int timeToMax = (int)Math.Ceiling(Math.Max(maxSoCInPiece - currSoC, 0) / (1.0 * p.Rate));
 
-                if (timeToMax < 0)
+                int usableTime = Math.Min(timeRemaining, timeToMax);
+
+                if (usableTime < 0)
                 {
-                    int y = 0;
+                    Console.WriteLine("hier gaat iets mis");
                 }
 
-                int usableTime = Math.Min(timeRemaining, timeToMax);
                 double gainableSoC = usableTime * p.Rate;
-                currSoC = Math.Min(gainableSoC, DUMMY_MAX_SOC); // numeric stability
+                currSoC += Math.Min(gainableSoC, DUMMY_MAX_SOC); // numeric stability
                 timeRemaining -= usableTime;
+            }
+
+            if (currSoC < startSoC)
+            {
+                Console.WriteLine("Charging is not charging");
             }
 
             return new ChargeResult()

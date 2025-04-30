@@ -20,7 +20,7 @@
     internal static class Config
     {
         internal static Header PROGRAM = new();
-        internal static int THREADS = 10;
+        internal static int THREADS = 1;
 
         // Graph display
         internal static Header DEBUG = new();
@@ -50,7 +50,7 @@
 
         internal static Header SOLVER = new();
         internal static bool USE_COLUMN_GENERATION = true;
-        internal static int MAX_COL_GEN_ITS = 1000;
+        internal static int MAX_COL_GEN_ITS = 5000;
         internal static int LS_OPT_IT_THRESHOLD = 10;
         internal static double LS_STARTING_T = 2;
         internal static double LS_ENDING_T = 0.01;
@@ -60,7 +60,7 @@
         internal static double LS_OVERCHARGE_PENALTY_VAR = 0.5;
         internal static double LS_UNDERCHARGE_PENALTY_FIX = 5;
         internal static double LS_UNDERCHARGE_PENALTY_VAR = 0.5;
-        internal static double LS_ADD_TRIP = 1;
+        internal static double LS_ADD_TRIP = 15;
         internal static double LS_REM_TRIP = 1;
         internal static double LS_CHANGE_CHARGE = 2;
         internal static double LS_INC_CHARGE = 4;

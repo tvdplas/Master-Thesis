@@ -3,6 +3,7 @@ using E_VCSP.Objects;
 using E_VCSP.Objects.Discrete;
 using Gurobi;
 using Microsoft.Msagl.Drawing;
+using System.Collections;
 using Color = Microsoft.Msagl.Drawing.Color;
 using Node = Microsoft.Msagl.Drawing.Node;
 
@@ -49,6 +50,31 @@ namespace E_VCSP.Solver
         internal required List<ChargingAction> ChargingActions;
         internal double BaseDrivingCost;
     }
+
+    class BitArrayComparer : IEqualityComparer<BitArray>
+    {
+        public bool Equals(BitArray? x, BitArray? y)
+        {
+            if (x == null && y == null) return true;
+            if (x == null || y == null) return false;
+
+            if (x.Length != y.Length) return false;
+            for (int i = 0; i < x.Length; i++)
+                if (x[i] != y[i]) return false;
+            return true;
+        }
+
+        public int GetHashCode(BitArray obj)
+        {
+            int[] ints = new int[(obj.Length + 31) / 32];
+            obj.CopyTo(ints, 0);
+            int hash = 17;
+            foreach (int i in ints)
+                hash = hash * 31 + i;
+            return hash;
+        }
+    }
+
 
     internal record SPLabel(int prevIndex, int prevId, double currSoC, double costs, int id);
 
@@ -110,7 +136,8 @@ namespace E_VCSP.Solver
         private List<List<Arc>> adj = new();
 
         private List<List<DeadheadTemplate?>> locationDHTMapping = new();
-        private Dictionary<string, VehicleTask> varTaskMapping = new();
+        private Dictionary<string, VehicleTask> varnameTaskMapping = new();
+        private Dictionary<BitArray, VehicleTask> coverTaskMapping = new(new BitArrayComparer());
 
         private VehicleType vt;
 
@@ -311,7 +338,7 @@ namespace E_VCSP.Solver
             {
                 if (v.VarName.StartsWith("vt_") && v.X >= Config.COL_GEN_GEQ_THRESHOLD)
                 {
-                    VehicleTask dvt = varTaskMapping[v.VarName];
+                    VehicleTask dvt = varnameTaskMapping[v.VarName];
                     tasks.Add(dvt);
                     foreach (int i in dvt.Covers)
                     {
@@ -634,7 +661,8 @@ namespace E_VCSP.Solver
                 GRBVar v = model.AddVar(0, 1, tasks[i].Cost, GRB.CONTINUOUS, $"vt_{i}");
                 maxVehicles += v;
                 vars.Add(v);
-                varTaskMapping[name] = tasks[i];
+                varnameTaskMapping[name] = tasks[i];
+                coverTaskMapping.Add(tasks[i].ToBitArray(instance.Trips.Count), tasks[i]);
             }
 
             // Add cover constraint for each of the trips
@@ -657,8 +685,11 @@ namespace E_VCSP.Solver
             model.Optimize();
 
             bool shouldStop = false;
-            int currIts = 1;
-            int itsWithoutRC = 0;
+            int currIts = 1,
+                itsWithoutRC = 0,
+                notFound = 0, // Column could not be generated
+                discardedNewColumns = 0, // Column discarded due to better one in model
+                discardedOldColumns = 0; // Column discarded due to better one found
 
             List<ShortestPathLS> splss = new();
             for (int i = 0; i < Config.THREADS; i++) splss.Add(new(instance, model, adjFull));
@@ -676,8 +707,28 @@ namespace E_VCSP.Solver
 
                 foreach (var task in generatedTasks)
                 {
-                    if (task == null) continue;
-                    (double reducedCost, VehicleTask vehicleTask) = ((double, VehicleTask))task;
+                    if (task == null)
+                    {
+                        notFound++;
+                        continue;
+                    }
+                    (double reducedCost, VehicleTask newTask) = ((double, VehicleTask))task;
+
+                    // Check if task is already in model 
+                    BitArray ba = newTask.ToBitArray(instance.Trips.Count);
+                    bool coverExists = coverTaskMapping.ContainsKey(ba);
+
+                    if (coverExists)
+                    {
+                        VehicleTask vt = coverTaskMapping[ba];
+
+                        // Same cover but higher cost can be ignored safely.
+                        if (vt.Cost < newTask.Cost)
+                        {
+                            discardedNewColumns++;
+                            continue;
+                        }
+                    }
 
                     // Add column to model 
                     if (reducedCost < 0)
@@ -685,24 +736,46 @@ namespace E_VCSP.Solver
                         // Reset non-reduced costs iterations
                         itsWithoutRC = 0;
 
-                        // Add vehicle task to set of active tasks
-                        int index = tasks.Count - 1;
-                        vehicleTask.Index = index;
-                        tasks.Add(vehicleTask);
+                        // Replace existing column with this task, as it has lower costs
+                        if (coverExists)
+                        {
+                            VehicleTask toBeReplaced = coverTaskMapping[ba];
+                            int index = toBeReplaced.Index;
+                            newTask.Index = index;
 
-                        // Create new column to add to model
-                        var modelConstrs = model.GetConstrs();
-                        GRBConstr[] constrs = modelConstrs.Where(
-                            (_, i) => vehicleTask.Covers.Contains(i)    // Covers trip
-                            || i == modelConstrs.Count() - 1            // Add to used vehicles
-                        ).ToArray();
-                        GRBColumn col = new();
-                        col.AddTerms(constrs.Select(_ => 1.0).ToArray(), constrs);
+                            // Bookkeeping; replace task in internal datastructures
+                            tasks[index] = newTask;
+                            string name = $"vt_{index}";
+                            varnameTaskMapping[name] = newTask;
+                            coverTaskMapping[ba] = newTask;
 
-                        // Add column to model
-                        string name = $"vt_{index}";
-                        vars.Add(model.AddVar(0, 1, vehicleTask.Cost, GRB.CONTINUOUS, col, name));
-                        varTaskMapping[name] = tasks[^1];
+                            // Adjust costs in model
+                            vars[index].Obj = newTask.Cost;
+                            discardedOldColumns++;
+                        }
+                        // Create new column for task, add it to model.
+                        else
+                        {
+                            int index = tasks.Count;
+                            string name = $"vt_{index}";
+                            tasks.Add(newTask);
+                            newTask.Index = index;
+
+                            // Create new column to add to model
+                            var modelConstrs = model.GetConstrs();
+                            GRBConstr[] constrs = modelConstrs.Where(
+                                (_, i) => newTask.Covers.Contains(i)    // Covers trip
+                                || i == modelConstrs.Count() - 1        // Add to used vehicles
+                            ).ToArray();
+                            GRBColumn col = new();
+                            col.AddTerms(constrs.Select(_ => 1.0).ToArray(), constrs);
+
+                            // Add column to model
+                            vars.Add(model.AddVar(0, 1, newTask.Cost, GRB.CONTINUOUS, col, name));
+                            varnameTaskMapping[name] = tasks[^1];
+                            coverTaskMapping[ba] = tasks[^1];
+                        }
+
                     }
                     else
                     {
@@ -718,6 +791,7 @@ namespace E_VCSP.Solver
                 }
 
                 // Continue.......
+                model.Update();
                 model.Optimize();
                 currIts++;
             }
@@ -727,7 +801,10 @@ namespace E_VCSP.Solver
             {
                 var.Set(GRB.CharAttr.VType, GRB.BINARY);
             }
-            Console.WriteLine("Solving non-relaxed model");
+            Console.WriteLine($"LS failed to generate charge-feasible trip {notFound} times during generation");
+            Console.WriteLine($"Discarded {discardedOldColumns} old, {discardedNewColumns} new columns during generation");
+            Console.WriteLine($"Solving non-relaxed model with total of {tasks.Count} columns");
+            model.Update();
             model.Optimize();
 
             Console.Write($"Costs: {model.ObjVal}, vehicle slack: {model.GetVarByName("vehicle_count_slack").X}");

@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Solver;
+using System.Collections;
 
 namespace E_VCSP.Objects.Discrete
 {
@@ -76,6 +77,13 @@ namespace E_VCSP.Objects.Discrete
                     return cost;
                 });
             }
+        }
+
+        internal BitArray ToBitArray(int tripCount)
+        {
+            BitArray ba = new BitArray(tripCount);
+            for (int i = 0; i < Covers.Count; i++) ba[Covers[i]] = true;
+            return ba;
         }
 
         internal VehicleTask(List<VehicleElement> elements)
