@@ -100,7 +100,13 @@ namespace E_VCSP.Parsing
             List<T> res = new();
             for (int i = 1; i < file.Count; i++)
             {
-                res.Add(ParseSingle(i - 1, file[i], attributeIndexMapping, locations));
+                res.Add(ParseSingle(
+                    i - 1,
+                    file[0],
+                    file[i],
+                    attributeIndexMapping,
+                    locations
+                ));
             }
             return res;
         }
@@ -115,6 +121,7 @@ namespace E_VCSP.Parsing
         /// <returns><typeparamref name="T"/> parsed from <paramref name="line"/>. May introduce new entries in <paramref name="locations"/> if they were not yet known.</returns>
         internal abstract T ParseSingle(
             int index,
+            List<string> headers,
             List<string> line,
             Dictionary<string, int> attributeIndexMapping,
             List<Location> locations

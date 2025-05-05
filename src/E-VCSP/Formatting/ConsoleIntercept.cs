@@ -2,18 +2,19 @@
 
 namespace E_VCSP.Formatting
 {
-    internal class TextBoxWriter : TextWriter
+    internal class ConsoleIntercept : TextWriter
     {
         private readonly TextBox _textBox;
         private bool _isNewLine = true; // Track if we are starting a new line
 
-        public TextBoxWriter(TextBox textBox)
+        public ConsoleIntercept(TextBox textBox)
         {
             _textBox = textBox;
         }
 
         public override void Write(char value)
         {
+
             Write(value.ToString());
         }
 
@@ -39,6 +40,10 @@ namespace E_VCSP.Formatting
                 }
             }
 
+            if (Config.RUN_LOG_FOLDER != "")
+            {
+                File.AppendAllText(Config.RUN_LOG_FOLDER + "log.txt", output.ToString());
+            }
             AppendTextToTextBox(output.ToString());
         }
 

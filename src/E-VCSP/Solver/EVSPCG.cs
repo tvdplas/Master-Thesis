@@ -652,6 +652,7 @@ namespace E_VCSP.Solver
 
             model = new(env);
             model.SetCallback(new CustomGRBCallback());
+            model.Parameters.TimeLimit = Config.SOLVER_TIMEOUT_SEC;
 
             GRBLinExpr maxVehicles = new();
             List<GRBVar> vars = new();
@@ -687,23 +688,36 @@ namespace E_VCSP.Solver
             bool shouldStop = false;
             int currIts = 1,
                 itsWithoutRC = 0,
+                totalGenerated = 0,
                 notFound = 0, // Column could not be generated
                 discardedNewColumns = 0, // Column discarded due to better one in model
                 discardedOldColumns = 0; // Column discarded due to better one found
 
+            int lastReportedPercent = 0,
+                maxColumns = Config.THREADS * Config.MAX_COL_GEN_ITS;
+
             List<ShortestPathLS> splss = new();
             for (int i = 0; i < Config.THREADS; i++) splss.Add(new(instance, model, adjFull));
 
+            Console.WriteLine("Column generation started");
+            Console.WriteLine("%\tT\tNF\tDN\tDO");
+
             while (currIts < Config.MAX_COL_GEN_ITS && !shouldStop && model.Status != GRB.Status.INFEASIBLE)
             {
-                //if (currIts / Config.MAX_COL_GEN_ITS)
-                //Console.WriteLine($"Col gen round: {currIts}/{Config.MAX_COL_GEN_ITS} generated");
                 (double, VehicleTask)?[] generatedTasks = new (double, VehicleTask)?[Config.THREADS];
                 Parallel.For(0, Config.THREADS, (i) =>
                 {
                     splss[i].Reset();
                     generatedTasks[i] = splss[i].getVehicleTaskLS();
                 });
+                totalGenerated += generatedTasks.Length;
+
+                int percent = (int)((totalGenerated / (double)maxColumns) * 100);
+                if (percent >= lastReportedPercent + 10)
+                {
+                    lastReportedPercent = percent - (percent % 10);
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}");
+                }
 
                 foreach (var task in generatedTasks)
                 {
@@ -801,10 +815,13 @@ namespace E_VCSP.Solver
             {
                 var.Set(GRB.CharAttr.VType, GRB.BINARY);
             }
+            Console.WriteLine($"Total generation attempts: ${totalGenerated}");
             Console.WriteLine($"LS failed to generate charge-feasible trip {notFound} times during generation");
             Console.WriteLine($"Discarded {discardedOldColumns} old, {discardedNewColumns} new columns during generation");
             Console.WriteLine($"Solving non-relaxed model with total of {tasks.Count} columns");
             model.Update();
+            bool configState = Config.CONSOLE_GUROBI;
+            Config.CONSOLE_GUROBI = true; // Force enable console at end as this solve takes a long time
             model.Optimize();
 
             Console.Write($"Costs: {model.ObjVal}, vehicle slack: {model.GetVarByName("vehicle_count_slack").X}");
@@ -817,9 +834,12 @@ namespace E_VCSP.Solver
                     model.ComputeIIS();
                     model.Write("infeasible_CG.ilp");
                 }
+
+                Config.CONSOLE_GUROBI = configState;
                 return false;
             }
 
+            Config.CONSOLE_GUROBI = configState;
             return true;
         }
     }

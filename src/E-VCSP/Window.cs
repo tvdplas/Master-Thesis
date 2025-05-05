@@ -3,6 +3,7 @@ using E_VCSP.Formatting;
 using E_VCSP.Objects;
 using E_VCSP.Solver;
 using System.Reflection;
+using System.Text;
 
 namespace E_VCSP
 {
@@ -17,7 +18,7 @@ namespace E_VCSP
         public MainView()
         {
             InitializeComponent();
-            Console.SetOut(new TextBoxWriter(textBox1));
+            Console.SetOut(new ConsoleIntercept(textBox1));
             Console.WriteLine("Program started");
 
             activeFolderLabel.Text = activeFolder;
@@ -169,7 +170,18 @@ namespace E_VCSP
                 g.AddNode("Graph not shown");
                 graphViewer.Graph = g;
             }
-            Console.WriteLine("Instance reloaded");
+
+            string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
+            Config.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
+            Directory.CreateDirectory(Config.RUN_LOG_FOLDER);
+
+            Type configType = typeof(Config);
+            FieldInfo[] fields = configType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            StringBuilder configDump = new();
+            foreach (FieldInfo field in fields)
+                configDump.AppendLine($"{field.Name}: {field.GetValue(null)}");
+            File.WriteAllText(Config.RUN_LOG_FOLDER + "config.txt", configDump.ToString());
+            Console.WriteLine($"Instance reloaded. Current config state dumped to {Config.RUN_LOG_FOLDER + "config.txt"}");
         }
     }
 }

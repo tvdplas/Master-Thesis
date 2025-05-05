@@ -22,6 +22,7 @@ namespace E_VCSP.Parsing
 
         internal override Empty ParseSingle(
             int index,
+            List<string> headers,
             List<string> line,
             Dictionary<string, int> attributeIndexMapping,
             List<Location> locations

@@ -25,7 +25,7 @@ namespace E_VCSP.Objects
 
             // If no depot is found yet; let the first parsed location be the depot. 
             // TODO: dit werkt toevallig voor de Terschelling dataset, maar dit moet wel echt gefixt worden. 
-            if (Locations.Find(loc => loc.IsDepot) == null) Locations[0].IsDepot = true;
+            if (Locations.Find(loc => loc.IsDepot) == null) Locations.Find(x => x.CanCharge && x.BreakAllowed).IsDepot = true;
 
             // Trips are parsed directly; Can add locations that were not previously known.
             Trips = new ParserTrips().Parse(path, Locations);

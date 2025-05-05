@@ -22,7 +22,7 @@ namespace E_VCSP.Parsing
             };
         }
 
-        internal override Trip ParseSingle(int index, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
+        internal override Trip ParseSingle(int index, List<string> headers, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
         {
             Location from = GetOrCreateLocation(line[attributeIndexMapping["FromId"]], locations);
             Location to = GetOrCreateLocation(line[attributeIndexMapping["ToId"]], locations);

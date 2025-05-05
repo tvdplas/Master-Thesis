@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects;
+using System.Text.RegularExpressions;
 
 namespace E_VCSP.Parsing
 {
@@ -14,13 +15,13 @@ namespace E_VCSP.Parsing
                 ( "DriveUsage", "Verbruik (kWh/km)" ),
                 ( "IdleUsage", "Verbruik bij stilstand (kWh per uur stilstand)" ),
                 ( "MinCharge", "Laagste toegestane lading" ),
-                ( "ChargeSpeedUniform", "Laadsnelheid (0-100%) kWh" ),
                 ( "Available", "Aantal beschikbaar" ),
             };
         }
 
         internal override VehicleType ParseSingle(
             int index,
+            List<string> headers,
             List<string> line,
             Dictionary<string, int> attributeIndexMapping,
             List<Location> locations
@@ -44,19 +45,33 @@ namespace E_VCSP.Parsing
                 MaxCharge = 1 * 100,
             };
 
-            if (attributeIndexMapping["ChargeSpeedUniform"] != -1)
+            // Get the columns for max charging speed
+            List<(int index, int low, int high)> chargingColumns = new();
+            for (int i = 0; i < headers.Count; i++)
             {
-                // Set all charging locations to accept this vehicle
-                foreach (Location loc in locations)
+                if (headers[i].StartsWith("Laadsnelheid"))
                 {
-                    if (loc.CanCharge)
+                    // Get the digits before/after the "-"
+                    var match = Regex.Match(headers[i], @"\((\d+)-(\d+)%\)");
+                    int low = int.Parse(match.Groups[1].Value);
+                    int high = int.Parse(match.Groups[2].Value);
+                    chargingColumns.Add((i, low, high));
+                }
+            }
+
+            foreach (Location loc in locations)
+            {
+                if (loc.CanCharge)
+                {
+                    var curveDefinition = chargingColumns.Select((val) =>
                     {
-                        // Normalized to percentage gained per second
-                        loc.ChargingCurves[vh.Id] = (new(
-                            [(100, double.Parse(line[attributeIndexMapping["ChargeSpeedUniform"]]) / 3600 / Capacity * 100)],
-                            Capacity
-                        ));
-                    }
+                        (int index, int low, int high) = val;
+                        return (high, Math.Min(loc.ChargeTotalPower, double.Parse(line[index]) / 3600 / Capacity * 100));
+                    }).ToList();
+                    loc.ChargingCurves[vh.Id] = (new(
+                        curveDefinition,
+                        Capacity
+                    ));
                 }
             }
 

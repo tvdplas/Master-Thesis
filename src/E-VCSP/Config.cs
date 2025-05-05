@@ -20,6 +20,7 @@
     internal static class Config
     {
         internal static Header PROGRAM = new();
+        internal static string RUN_LOG_FOLDER = "";
         internal static int THREADS = 1;
 
         // Graph display
@@ -66,6 +67,7 @@
         internal static double LS_INC_CHARGE = 4;
         internal static double LS_DEC_CHARGE = 3;
         internal static double COL_GEN_GEQ_THRESHOLD = 0.1;
+        internal static int SOLVER_TIMEOUT_SEC = 300;
         internal static bool DETERMINE_IIS = false;
     }
 }

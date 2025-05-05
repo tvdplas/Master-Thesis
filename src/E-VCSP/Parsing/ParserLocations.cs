@@ -16,7 +16,7 @@ namespace E_VCSP.Parsing
             };
         }
 
-        internal override Location ParseSingle(int index, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
+        internal override Location ParseSingle(int index, List<string> headers, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
         {
             Location loc = GetOrCreateLocation(line[attributeIndexMapping["Id"]], locations);
             loc.ChargeSpots = int.Parse(line[attributeIndexMapping["ChargeSpots"]]);
