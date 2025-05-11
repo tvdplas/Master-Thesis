@@ -27,7 +27,7 @@ namespace E_VCSP.Objects.Discrete
     }
     internal class VEDeadhead : VehicleElement
     {
-        internal required LabelDeadhead Deadhead;
+        internal required Deadhead Deadhead;
 
         internal int SelectedAction = -1;
         internal int ChargeTime = 0;
@@ -67,21 +67,26 @@ namespace E_VCSP.Objects.Discrete
         {
             get
             {
-                return Elements.Sum(e =>
+                double cost = Elements.Sum(e =>
                 {
-                    double cost = e.DrivingCost;
+                    double c = e.DrivingCost;
 
                     if (e is VEDeadhead ved && ved.ChargeGained > 0)
-                        cost += ved.ChargeCost;
+                        c += ved.ChargeCost;
 
-                    return cost;
+                    return c;
                 });
+
+                if (Elements[^1].EndSoCInTask != null)
+                    cost += Math.Min(0, ShortestPathLS.vehicleType.StartCharge - (double)Elements[^1]!.EndSoCInTask!) * ShortestPathLS.vehicleType.Capacity / 100 * Config.KWH_COST;
+
+                return cost;
             }
         }
 
         internal BitArray ToBitArray(int tripCount)
         {
-            BitArray ba = new BitArray(tripCount);
+            BitArray ba = new(tripCount);
             for (int i = 0; i < Covers.Count; i++) ba[Covers[i]] = true;
             return ba;
         }
@@ -89,7 +94,7 @@ namespace E_VCSP.Objects.Discrete
         internal VehicleTask(List<VehicleElement> elements)
         {
             Elements = elements;
-            Covers = elements.Where(e => e is VETrip).Select(e => ((VETrip)e).Trip.Index).ToList();
+            Covers = [.. elements.Where(e => e is VETrip).Select(e => ((VETrip)e).Trip.Index)];
         }
     }
 }

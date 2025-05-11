@@ -1,4 +1,6 @@
-﻿namespace E_VCSP
+﻿using System.Threading;
+
+namespace E_VCSP
 {
     partial class MainView
     {
@@ -24,8 +26,9 @@
             graphViewer = new Microsoft.Msagl.GraphViewerGdi.GViewer();
             textBox1 = new TextBox();
             panel1 = new Panel();
-            splitContainer1 = new SplitContainer();
             solveButton = new Button();
+            stopButton = new Button();
+            splitContainer1 = new SplitContainer();
             panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
             splitContainer1.Panel1.SuspendLayout();
@@ -105,12 +108,13 @@
             textBox1.Name = "textBox1";
             textBox1.ReadOnly = true;
             textBox1.ScrollBars = ScrollBars.Both;
-            textBox1.Size = new Size(553, 558);
+            textBox1.Size = new Size(408, 558);
             textBox1.TabIndex = 4;
             // 
             // panel1
             // 
             panel1.Controls.Add(solveButton);
+            panel1.Controls.Add(stopButton);
             panel1.Controls.Add(loadButton);
             panel1.Controls.Add(activeFolderLabel);
             panel1.Dock = DockStyle.Left;
@@ -118,6 +122,27 @@
             panel1.Name = "panel1";
             panel1.Size = new Size(304, 558);
             panel1.TabIndex = 1;
+            // 
+            // solveButton
+            // 
+            solveButton.Location = new Point(3, 33);
+            solveButton.Name = "solveButton";
+            solveButton.Size = new Size(75, 23);
+            solveButton.TabIndex = 2;
+            solveButton.Text = "Solve";
+            solveButton.UseVisualStyleBackColor = true;
+            solveButton.Click += solveButtonClick;
+            // 
+            // stopButton
+            // 
+            stopButton.Enabled = false;
+            stopButton.Location = new Point(85, 33);
+            stopButton.Name = "stopButton";
+            stopButton.Size = new Size(75, 23);
+            stopButton.TabIndex = 3;
+            stopButton.Text = "Stop";
+            stopButton.UseVisualStyleBackColor = true;
+            stopButton.Click += stopButtonClick;
             // 
             // splitContainer1
             // 
@@ -136,16 +161,6 @@
             splitContainer1.Size = new Size(860, 558);
             splitContainer1.SplitterDistance = 445;
             splitContainer1.TabIndex = 0;
-            // 
-            // button1
-            // 
-            solveButton.Location = new Point(4, 33);
-            solveButton.Name = "solveButton";
-            solveButton.Size = new Size(75, 23);
-            solveButton.TabIndex = 2;
-            solveButton.Text = "Solve";
-            solveButton.UseVisualStyleBackColor = true;
-            solveButton.Click += solveButtonClick;
             // 
             // MainView
             // 
@@ -177,5 +192,7 @@
         private Panel panel1; // Panel for the Button and FolderBrowserDialog
         private SplitContainer splitContainer1; // SplitContainer for the TextBox and GraphViewer
         private Button solveButton;
+        private Button stopButton;
+        private CancellationTokenSource cancellationTokenSource;
     }
 }

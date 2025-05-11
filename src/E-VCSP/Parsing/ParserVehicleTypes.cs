@@ -68,7 +68,7 @@ namespace E_VCSP.Parsing
                         (int index, int low, int high) = val;
                         return (high, Math.Min(loc.ChargeTotalPower, double.Parse(line[index]) / 3600 / Capacity * 100));
                     }).ToList();
-                    loc.ChargingCurves[vh.Id] = (new(
+                    loc.ChargingCurves.Add(new(
                         curveDefinition,
                         Capacity
                     ));

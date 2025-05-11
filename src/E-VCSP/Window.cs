@@ -4,12 +4,13 @@ using E_VCSP.Objects;
 using E_VCSP.Solver;
 using System.Reflection;
 using System.Text;
+using MethodInvoker = System.Windows.Forms.MethodInvoker;
 
 namespace E_VCSP
 {
     public partial class MainView : Form
     {
-        private Dictionary<string, Control> controlsMap = new();
+        private readonly Dictionary<string, Control> controlsMap = [];
         public string activeFolder = "No folder selected";
 
         Instance? instance;
@@ -30,7 +31,7 @@ namespace E_VCSP
             Type configType = typeof(Config);
             FieldInfo[] fields = configType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
 
-            Panel scrollablePanel = new Panel
+            Panel scrollablePanel = new()
             {
                 AutoScroll = true,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -44,7 +45,7 @@ namespace E_VCSP
             int yOffset = 10;
             foreach (FieldInfo field in fields)
             {
-                System.Windows.Forms.Label label = new System.Windows.Forms.Label
+                Label label = new()
                 {
                     Text = field.Name.Replace('_', ' ').ToLower(),
                     AutoSize = true,
@@ -61,7 +62,7 @@ namespace E_VCSP
                 Control inputControl;
                 if (field.FieldType == typeof(int) || field.FieldType == typeof(double) || field.FieldType == typeof(string))
                 {
-                    TextBox textBox = new TextBox
+                    TextBox textBox = new()
                     {
                         Text = field.GetValue(null)?.ToString()?.Replace('_', ' ').ToLower(),
                         Location = new System.Drawing.Point(150, yOffset),
@@ -72,7 +73,7 @@ namespace E_VCSP
                 }
                 else if (field.FieldType.IsEnum)
                 {
-                    ComboBox comboBox = new ComboBox
+                    ComboBox comboBox = new()
                     {
                         DropDownStyle = ComboBoxStyle.DropDownList,
                         Location = new System.Drawing.Point(150, yOffset),
@@ -86,7 +87,7 @@ namespace E_VCSP
                 }
                 else if (field.FieldType == typeof(bool))
                 {
-                    CheckBox check = new CheckBox
+                    CheckBox check = new()
                     {
                         Checked = (bool)(field.GetValue(null) ?? false),
                         Location = new System.Drawing.Point(150, yOffset),
@@ -104,7 +105,7 @@ namespace E_VCSP
                 yOffset += 30;
             }
 
-            Button applyButton = new Button
+            Button applyButton = new()
             {
                 Text = "Apply Changes",
                 Location = new System.Drawing.Point(10, yOffset + 10),
@@ -114,7 +115,7 @@ namespace E_VCSP
             scrollablePanel.Controls.Add(applyButton);
         }
 
-        private void UpdateString(FieldInfo field, string text)
+        private static void UpdateString(FieldInfo field, string text)
         {
             if (field.FieldType == typeof(string))
                 field.SetValue(null, text);
@@ -138,19 +139,68 @@ namespace E_VCSP
             }
         }
 
-        private void solveButtonClick(object sender, EventArgs e)
+        private void stopButtonClick(object sender, EventArgs e) // <<< Add this method
         {
-            solve();
+            if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
+            {
+                Console.WriteLine("Stop button clicked. Requesting cancellation...");
+                cancellationTokenSource.Cancel();
+                stopButton.Enabled = false; // Disable stop button immediately
+            }
         }
 
-        private void solve()
+        private async void solveButtonClick(object sender, EventArgs e) // <<< Change to async void
         {
-            reload();
+            reload(); // Ensure instance and solver are ready
             if (solver == null) return;
 
-            if (solver.Solve())
+            solveButton.Enabled = false;
+            stopButton.Enabled = true;
+            cancellationTokenSource = new CancellationTokenSource();
+            var token = cancellationTokenSource.Token;
+
+            bool success = false;
+            try
             {
-                graphViewer.Graph = solver.GenerateSolutionGraph();
+                // Run the solver on a background thread
+                success = await Task.Run(() => solver.Solve(token), token); // <<< Pass token
+
+                if (success)
+                {
+                    // Update UI thread safely
+                    graphViewer.Invoke((System.Windows.Forms.MethodInvoker)delegate
+                    {
+                        graphViewer.Graph = solver.GenerateSolutionGraph();
+                    });
+                    Console.WriteLine("Solver finished successfully.");
+                }
+                else
+                {
+                    Console.WriteLine("Solver did not find a solution or was cancelled.");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("Solver operation was cancelled.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred during solving: {ex.Message}");
+                // Optionally show more details or log the exception
+            }
+            finally
+            {
+                // Ensure UI is updated even if errors occur
+                if (this.IsHandleCreated) // Check if the form handle still exists
+                {
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        solveButton.Enabled = true;
+                        stopButton.Enabled = false;
+                        cancellationTokenSource?.Dispose(); // Dispose the source
+                        cancellationTokenSource = null;
+                    });
+                }
             }
         }
 

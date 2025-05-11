@@ -7,7 +7,7 @@
 
         internal double ChargeTotalPower = 0; // KWh
         internal int ChargeSpots = 0;
-        internal Dictionary<string, ChargingCurve> ChargingCurves = new() { };
+        internal List<ChargingCurve> ChargingCurves = new(); // indexed by vehicle id
 
         internal int SignOnTime = 0;
         internal int SignOffTime = 0;

@@ -13,14 +13,14 @@ namespace E_VCSP.Solver
         internal DGraph DGraph;
 
         private Dictionary<string, DDeadhead> deadheadVarMapping = new();
-        private GRBModel model;
+        private GRBModel? model;
 
         public EVSPDiscrete(Instance instance)
         {
             DGraph = new(instance);
         }
 
-        internal override bool Solve()
+        internal override bool Solve(CancellationToken cancellationToken)
         {
             GRBEnv env = new();
             env.LogToConsole = 1;
@@ -133,6 +133,8 @@ namespace E_VCSP.Solver
 
         internal override Graph GenerateSolutionGraph()
         {
+            if (model == null) throw new InvalidDataException("Cannot generate solution graph without model instance");
+
             Console.WriteLine("Reconstructing paths");
             List<List<(int, DDeadhead)>> adj = new(); // trips 1->n are map to 0->n-1, depot start = n, depot end = n + 1
             HashSet<int> visited = new(); // Validation that all nodes are actually visited

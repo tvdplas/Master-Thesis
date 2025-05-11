@@ -28,7 +28,7 @@ namespace E_VCSP.Solver
     {
         internal required EVSPNode From;
         internal required EVSPNode To;
-        internal required LabelDeadhead Deadhead;
+        internal required Deadhead Deadhead;
     }
 
     internal class ChargingAction
@@ -44,107 +44,30 @@ namespace E_VCSP.Solver
         internal int TimeAtLocation;
     }
 
-    internal class LabelDeadhead
+    internal class Deadhead
     {
         internal required DeadheadTemplate DeadheadTemplate;
         internal required List<ChargingAction> ChargingActions;
         internal double BaseDrivingCost;
     }
 
-    class BitArrayComparer : IEqualityComparer<BitArray>
-    {
-        public bool Equals(BitArray? x, BitArray? y)
-        {
-            if (x == null && y == null) return true;
-            if (x == null || y == null) return false;
-
-            if (x.Length != y.Length) return false;
-            for (int i = 0; i < x.Length; i++)
-                if (x[i] != y[i]) return false;
-            return true;
-        }
-
-        public int GetHashCode(BitArray obj)
-        {
-            int[] ints = new int[(obj.Length + 31) / 32];
-            obj.CopyTo(ints, 0);
-            int hash = 17;
-            foreach (int i in ints)
-                hash = hash * 31 + i;
-            return hash;
-        }
-    }
-
-
-    internal record SPLabel(int prevIndex, int prevId, double currSoC, double costs, int id);
-
-    internal class Front
-    {
-        private SortedList<double, SPLabel> front = new();
-
-        internal void Insert(SPLabel label)
-        {
-            int l = 0, r = front.Count;
-            // find first item that is larger than or equal to label currSoC
-            while (l < r)
-            {
-                int m = (l + r) / 2;
-                if (front.Keys[m] >= label.currSoC) r = m;
-                else l = m + 1;
-            }
-
-            // Linear scan over remaining items, stop insertion once an item is found which dominates
-            for (int i = l; i < front.Count; i++)
-            {
-                // Skip once domination is found
-                if (front.Values[i].costs <= label.costs) return;
-            }
-
-            // Label is inserted, all dominated items need to be removed
-            for (int i = l - 1; i >= 0 && i < front.Count; i--)
-            {
-                var b = front.Values[i];
-                if (label.costs <= b.costs)
-                {
-                    front.RemoveAt(i);
-                }
-            }
-            front[label.currSoC] = label;
-        }
-        internal int Count => front.Count;
-
-        internal void Clear() => front.Clear();
-
-        internal SPLabel Pop()
-        {
-            int lastIndex = front.Count - 1;
-            var label = front.Values[lastIndex];
-            front.RemoveAt(lastIndex);
-            return label;
-        }
-    }
-
-
     internal class EVSPCG : Solver
     {
         private Instance instance;
 
-        private List<VehicleTask> tasks = new();
+        private List<VehicleTask> tasks = [];
 
-        private List<EVSPNode> nodes = new();
-        private List<List<Arc?>> adjFull = new();
-        private List<List<Arc>> adj = new();
+        private List<EVSPNode> nodes = [];
+        private List<List<Arc?>> adjFull = [];
+        private List<List<Arc>> adj = [];
 
-        private List<List<DeadheadTemplate?>> locationDHTMapping = new();
-        private Dictionary<string, VehicleTask> varnameTaskMapping = new();
-        private Dictionary<BitArray, VehicleTask> coverTaskMapping = new(new BitArrayComparer());
+        private List<List<DeadheadTemplate?>> locationDHTMapping = [];
+        private Dictionary<string, VehicleTask> varnameTaskMapping = [];
+        private Dictionary<BitArray, VehicleTask> coverTaskMapping = new(new Utils.BitArrayComparer());
 
         private VehicleType vt;
 
-        private GRBModel model;
-
-        private List<List<SPLabel>> allLabels = new();
-        private List<Front> activeLabels = new();
+        private GRBModel? model;
 
         internal EVSPCG(Instance instance)
         {
@@ -154,7 +77,7 @@ namespace E_VCSP.Solver
             // Generate lookup table for deadhead templates 
             foreach (Location l1 in instance.Locations)
             {
-                locationDHTMapping.Add(new());
+                locationDHTMapping.Add([]);
                 foreach (Location l2 in instance.Locations)
                 {
                     DeadheadTemplate? dht = instance.DeadheadTemplates.Find((x) => x.From == l1 && x.To == l2);
@@ -167,13 +90,6 @@ namespace E_VCSP.Solver
 
             // Generate initial set of vehicle tasks
             GenerateInitialTasks();
-
-            // Initialize labels
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                allLabels.Add(new());
-                activeLabels.Add(new());
-            }
         }
 
         private void GenerateGraph()
@@ -185,8 +101,7 @@ namespace E_VCSP.Solver
                 nodes.Add(new TripNode() { Index = i, Trip = instance.Trips[i] });
             }
 
-            Location? depot = instance.Locations.Find(loc => loc.IsDepot);
-            if (depot == null) throw new InvalidDataException("No depot found in location list");
+            Location? depot = instance.Locations.Find(loc => loc.IsDepot) ?? throw new InvalidDataException("No depot found in location list");
             nodes.Add(new DepotNode() { Index = nodes.Count, Depot = depot }); // Start depot
             nodes.Add(new DepotNode() { Index = nodes.Count, Depot = depot }); // End depot
 
@@ -194,8 +109,8 @@ namespace E_VCSP.Solver
             // Initialize adjacency lists
             for (int i = 0; i < nodes.Count; i++)
             {
-                adjFull.Add(new());
-                adj.Add(new());
+                adjFull.Add([]);
+                adj.Add([]);
                 for (int j = 0; j < nodes.Count; j++)
                 {
                     adjFull[i].Add(null);
@@ -206,12 +121,11 @@ namespace E_VCSP.Solver
             for (int i = 0; i < nodes.Count - 2; i++)
             {
                 TripNode tn = (TripNode)nodes[i];
-                DeadheadTemplate? dht = locationDHTMapping[depot.Index][tn.Trip.From.Index];
-                if (dht == null) throw new InvalidDataException("No travel possible from depot to trip");
+                DeadheadTemplate? dht = locationDHTMapping[depot.Index][tn.Trip.From.Index] ?? throw new InvalidDataException("No travel possible from depot to trip");
                 double baseCost = Config.PULLOUT_COST + (dht.Distance * Config.M_COST);
 
                 // TODO: Charge directly after depot?
-                LabelDeadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
+                Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
                 adjFull[^2][i] = new Arc() { From = nodes[^2], To = tn, Deadhead = dh };
                 adj[^2].Add(new Arc() { From = nodes[^2], To = tn, Deadhead = dh });
             }
@@ -219,21 +133,19 @@ namespace E_VCSP.Solver
             for (int i = 0; i < nodes.Count - 2; i++)
             {
                 TripNode tn = (TripNode)nodes[i];
-                DeadheadTemplate? dht = locationDHTMapping[tn.Trip.To.Index][depot.Index];
-                if (dht == null) throw new InvalidDataException("No travel possible from trip to depot");
+                DeadheadTemplate? dht = locationDHTMapping[tn.Trip.To.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
                 double baseCost = dht.Distance * Config.M_COST;
                 // TODO: Charge directly before depot?
-                LabelDeadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
+                Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
                 adjFull[i][^1] = new Arc() { To = nodes[^1], From = tn, Deadhead = dh };
                 adj[i].Add(new Arc() { To = nodes[^1], From = tn, Deadhead = dh });
             }
             // depot -> depot arc
             {
-                DeadheadTemplate? dht = locationDHTMapping[depot.Index][depot.Index];
-                if (dht == null) throw new InvalidDataException("No travel possible from depot to depot");
+                DeadheadTemplate? dht = locationDHTMapping[depot.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from depot to depot");
                 double baseCost = dht.Distance * Config.M_COST;
                 // TODO: Charge directly before depot?
-                LabelDeadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
+                Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
                 adjFull[^2][^1] = new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh };
                 adj[^2].Add(new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh });
             }
@@ -253,7 +165,7 @@ namespace E_VCSP.Solver
                     if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
 
                     double baseCost = dht.Distance * Config.M_COST;
-                    List<ChargingAction> chargingActions = new List<ChargingAction>();
+                    List<ChargingAction> chargingActions = [];
                     foreach (Location chargeLocation in instance.ChargingLocations)
                     {
                         DeadheadTemplate? dhtTo = locationDHTMapping[tn1.Trip.To.Index][chargeLocation.Index];
@@ -278,7 +190,7 @@ namespace E_VCSP.Solver
                         });
                     }
 
-                    LabelDeadhead dh = new() { ChargingActions = chargingActions, BaseDrivingCost = baseCost, DeadheadTemplate = dht };
+                    Deadhead dh = new() { ChargingActions = chargingActions, BaseDrivingCost = baseCost, DeadheadTemplate = dht };
 
                     adjFull[i][j] = new Arc() { To = tn2, From = tn1, Deadhead = dh };
                     adj[i].Add(new Arc() { To = tn2, From = tn1, Deadhead = dh });
@@ -290,9 +202,8 @@ namespace E_VCSP.Solver
         {
             for (int i = 0; i < nodes.Count - 2; i++)
             {
-                LabelDeadhead? dhTo = adjFull[^2][i]?.Deadhead;
-                if (dhTo == null) throw new InvalidDataException("No arc from depot to trip");
-                VEDeadhead toTrip = new VEDeadhead()
+                Deadhead dhTo = (adjFull[^2][i]?.Deadhead) ?? throw new InvalidDataException("No arc from depot to trip");
+                VEDeadhead toTrip = new()
                 {
                     Deadhead = dhTo,
                     EndTime = ((TripNode)nodes[dhTo.DeadheadTemplate.To.Index]).Trip.StartTime,
@@ -301,9 +212,8 @@ namespace E_VCSP.Solver
                     SoCDiff = -dhTo.DeadheadTemplate.Duration * vt.DriveUsage,
                 };
 
-                LabelDeadhead? dhFrom = adjFull[i][^1]?.Deadhead;
-                if (dhFrom == null) throw new InvalidDataException("No arc from trip to depot");
-                VEDeadhead fromTrip = new VEDeadhead()
+                Deadhead dhFrom = adjFull[i][^1]?.Deadhead ?? throw new InvalidDataException("No arc from trip to depot");
+                VEDeadhead fromTrip = new()
                 {
                     Deadhead = dhFrom,
                     StartTime = ((TripNode)nodes[dhFrom.DeadheadTemplate.From.Index]).Trip.EndTime,
@@ -313,7 +223,7 @@ namespace E_VCSP.Solver
                 };
 
                 Trip t = ((TripNode)nodes[i]).Trip;
-                VETrip trip = new VETrip()
+                VETrip trip = new()
                 {
                     Trip = t,
                     EndTime = t.EndTime,
@@ -332,11 +242,13 @@ namespace E_VCSP.Solver
 
         internal override Graph GenerateSolutionGraph()
         {
-            List<VehicleTask> tasks = new();
+            if (model == null) throw new InvalidOperationException("Cannot generate solution graph without model instance");
+
+            List<VehicleTask> tasks = [];
             int[] covered = new int[instance.Trips.Count];
             foreach (GRBVar v in model.GetVars())
             {
-                if (v.VarName.StartsWith("vt_") && v.X >= Config.COL_GEN_GEQ_THRESHOLD)
+                if (v.VarName.StartsWith("vt_") && v.X == 1)
                 {
                     VehicleTask dvt = varnameTaskMapping[v.VarName];
                     tasks.Add(dvt);
@@ -358,21 +270,21 @@ namespace E_VCSP.Solver
 
             Graph graph = new();
 
-            List<(int startTime, int endTime, List<Node?> nodes)> taskNodes = new();
+            List<(int startTime, int endTime, List<Node?> nodes)> taskNodes = [];
 
             for (int i = 0; i < tasks.Count; i++)
             {
                 var task = tasks[i];
-                List<Node?> pathNodes = new();
+                List<Node?> pathNodes = [];
                 int startTime = task.Elements[0].StartTime, endTime = task.Elements[^1].EndTime;
-                var add = (Node? node) =>
+                void add(Node? node)
                 {
                     if (node != null)
                     {
                         graph.AddNode(node);
                         pathNodes.Add(node);
                     }
-                };
+                }
 
                 foreach (var element in task.Elements)
                 {
@@ -401,7 +313,7 @@ namespace E_VCSP.Solver
                     }
                     if (element is VEDeadhead dved)
                     {
-                        LabelDeadhead ddh = dved.Deadhead;
+                        Deadhead ddh = dved.Deadhead;
 
                         if (dved.SelectedAction == -1)
                         {
@@ -486,224 +398,112 @@ namespace E_VCSP.Solver
 
             // This library isn't really built for alining nodes in a single layer;
             // force by centering nodes at beginning and end of each task
-            List<Node?> leftAlign = taskNodes.Select(x => x.nodes[0]).ToList(),
-                       rightAlign = taskNodes.Select(x => x.nodes[^1]).ToList();
+            List<Node?> leftAlign = [.. taskNodes.Select(x => x.nodes[0])],
+                       rightAlign = [.. taskNodes.Select(x => x.nodes[^1])];
             for (int i = 0; i < leftAlign.Count - 1; i++) lc.AddUpDownVerticalConstraint(leftAlign[i], leftAlign[i + 1]);
             for (int i = 0; i < rightAlign.Count - 1; i++) lc.AddUpDownVerticalConstraint(rightAlign[i], rightAlign[i + 1]);
             return graph;
         }
 
-        private (double minCosts, VehicleTask vehicleTask) getVehicleTaskLabeling()
+        /// <summary>
+        /// Initialize model for column generaton
+        /// </summary>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Model where first <c>n</c> constraints correspond to the <c>n</c> trips, and a list of initial vehicle task vars</returns>
+        private (GRBModel model, List<GRBVar> taskVars) InitModel(CancellationToken ct)
         {
-            if (Config.CONSOLE_LABELING) Console.WriteLine("Starting label correction");
-
-            if (model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
-                throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
-
-            List<double> reducedCosts = new();
-            GRBConstr[] constrs = model.GetConstrs();
-            for (int i = 0; i < instance.Trips.Count; i++)
+            // Env
+            GRBEnv env = new()
             {
-                reducedCosts.Add(constrs[i].Pi);
-            }
+                LogToConsole = 1,
+                LogFile = Path.Combine(Config.RUN_LOG_FOLDER, "evspcg_gurobi.log")
+            };
 
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                allLabels[i].Clear();
-                activeLabels[i].Clear();
-            }
-
-            int labelId = 0;
-            void addLabel(SPLabel spl, int index)
-            {
-                allLabels[index].Add(spl);
-                activeLabels[index].Insert(spl);
-            }
-
-
-            addLabel(new SPLabel(nodes.Count - 2, -1, vt.StartCharge, 0, labelId++), nodes.Count - 2);
-
-            while (activeLabels.Sum(x => x.Count) > 0)
-            {
-                // Get label to expand
-                SPLabel? l = null;
-                int currIndex = -1;
-                for (int i = 0; i < activeLabels.Count; i++) if (activeLabels[i].Count > 0)
-                    {
-                        l = activeLabels[i].Pop();
-                        currIndex = i;
-                        break;
-                    }
-
-                // Try to expand label
-                for (int i = 0; i < adj[currIndex].Count; i++)
-                {
-                    Arc arc = adj[currIndex][i];
-                    int targetIndex = arc.To.Index;
-
-                    List<(double newSoC, double cost)> options = new();
-                    int tripDistance = currIndex < instance.Trips.Count - 2 ? instance.Trips[currIndex].Distance : 0;
-                    double tripCost = currIndex < instance.Trips.Count - 2 ? reducedCosts[currIndex] : 0;
-                    double directTravelSoC = l!.currSoC -
-                        ((tripDistance + arc.Deadhead.DeadheadTemplate.Distance) * vt.DriveUsage);
-                    if (directTravelSoC >= vt.MinCharge)
-                        options.Add((directTravelSoC, l.costs - tripCost + (arc.Deadhead.DeadheadTemplate.Distance * Config.M_COST)));
-
-                    // TODO: dit moet VEEL efficienter
-                    foreach (var chargeAction in arc.Deadhead.ChargingActions)
-                    {
-                        double chargeAtStation = l.currSoC - (tripDistance * vt.DriveUsage) - chargeAction.ChargeUsedTo;
-                        if (chargeAtStation < vt.MinCharge) continue; // Not feasible
-
-                        ChargingCurve cc = chargeAction.ChargeLocation.ChargingCurves[vt.Id];
-                        var maxCharge = cc.MaxChargeGained(chargeAtStation, chargeAction.TimeAtLocation, false);
-
-                        // Try some charging actions. 
-                        double chargeRange = maxCharge.SoCGained;
-                        for (int j = 0; j <= Config.DISCRETE_FACTOR; j++)
-                        {
-                            var res = cc.ChargeCosts(chargeAtStation, Math.Min(chargeAtStation + (j * chargeRange / Config.DISCRETE_FACTOR), 100.0), false);
-                            double SoCAtNextTrip = chargeAtStation + res.SoCGained - chargeAction.ChargeUsedFrom;
-                            if (SoCAtNextTrip < vt.MinCharge) continue;
-                            options.Add((SoCAtNextTrip, l.costs - tripCost + chargeAction.DrivingCost + res.Cost));
-                        }
-                    }
-
-                    // For each label possibility, check if it is not already dominated at the target node. 
-                    foreach (var option in options)
-                    {
-                        addLabel(new SPLabel(currIndex, l.id, option.newSoC, option.cost, labelId++), targetIndex);
-                    }
-                }
-            }
-
-            if (Config.CONSOLE_LABELING) Console.WriteLine($"Total of {labelId} labels considered");
-
-            // Backtrack in order to get path
-            // indexes to nodes
-            List<(int, SPLabel)> path = [(allLabels.Count - 1, allLabels[^1].MinBy(x => x.costs))];
-            double minCosts = allLabels[^1].Min(x => x.costs);
-            while (path[^1].Item2.prevId != -1)
-            {
-                var prev = allLabels[path[^1].Item2.prevIndex].Find(x => x.id == path[^1].Item2.prevId);
-                if (prev == null) throw new Exception("waar is mn pad gebleven");
-                path.Add((path[^1].Item2.prevIndex, prev));
-            }
-
-            path.Reverse();
-
-            List<VehicleElement> taskElements = new();
-            for (int i = 0; i < path.Count - 1; i++)
-            {
-                int index = path[i].Item1;
-                int nextIndex = path[i + 1].Item1;
-                var node = nodes[index];
-                if (index < instance.Trips.Count)
-                {
-                    taskElements.Add(new VETrip()
-                    {
-                        Trip = instance.Trips[index],
-                        EndTime = instance.Trips[index].EndTime,
-                        StartTime = instance.Trips[index].StartTime,
-                        DrivingCost = 0,
-                        SoCDiff = vt.DriveUsage * instance.Trips[index].Duration,
-                    });
-                }
-
-                int startTime, endTime;
-                LabelDeadhead? dh = adjFull[index][nextIndex]?.Deadhead;
-                if (dh == null) throw new InvalidDataException("Huh waar is mn deadhead");
-
-                if (index == instance.Trips.Count)
-                {
-                    startTime = instance.Trips[nextIndex].StartTime - dh.DeadheadTemplate.Duration;
-                    endTime = instance.Trips[nextIndex].StartTime;
-                }
-                else if (index == instance.Trips.Count + 1)
-                {
-                    endTime = instance.Trips[index].EndTime;
-                    startTime = instance.Trips[index].EndTime + dh.DeadheadTemplate.Duration;
-                }
-                else
-                {
-                    startTime = instance.Trips[index].StartTime;
-                    endTime = instance.Trips[index].EndTime;
-                }
-                taskElements.Add(new VEDeadhead()
-                {
-                    Deadhead = dh,
-                    StartTime = startTime,
-                    EndTime = endTime,
-                    DrivingCost = dh.BaseDrivingCost,
-                    SoCDiff = -1, //TODO
-                });
-            }
-
-            if (Config.CONSOLE_LABELING) Console.WriteLine($"Generated column with reduced cost of {minCosts}");
-
-            return (minCosts, new VehicleTask(taskElements));
-        }
-
-        internal override bool Solve()
-        {
-            GRBEnv env = new();
-            env.LogToConsole = 1;
-            env.LogFile = "evsp_discrete.log";
-
-            model = new(env);
-            model.SetCallback(new CustomGRBCallback());
+            // Model
+            GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.SOLVER_TIMEOUT_SEC;
+            model.SetCallback(new CustomGRBCallback());
+            ct.Register(() =>
+            {
+                if (model == null) return;
 
+                Console.WriteLine("Cancellation requested. Terminating Gurobi model...");
+                try { model.Terminate(); }
+                catch (Exception ex) { Console.WriteLine($"Error terminating Gurobi: {ex.Message}"); }
+            });
+
+
+            // Add variable for each task/column; add to maxVehicle constraint
             GRBLinExpr maxVehicles = new();
-            List<GRBVar> vars = new();
+            List<GRBVar> taskVars = [];
             for (int i = 0; i < tasks.Count; i++)
             {
                 string name = $"vt_{i}";
-                GRBVar v = model.AddVar(0, 1, tasks[i].Cost, GRB.CONTINUOUS, $"vt_{i}");
+                GRBVar v = model.AddVar(0, 1, tasks[i].Cost, GRB.CONTINUOUS, name);
                 maxVehicles += v;
-                vars.Add(v);
+
+                // Bookkeeping to find variable based on name / cover easily
+                taskVars.Add(v);
                 varnameTaskMapping[name] = tasks[i];
                 coverTaskMapping.Add(tasks[i].ToBitArray(instance.Trips.Count), tasks[i]);
             }
 
             // Add cover constraint for each of the trips
-            // Note: index of constraint corresponds directly to index of trip
+            // Note: index of constraint corresponds directly to index of trip 
             foreach (Trip t in instance.Trips)
             {
                 GRBLinExpr expr = new();
                 for (int i = 0; i < tasks.Count; i++)
                 {
                     if (tasks[i].Covers.Contains(t.Index))
-                        expr.AddTerm(1, vars[i]);
+                        expr.AddTerm(1, taskVars[i]);
                 }
-                model.AddConstr(expr >= 1, "cover_" + t.Id);
+
+                // Switch between set partition and cover
+                char sense = Config.ALLOW_VH_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
+                model.AddConstr(expr, sense, 1, "cover_" + t.Id);
             }
 
-            // Add max vehicles constraint
+            // Finalize max vehicle constraint with slack
+            // Note: added after trips so trips have easier indexing. 
             GRBVar vehicleCountSlack = model.AddVar(0, instance.Trips.Count - Config.MAX_VEHICLES, Config.MAX_VEHICLES_OVER_COST, GRB.CONTINUOUS, "vehicle_count_slack");
             model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
 
+            this.model = model;
+            return (model, taskVars);
+        }
+
+        internal override bool Solve(CancellationToken ct)
+        {
+            (GRBModel model, List<GRBVar> taskVars) = InitModel(ct);
             model.Optimize();
 
-            bool shouldStop = false;
-            int currIts = 1,
-                itsWithoutRC = 0,
-                totalGenerated = 0,
-                notFound = 0, // Column could not be generated
-                discardedNewColumns = 0, // Column discarded due to better one in model
-                discardedOldColumns = 0; // Column discarded due to better one found
+            // Tracking generated columns
+            int maxColumns = Config.THREADS * Config.MAX_COL_GEN_ITS,
+                lastReportedPercent = 0,    // Percentage of total reporting
+                currIts = 1,                // Number of CG / solution rounds had
+                totalGenerated = 0,         // Total number of columns generated
+                seqWithoutRC = 0,           // Number of sequential columns without reduced cost found
+                totWithoutRC = 0,           // Total columns generated with no RC
+                notFound = 0,               // Number of columns that could not be generated
+                discardedNewColumns = 0,    // Number of columns discarded due to better one in model
+                discardedOldColumns = 0;    // Number of columns in model discarded due to better one found
 
-            int lastReportedPercent = 0,
-                maxColumns = Config.THREADS * Config.MAX_COL_GEN_ITS;
+            // Multithreaded shortestpath searching
+            List<ShortestPathLS> splss = [.. Enumerable.Range(0, Config.THREADS).Select(_ => new ShortestPathLS(instance, model, adjFull))];
 
-            List<ShortestPathLS> splss = new();
-            for (int i = 0; i < Config.THREADS; i++) splss.Add(new(instance, model, adjFull));
 
             Console.WriteLine("Column generation started");
-            Console.WriteLine("%\tT\tNF\tDN\tDO");
+            Console.WriteLine("%\tT\tNF\tDN\tDO\tWRC");
 
-            while (currIts < Config.MAX_COL_GEN_ITS && !shouldStop && model.Status != GRB.Status.INFEASIBLE)
+            // Continue until max number of columns is found, model isn't feasible during solve or break
+            // due to RC constraint. 
+            while (currIts < Config.MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE)
             {
+                // Terminate column generation if cancelled
+                if (ct.IsCancellationRequested) return false;
+
+                // Generate batch of new tasks using pricing information from previous solve
                 (double, VehicleTask)?[] generatedTasks = new (double, VehicleTask)?[Config.THREADS];
                 Parallel.For(0, Config.THREADS, (i) =>
                 {
@@ -716,7 +516,7 @@ namespace E_VCSP.Solver
                 if (percent >= lastReportedPercent + 10)
                 {
                     lastReportedPercent = percent - (percent % 10);
-                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}");
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}");
                 }
 
                 foreach (var task in generatedTasks)
@@ -748,7 +548,7 @@ namespace E_VCSP.Solver
                     if (reducedCost < 0)
                     {
                         // Reset non-reduced costs iterations
-                        itsWithoutRC = 0;
+                        seqWithoutRC = 0;
 
                         // Replace existing column with this task, as it has lower costs
                         if (coverExists)
@@ -764,7 +564,7 @@ namespace E_VCSP.Solver
                             coverTaskMapping[ba] = newTask;
 
                             // Adjust costs in model
-                            vars[index].Obj = newTask.Cost;
+                            taskVars[index].Obj = newTask.Cost;
                             discardedOldColumns++;
                         }
                         // Create new column for task, add it to model.
@@ -777,15 +577,15 @@ namespace E_VCSP.Solver
 
                             // Create new column to add to model
                             var modelConstrs = model.GetConstrs();
-                            GRBConstr[] constrs = modelConstrs.Where(
+                            GRBConstr[] constrs = [.. modelConstrs.Where(
                                 (_, i) => newTask.Covers.Contains(i)    // Covers trip
-                                || i == modelConstrs.Count() - 1        // Add to used vehicles
-                            ).ToArray();
+                                || i == modelConstrs.Length - 1        // Add to used vehicles
+                            )];
                             GRBColumn col = new();
-                            col.AddTerms(constrs.Select(_ => 1.0).ToArray(), constrs);
+                            col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
 
                             // Add column to model
-                            vars.Add(model.AddVar(0, 1, newTask.Cost, GRB.CONTINUOUS, col, name));
+                            taskVars.Add(model.AddVar(0, 1, newTask.Cost, GRB.CONTINUOUS, col, name));
                             varnameTaskMapping[name] = tasks[^1];
                             coverTaskMapping[ba] = tasks[^1];
                         }
@@ -793,12 +593,13 @@ namespace E_VCSP.Solver
                     }
                     else
                     {
-                        itsWithoutRC++;
+                        seqWithoutRC++;
+                        totWithoutRC++;
                     }
                 }
 
 
-                if (itsWithoutRC >= Config.LS_OPT_IT_THRESHOLD)
+                if (seqWithoutRC >= Config.LS_OPT_IT_THRESHOLD)
                 {
                     Console.WriteLine($"Stopped due to RC > 0 for {Config.LS_OPT_IT_THRESHOLD} consecutive tasks");
                     break;
@@ -811,13 +612,22 @@ namespace E_VCSP.Solver
             }
 
             // Make model binary again
-            foreach (GRBVar var in vars)
+            foreach (GRBVar var in taskVars)
             {
-                var.Set(GRB.CharAttr.VType, GRB.BINARY);
+                if (var.VarName.StartsWith(""))
+                    var.Set(GRB.CharAttr.VType, GRB.BINARY);
             }
+
+            if (!Config.ALLOW_VH_SLACK_FINAL_SOLVE)
+            {
+                // Remove ability to go over vehicle bounds -> hopefully speeds up solving at end.
+                model.GetVarByName("vehicle_count_slack").UB = 0;
+            }
+
             Console.WriteLine($"Total generation attempts: ${totalGenerated}");
             Console.WriteLine($"LS failed to generate charge-feasible trip {notFound} times during generation");
             Console.WriteLine($"Discarded {discardedOldColumns} old, {discardedNewColumns} new columns during generation");
+            Console.WriteLine($"{totWithoutRC} columns were not added due to positive reduced costs.");
             Console.WriteLine($"Solving non-relaxed model with total of {tasks.Count} columns");
             model.Update();
             bool configState = Config.CONSOLE_GUROBI;
@@ -826,9 +636,9 @@ namespace E_VCSP.Solver
 
             Console.Write($"Costs: {model.ObjVal}, vehicle slack: {model.GetVarByName("vehicle_count_slack").X}");
 
-            if (model.Status == GRB.Status.INFEASIBLE)
+            if (model.Status == GRB.Status.INFEASIBLE || model.Status == GRB.Status.INTERRUPTED)
             {
-                Console.WriteLine("Model infeasible");
+                Console.WriteLine("Model infeasible / canceled");
                 if (Config.DETERMINE_IIS)
                 {
                     model.ComputeIIS();

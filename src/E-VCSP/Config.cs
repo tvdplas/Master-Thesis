@@ -50,8 +50,14 @@
         internal static int MIN_CHARGE_TIME = 300;
 
         internal static Header SOLVER = new();
+        internal static int SOLVER_TIMEOUT_SEC = 300;
+        internal static bool DETERMINE_IIS = false;
+        internal static bool ALLOW_VH_OVERCOVER = true; // determines >= in constraint
+        internal static bool ALLOW_VH_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
         internal static bool USE_COLUMN_GENERATION = true;
         internal static int MAX_COL_GEN_ITS = 5000;
+
+        internal static Header LOCAL_SEARCH = new();
         internal static int LS_OPT_IT_THRESHOLD = 10;
         internal static double LS_STARTING_T = 2;
         internal static double LS_ENDING_T = 0.01;
@@ -66,8 +72,5 @@
         internal static double LS_CHANGE_CHARGE = 2;
         internal static double LS_INC_CHARGE = 4;
         internal static double LS_DEC_CHARGE = 3;
-        internal static double COL_GEN_GEQ_THRESHOLD = 0.1;
-        internal static int SOLVER_TIMEOUT_SEC = 300;
-        internal static bool DETERMINE_IIS = false;
     }
 }

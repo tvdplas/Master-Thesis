@@ -108,7 +108,7 @@ namespace E_VCSP.Objects.Discrete
                         double SoCAtCharge = dt1.StartingSoC - SoCusedInDT1 - (dht_toCharge.Distance * vh.DriveUsage);
                         if (SoCAtCharge < vh.MinCharge) continue;
 
-                        ChargingCurve cc = chargeLoc.ChargingCurves[vh.Id];
+                        ChargingCurve cc = chargeLoc.ChargingCurves[vh.Index];
                         ChargeResult cr = cc.MaxChargeGained(SoCAtCharge, idleTime, false);
 
                         // Now, check if the charge is actually compatible; In order to do so, we need to check if we can use some partial charge such that our target SOC is reached.

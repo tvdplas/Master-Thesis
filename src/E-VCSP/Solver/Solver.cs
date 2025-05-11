@@ -8,7 +8,7 @@ namespace E_VCSP.Solver
         /// Solve loaded instance
         /// </summary>
         /// <returns><c>true</c> if solving was successful; <c>false</c> otherwise</returns>
-        internal abstract bool Solve();
+        internal abstract bool Solve(CancellationToken cancellationToken);
 
         /// <summary>
         /// Generate solution graph

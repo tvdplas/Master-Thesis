@@ -21,6 +21,7 @@
 \section{Introduction}
 Electric vehicles are beginning to make up large portions of the fleet for public transport providers. In The Netherlands for example, approximately 21\% of all registered buses utilize an electric drivetrain, as reported by the \citet{RDW}. To comply with strict Dutch and \citet{europaRegulation20181999} on climate and sustainability, this proportion must increase substantially; from 2025 onward, the procurement of new buses powered by non-renewable energy sources will no longer be permitted, with the objective that by 2030, all public transport buses operate with zero emissions. Individual line operators such as \citet{qbuzzQbuzz} are therefore rapidly replacing their remaining buses that use fossil fuels, resulting in primarily electric-powered fleets. \\
 Effective use of these new electric vehicles is however more challenging than that of a combustion based fleet. One of the logistical steps in which this is most apparent is that of vehicle scheduling. The Vehicle Scheduling Problem (VSP) aims to assign vehicles such that a set of trips are driven at minimum cost; in the case of buses, these trips are defined by the timetables for individual lines. A typical solution to this problem comes in the form of a collection of vehicle tasks, each of which can be seen as a schedule that an individual bus will follow throughout the day. It may start at a bus storage facility (more commonly called a depot), then perform one or more trips, before finally returning to the depot. In order to string multiple trips together, a bus must make an empty travel from the ending location of one trip to the starting location of the next. These empty travels, often called deadheads, are the main focus when determining the overall costs of a collection of vehicle tasks. There is ample choice as to which deadheads can be driven, as in theory the deadhead between each pair of compatible trips can be included during the creation of a vehicle task. It is therefore necessary to determine which of these deadheads are required in order to drive all trips while minimizing costs. \\
+
 In the VSP and its variants, a commonly made assumption is that a vehicle can travel an entire day without having to refuel. With electric vehicles, this assumption is often not valid: recharging throughout the day is required as the range of an electric vehicle is limited. Additionally, recharging takes a long time when compared to the refueling of a combustion vehicle: refueling can be done in a matter of minutes, whereas recharging may take multiple hours for a full charge. The electrification of fleets therefore requires the VSP to be adapted to include maximum range constraints, as well as charging possibilities within a vehicle task. This extended version of the problem, often referred to as the Electric Vehicle Scheduling Problem (E-VSP), is significantly harder than its non-electric counterpart; the VSP with a single depot can be solved in polynomial time, whereas the E-VSP is NP-Hard as shown by \citet{Bunte2009} and \citet{Sassi2014} respectively. \\
 \todo{beter} Barring the use of self-driving vehicles, buses require drivers in order to operate. The Crew Scheduling Problem (CSP) is therefore commonly the step that follows vehicle scheduling; in this, the objective is to make an assignment of drivers such that a driver is always present when a vehicle is moving. A driver may drive multiple vehicles throughout the day, handing vehicles over to other drivers at designated relief locations. Driver shifts are constructed consisting of driving time and breaks following local labor regulations. The CSP is also NP-Hard, as shown by \citet{Fischetti1989}.\\
 Costs in the crew scheduling step often exceed those associated with the vehicles themselves, with a recent estimate by \citet{Perumal2019Crew} putting crew member costs at around 60\% of all operational costs. Optimal solutions for the CSP are directly influenced by the selected vehicle tasks; depending on which deadhead is selected, the amount of vehicle idle time before a trip may vary. It may therefore not always be feasible for a driver to perform a handover or break between two trips depending on on the deadheads used in the vehicle tasks. Sequentially minimizing costs in the VSP and CSP may therefore not result in a solution with overall lowest costs, as the crew schedules in the CSP may be improved greatly by incurring higher driving costs in the VSP. This was already pointed out in the 1980s by \citet{Bodin1983}, who instead advocated for an integrated approach; here, the costs of the VSP and CSP are minimized simultaneously, resulting in the Vehicle and Crew Scheduling Problem (VCSP). \\
@@ -297,39 +298,20 @@ Research has also been done into integrating the E-VSP with the step before it i
 \subsection{Research gap}
 As can be seen in Table \ref{tab:eVCSP-lit}, research into the E-VSP has successfully incorporated many battery characteristics which can be of importance when determining overall operational costs and feasibility. The E-VCSP on the other hand has seen less progress: both non-linear charging and battery degradation have not yet been considered in any work at the time of writing. Additionally, no documented attempt at using a discretized SoC model for the E-VCSP has been made. In this work, we therefore aim to address two of these points: the use of a discretized model, as well as incorporating non-linear charging curves. 
 
-\section{Rough planning}
-The following constraints list of constraints seem to make the problem the most challenging (when compared to a single-depot single-vehicle type combustion based model): Partial charges, Nonlinear charges, Capacitated charging stations, Multiple vehicle types and Multiple depots. \\
-Partial and nonlinear charges can both be solved by using a similar discrete model as the one used in \Citet{vanKootenNiekerk2017}, \citet{Zhang2021} or \Citet{deVos2024}; all of these allow for handling of partial and nonlinear in the charging deadhead arcs, and battery degradation costs/ToU pricing could be included during vehicle task column generation. As all of these basically come for free with the choice of modeling, it would seem wise to focus on getting this working with a single depot / single vehicle type instance first. \\
-Next, the issue of multiple vehicle types and depots. Both of these can be approached in roughly the same manner, however from conversations with Qbuzz it would seem that vehicle types should be done first as even the smallest instance provided to me now uses multiple vehicle types. Here, an approach similar to that found in \citet{Huisman2005} might be adaptable. \\
-Lastly, the addition of capacitated charging stations is an issue. In both \citet{Zhang2021} and \Citet{deVos2024}, this is handled however only the number of individual charging spots is constrained; total charging power available is also constrained in the Qbuzz context. I'm unsure of how to easily integrate this into a discretized model at time of writing without underestimating total power available, and doing so would probably require some pretty drastic changes to the model as a whole. \\
-In conclusion, my personal guess is that the following list of priorities is the best going forward:
-\begin{itemize}
-  \item Begin with implementing an adaptation of one of the previously mentioned models (probably a combination of \Citet{vanKootenNiekerk2017} and \Citet{deVos2024}) in order to get solutions to the E-VSP which incorporate partial charging, nonlinear charging and battery degradation.
-  \item Add extraction of task blocks for crew scheduling, link with a set cover approach to crew scheduling.
-  \item Expand model to include multiple vehicle types/depots.
-  \item Expand model to include charging capacity (if time allows).
-\end{itemize}
-A rough planning has been outlined in Table \ref{tab:planning}. At time of writing I'm very unsure of the exact time required for each implementation step as this is my first time implementing most of the relevant techniques, so I've tried to leave some buffer room.
-\begin{table}[h]
-  \centering
-  \begin{tabular}{ll}
-    \toprule
-    \multicolumn{1}{l}{\textbf{Date}} & \multicolumn{1}{l}{\textbf{Task description}}               \\
-    \cmidrule(lr){1-1}\cmidrule(lr){2-2}
-    March & Implementation of E-SDVSP  \\
-    Begin April - End April & Link E-SDVSP with crew scheduling \\ 
-    Begin May - Mid May & Testing with E-SDVCSP, report findings, draft \\
-    Mid May - End May & Buffer \\ 
-    Start June - End June & Extend to include multi-vehicle/multi-depot constraints \\
-    Start July - Mid July & Testing with E-MDVCSP, report findings, draft \\ 
-    Mid July - End July & Finalize report, prepare final presentation \\ 
-    Start August & Finalize project \\
-    If time available & Charging station capacities \\
-    \bottomrule
-  \end{tabular}
-  \label{tab:planning}
-  \caption{Rough outline of planning}
-\end{table}
+\section{Methodology}
+The main idea is that the E-VSP and CSP are both seen as subproblems of the larger E-VCSP. Both are solved, and information is passed back and forth using the main problem. 
 
+In order to solve quickly, a heuristic approach is applied to both subproblems. Specifically, a simulated annealing algorithm (SAA) is used in order to solve the pricing problem of the two subproblems. 
+
+Preivous work has shown that solving the pricing problem for the E-VSP using exact approaches works well, however the resulting methods are slow; therefore, less information about the solution is known early. Additionally, the inclusion of crew schedules implies that always charging fully or moving all charging to an early point in the schedule might not be ideal; therefore, a SAA approach was implemented instead, allowing for more flexibility and a hard constraint on the amount of time spent by limiting the overall number of iterations. 
+
+For the E-VSP, a pricing problem was implemented using the following operations: 
+- add trip
+- remove trip
+- change charging action between two trips 
+- increase charging time during action
+- decrease charging time during action
+
+Eac
 \printbibliography
 \end{document}

@@ -17,15 +17,18 @@ namespace E_VCSP.Objects
         internal Instance(string path)
         {
             // Load initial set of locations with chargers; may not be complete.
-            Locations = new ParserLocations().Parse(path, []);
+            Locations = new ParserLocations().Parse(path, []) ?? [];
             ChargingLocations = [.. Locations];
 
             // Add additional location info based on crew properties
             new ParserCrew().Parse(path, Locations);
 
             // If no depot is found yet; let the first parsed location be the depot. 
-            // TODO: dit werkt toevallig voor de Terschelling dataset, maar dit moet wel echt gefixt worden. 
-            if (Locations.Find(loc => loc.IsDepot) == null) Locations.Find(x => x.CanCharge && x.BreakAllowed).IsDepot = true;
+            if (Locations.Find(loc => loc.IsDepot) == null)
+            {
+                var depotTarget = Locations.Find(x => x.CanCharge && x.BreakAllowed) ?? throw new InvalidDataException("Cannot find depot");
+                depotTarget.IsDepot = true;
+            }
 
             // Trips are parsed directly; Can add locations that were not previously known.
             Trips = new ParserTrips().Parse(path, Locations);
@@ -53,7 +56,7 @@ namespace E_VCSP.Objects
                     From = loc,
                     To = loc,
                     Distance = 0,
-                    Duration = 300,// TODO: add actual modeled time
+                    Duration = 0,// TODO: add actual modeled time
                     Id = $"dht-self{DeadheadTemplates.Count}"
                 });
             }
