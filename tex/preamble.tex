@@ -94,6 +94,10 @@
 \newcommand{\@dailysupervisor}{}
 \newcommand{\@externalsupervisor}{}
 
+\renewcommand{\title}[1]{
+    \renewcommand{\@title}{#1}
+}
+
 \renewcommand{\author}[2]{
     \renewcommand{\@author}{#1}
     \renewcommand{\@studentnumber}{#2}
