@@ -42,6 +42,6 @@ namespace E_VCSP.Solver
             Depot = instance.Locations.Find(x => x.IsDepot) ?? throw new InvalidDataException("No depot found");
         }
 
-        internal abstract (double reducedCost, VehicleTask vehicleTask)? GenerateVehicleTask();
+        internal abstract List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks();
     }
 }

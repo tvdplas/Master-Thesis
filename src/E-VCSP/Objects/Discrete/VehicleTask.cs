@@ -36,14 +36,39 @@ namespace E_VCSP.Objects.Discrete
     }
     internal class VEDeadhead : VehicleElement
     {
-        internal required Deadhead Deadhead;
+        internal Deadhead Deadhead;
 
         internal int SelectedAction = -1;
         internal int ChargeTime = 0;
-        internal double ChargeGained = 0;
+        internal double SoCGained = 0;
         internal double ChargeCost = 0;
 
+        internal VEDeadhead(Deadhead dh, int startTime, VehicleType vt)
+        {
+            Deadhead = dh;
+            StartTime = startTime;
+            EndTime = startTime + dh.DeadheadTemplate.Duration;
+            DrivingCost = dh.BaseDrivingCost;
+            SoCDiff = -dh.DeadheadTemplate.Distance * vt.DriveUsage;
+        }
 
+        internal VEDeadhead(Deadhead dh, int startTime, VehicleType vt, int selectedAction, double startSoC)
+        {
+            Deadhead = dh;
+            StartTime = startTime;
+            SelectedAction = selectedAction;
+
+            // Determine charge; only allow fully charging at location
+            var ca = dh.ChargingActions[selectedAction];
+            EndTime = startTime + ca.DrivingTimeFrom + ca.DrivingTimeTo + ca.TimeAtLocation;
+            DrivingCost = ca.DrivingCost;
+            ChargeTime = ca.TimeAtLocation;
+
+            var chargeResult = ca.ChargeLocation.ChargingCurves[vt.Index].MaxChargeGained(startSoC - ca.ChargeUsedTo, ca.TimeAtLocation, false);
+            SoCDiff = chargeResult.SoCGained - ca.ChargeUsedTo - ca.ChargeUsedFrom;
+            SoCGained = chargeResult.SoCGained;
+            ChargeCost = chargeResult.Cost;
+        }
 
         public override string ToString()
         {
@@ -54,13 +79,16 @@ namespace E_VCSP.Objects.Discrete
     {
         internal Location Location;
 
-        public VEIdle(Location location, int startTime, int endTime)
+        public VEIdle(Location location, int startTime, int endTime, VehicleType vt)
         {
+
             Location = location;
             StartTime = startTime;
             EndTime = endTime;
-            DrivingCost = (endTime - startTime) * Config.IDLE_COST;
-            SoCDiff = 0; //todo
+
+            bool isGarage = location.CanCharge || location.BreakAllowed; // no need to use SoC at garage
+            DrivingCost = isGarage ? 0 : (endTime - startTime) * Config.IDLE_COST;
+            SoCDiff = isGarage ? 0 : -(endTime - startTime) * vt.IdleUsage;
         }
 
         public override string ToString()
@@ -101,7 +129,7 @@ namespace E_VCSP.Objects.Discrete
                 {
                     double c = e.DrivingCost;
 
-                    if (e is VEDeadhead ved && ved.ChargeGained > 0)
+                    if (e is VEDeadhead ved && ved.SoCGained > 0)
                         c += ved.ChargeCost;
 
                     return c;

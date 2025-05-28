@@ -201,37 +201,24 @@ namespace E_VCSP.Solver
 
         private void GenerateInitialTasks()
         {
-            for (int i = 0; i < nodes.Count - 2; i++)
+            for (int i = 0; i < instance.Trips.Count; i++)
             {
-                Deadhead dhTo = (adjFull[^2][i]?.Deadhead) ?? throw new InvalidDataException("No arc from depot to trip");
-                VEDeadhead toTrip = new()
-                {
-                    Deadhead = dhTo,
-                    EndTime = ((TripNode)nodes[dhTo.DeadheadTemplate.To.Index]).Trip.StartTime,
-                    StartTime = ((TripNode)nodes[dhTo.DeadheadTemplate.To.Index]).Trip.StartTime - dhTo.DeadheadTemplate.Duration,
-                    DrivingCost = dhTo.BaseDrivingCost,
-                    SoCDiff = -dhTo.DeadheadTemplate.Distance * vehicleType.DriveUsage,
-                };
+                Trip t = instance.Trips[i];
+                Deadhead dhTo = (adjFull[instance.DepotStartIndex][i]?.Deadhead) ?? throw new InvalidDataException("No arc from depot to trip");
+                Deadhead dhFrom = adjFull[i][instance.DepotEndIndex]?.Deadhead ?? throw new InvalidDataException("No arc from trip to depot");
 
-
-                Trip t = ((TripNode)nodes[i]).Trip;
+                VEDeadhead toTrip = new(dhTo, instance.Trips[i].StartTime - dhTo.DeadheadTemplate.Duration, vehicleType);
                 VETrip trip = new(t, vehicleType);
 
-                Deadhead dhFrom = adjFull[i][^1]?.Deadhead ?? throw new InvalidDataException("No arc from trip to depot");
                 double endSoC = vehicleType.StartCharge - (dhTo.DeadheadTemplate.Distance + dhFrom.DeadheadTemplate.Distance + t.Distance) * vehicleType.DriveUsage;
-                VEDeadhead fromTrip = new()
+                VEDeadhead fromTrip = new(dhFrom, t.EndTime, vehicleType)
                 {
-                    Deadhead = dhFrom,
-                    StartTime = ((TripNode)nodes[dhFrom.DeadheadTemplate.From.Index]).Trip.EndTime,
-                    EndTime = ((TripNode)nodes[dhFrom.DeadheadTemplate.To.Index]).Trip.EndTime + dhFrom.DeadheadTemplate.Duration,
-                    DrivingCost = dhFrom.BaseDrivingCost,
-                    SoCDiff = -dhFrom.DeadheadTemplate.Distance * vehicleType.DriveUsage,
                     EndSoCInTask = endSoC
                 };
 
                 VehicleTask vehicleTask = new([toTrip, trip, fromTrip])
                 {
-                    vehicleType = instance.VehicleTypes[0],
+                    vehicleType = vehicleType,
                     Index = i,
                 };
                 tasks.Add(vehicleTask);
@@ -296,7 +283,7 @@ namespace E_VCSP.Solver
                         var node = Formatting.GraphElement.ScheduleNode(
                             element.StartTime,
                             element.EndTime,
-                            $"{trip.From}@{SoCAtStart} -> {trip.To}@{SoCAtEnd} ({trip.Route})",
+                            $"{trip.From}@{SoCAtStart}% -> {trip.To}@{SoCAtEnd}% ({trip.Route})",
                             Color.LightBlue);
                         add(node);
                     }
@@ -305,7 +292,7 @@ namespace E_VCSP.Solver
                         var node = Formatting.GraphElement.ScheduleNode(
                             element.StartTime,
                             element.EndTime,
-                            $"idle {idle.Location.Id}@{SoCAtStart}",
+                            $"idle {idle.Location.Id}@{SoCAtStart}% -> {SoCAtEnd}%",
                             Color.White);
                         add(node);
                     }
@@ -318,7 +305,7 @@ namespace E_VCSP.Solver
                             var node = Formatting.GraphElement.ScheduleNode(
                                 element.StartTime,
                                 element.EndTime,
-                                $"{ddh.DeadheadTemplate.From}@{SoCAtStart} -> {ddh.DeadheadTemplate.To}@{SoCAtEnd} ",
+                                $"{ddh.DeadheadTemplate.From}@{SoCAtStart}% -> {ddh.DeadheadTemplate.To}@{SoCAtEnd}%",
                                 Color.LightGreen);
                             add(node);
                         }
@@ -337,10 +324,10 @@ namespace E_VCSP.Solver
                             var charge = Formatting.GraphElement.ScheduleNode(
                                 currTime,
                                 currTime + dved.ChargeTime,
-                                $"{ca.ChargeLocation} {(int)currSoC}% -> {(int)(currSoC + dved.ChargeGained)}%",
+                                $"{ca.ChargeLocation} {(int)currSoC}% -> {(int)(currSoC + dved.SoCGained)}%",
                                 Color.Yellow);
                             currTime += dved.ChargeTime;
-                            currSoC += dved.ChargeGained;
+                            currSoC += dved.SoCGained;
                             var fromCharger = Formatting.GraphElement.ScheduleNode(
                                 currTime,
                                 currTime + ca.DrivingTimeFrom,
@@ -491,7 +478,8 @@ namespace E_VCSP.Solver
 
             // Multithreaded shortestpath searching
             List<List<VehicleShortestPath>> instances = [
-                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLS(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS
+                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_GLOBAL
+                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_SINGLE
                 [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))] // SP
             ];
 
@@ -499,7 +487,6 @@ namespace E_VCSP.Solver
             Console.WriteLine("%\tT\tLS\tSP\tNF\tDN\tDO\tWRC");
 
             Random rnd = new();
-            Console.WriteLine(Config.LS_CHANCE);
 
             // Continue until max number of columns is found, model isn't feasible during solve or break
             // due to RC constraint. 
@@ -511,9 +498,10 @@ namespace E_VCSP.Solver
                 var reducedCosts = model.GetConstrs().Select(x => x.Pi);
 
                 // Generate batch of new tasks using pricing information from previous solve
-                (double, VehicleTask)?[] generatedTasks = new (double, VehicleTask)?[Config.THREADS];
+                List<(double, VehicleTask)>[] generatedTasks = new List<(double, VehicleTask)>[Config.THREADS];
 
-                int selectedMethodÍndex = rnd.NextDouble() <= Config.LS_CHANCE ? 0 : 1;
+                //int selectedMethodÍndex = rnd.NextDouble() <= Config.VSP_LS_S_CHANCE ? 0 : 1;
+                int selectedMethodÍndex = 0; // LS_GLOBAL
                 List<VehicleShortestPath> selectedMethod = instances[selectedMethodÍndex];
                 switch (selectedMethodÍndex)
                 {
@@ -524,7 +512,7 @@ namespace E_VCSP.Solver
 
                 Parallel.For(0, Config.THREADS, (i) =>
                 {
-                    generatedTasks[i] = selectedMethod[i].GenerateVehicleTask();
+                    generatedTasks[i] = selectedMethod[i].GenerateVehicleTasks();
                 });
                 totalGenerated += generatedTasks.Length;
 
@@ -535,93 +523,97 @@ namespace E_VCSP.Solver
                     Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lsGenerated}\t{spGenerated}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}");
                 }
 
-                foreach (var task in generatedTasks)
+                foreach (var taskSet in generatedTasks)
                 {
-                    if (task == null)
+                    if (taskSet.Count == 0)
                     {
                         notFound++;
                         continue;
                     }
-                    (double reducedCost, VehicleTask newTask) = ((double, VehicleTask))task;
 
-                    // Check if task is already in model 
-                    BitArray ba = newTask.ToBitArray(instance.Trips.Count);
-                    if (Config.CONSOLE_COVER)
+                    foreach (var task in taskSet)
                     {
-                        Console.WriteLine($"Cover: {String.Join("", Enumerable.Range(0, ba.Count).Select(i => ba[i] ? "1" : "0"))}");
-                    }
+                        (double reducedCost, VehicleTask newTask) = ((double, VehicleTask))task;
 
-                    bool coverExists = coverTaskMapping.ContainsKey(ba);
-                    if (coverExists)
-                    {
-                        VehicleTask vt = coverTaskMapping[ba];
-
-                        // Same cover but higher cost can be ignored safely.
-                        if (vt.Cost < newTask.Cost)
+                        // Check if task is already in model 
+                        BitArray ba = newTask.ToBitArray(instance.Trips.Count);
+                        if (Config.CONSOLE_COVER)
                         {
-                            discardedNewColumns++;
-                            continue;
+                            Console.WriteLine($"Cover: {String.Join("", Enumerable.Range(0, ba.Count).Select(i => ba[i] ? "1" : "0"))}");
                         }
-                    }
 
-                    // Add column to model 
-                    if (reducedCost < 0)
-                    {
-                        // Reset non-reduced costs iterations
-                        seqWithoutRC = 0;
-
-                        // Replace existing column with this task, as it has lower costs
+                        bool coverExists = coverTaskMapping.ContainsKey(ba);
                         if (coverExists)
                         {
-                            VehicleTask toBeReplaced = coverTaskMapping[ba];
-                            int index = toBeReplaced.Index;
-                            newTask.Index = index;
+                            VehicleTask vt = coverTaskMapping[ba];
 
-                            // Bookkeeping; replace task in internal datastructures
-                            tasks[index] = newTask;
-                            string name = $"vt_{index}";
-                            varnameTaskMapping[name] = newTask;
-                            coverTaskMapping[ba] = newTask;
-
-                            // Adjust costs in model
-                            taskVars[index].Obj = newTask.Cost;
-                            discardedOldColumns++;
+                            // Same cover but higher cost can be ignored safely.
+                            if (vt.Cost < newTask.Cost)
+                            {
+                                discardedNewColumns++;
+                                continue;
+                            }
                         }
-                        // Create new column for task, add it to model.
-                        else
-                        {
-                            int index = tasks.Count;
-                            string name = $"vt_{index}";
-                            tasks.Add(newTask);
-                            newTask.Index = index;
 
-                            // Create new column to add to model
-                            var modelConstrs = model.GetConstrs();
-                            GRBConstr[] constrs = [.. modelConstrs.Where(
+                        // Add column to model 
+                        if (reducedCost < 0)
+                        {
+                            // Reset non-reduced costs iterations
+                            seqWithoutRC = 0;
+
+                            // Replace existing column with this task, as it has lower costs
+                            if (coverExists)
+                            {
+                                VehicleTask toBeReplaced = coverTaskMapping[ba];
+                                int index = toBeReplaced.Index;
+                                newTask.Index = index;
+
+                                // Bookkeeping; replace task in internal datastructures
+                                tasks[index] = newTask;
+                                string name = $"vt_{index}";
+                                varnameTaskMapping[name] = newTask;
+                                coverTaskMapping[ba] = newTask;
+
+                                // Adjust costs in model
+                                taskVars[index].Obj = newTask.Cost;
+                                discardedOldColumns++;
+                            }
+                            // Create new column for task, add it to model.
+                            else
+                            {
+                                int index = tasks.Count;
+                                string name = $"vt_{index}";
+                                tasks.Add(newTask);
+                                newTask.Index = index;
+
+                                // Create new column to add to model
+                                var modelConstrs = model.GetConstrs();
+                                GRBConstr[] constrs = [.. modelConstrs.Where(
                                 (_, i) => newTask.Covers.Contains(i)    // Covers trip
                                 || i == modelConstrs.Length - 1        // Add to used vehicles
                             )];
-                            GRBColumn col = new();
-                            col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
+                                GRBColumn col = new();
+                                col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
 
-                            // Add column to model
-                            taskVars.Add(model.AddVar(0, 1, newTask.Cost, GRB.CONTINUOUS, col, name));
-                            varnameTaskMapping[name] = tasks[^1];
-                            coverTaskMapping[ba] = tasks[^1];
+                                // Add column to model
+                                taskVars.Add(model.AddVar(0, 1, newTask.Cost, GRB.CONTINUOUS, col, name));
+                                varnameTaskMapping[name] = tasks[^1];
+                                coverTaskMapping[ba] = tasks[^1];
+                            }
+
                         }
-
-                    }
-                    else
-                    {
-                        seqWithoutRC++;
-                        totWithoutRC++;
+                        else
+                        {
+                            seqWithoutRC++;
+                            totWithoutRC++;
+                        }
                     }
                 }
 
 
-                if (seqWithoutRC >= Config.LS_OPT_IT_THRESHOLD)
+                if (seqWithoutRC >= Config.OPT_IT_THRESHOLD)
                 {
-                    Console.WriteLine($"Stopped due to RC > 0 for {Config.LS_OPT_IT_THRESHOLD} consecutive tasks");
+                    Console.WriteLine($"Stopped due to RC > 0 for {Config.OPT_IT_THRESHOLD} consecutive tasks");
                     break;
                 }
 

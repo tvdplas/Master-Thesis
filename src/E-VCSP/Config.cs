@@ -57,21 +57,30 @@
         internal static bool ALLOW_VH_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
         internal static bool USE_COLUMN_GENERATION = true;
         internal static int MAX_COL_GEN_ITS = 5000;
-        internal static double LS_CHANCE = 0;
+        internal static double VSP_LS_S_CHANCE = 0;
         internal static double CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same
+        internal static int OPT_IT_THRESHOLD = 10; // Amount of columns sequentially generated without rc before cg is stopped
 
-        internal static Header LOCAL_SEARCH = new();
-        internal static int LS_OPT_IT_THRESHOLD = 10;
-        internal static double LS_STARTING_T = 2;
-        internal static double LS_ENDING_T = 0.01;
-        internal static double LS_COOLING_RATE = 0.95;
-        internal static double LS_ITERATIONS = 10_000;
-        internal static double LS_OVERCHARGE_PENALTY_FIX = 5;
-        internal static double LS_OVERCHARGE_PENALTY_VAR = 0.5;
-        internal static double LS_UNDERCHARGE_PENALTY_FIX = 5;
-        internal static double LS_UNDERCHARGE_PENALTY_VAR = 0.5;
-        internal static double LS_ADD_TRIP = 15;
-        internal static double LS_REM_TRIP = 1;
-        internal static double LS_CHANGE_CHARGE = 5;
+        internal static Header VSP_LS_SINGLE = new();
+        internal static double VSP_LS_S_STARTING_T = 2;
+        internal static double VSP_LS_S_ENDING_T = 0.01;
+        internal static double VSP_LS_S_COOLING_RATE = 0.95;
+        internal static double VSP_LS_S_ITERATIONS = 10_000;
+        internal static double VSP_LS_S_OVERCHARGE_PENALTY_FIX = 5;
+        internal static double VSP_LS_S_OVERCHARGE_PENALTY_VAR = 0.5;
+        internal static double VSP_LS_S_UNDERCHARGE_PENALTY_FIX = 5;
+        internal static double VSP_LS_S_UNDERCHARGE_PENALTY_VAR = 0.5;
+        internal static double VSP_LS_S_ADD_TRIP = 15;
+        internal static double VSP_LS_S_REM_TRIP = 1;
+        internal static double VSP_LS_S_CHANGE_CHARGE = 5;
+
+        internal static Header VSP_LS_GLOBAL = new();
+        internal static double VSP_LS_G_STARTING_T = 2;
+        internal static double VSP_LS_G_ENDING_T = 0.01;
+        internal static double VSP_LS_G_COOLING_RATE = 0.95;
+        internal static double VSP_LS_G_ITERATIONS = 10_000;
+        internal static double VSP_LS_G_2OPT = 15;
+        internal static double VSP_LS_G_MOVE_RANGE = 15;
+        internal static double VSP_LS_G_CHANGE_CHARGE = 15;
     }
 }

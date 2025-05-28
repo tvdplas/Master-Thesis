@@ -121,7 +121,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
         }
 
-        internal override (double reducedCost, VehicleTask vehicleTask)? GenerateVehicleTask()
+        internal override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
         {
             reset();
 
@@ -260,56 +260,28 @@ namespace E_VCSP.Solver.ColumnGenerators
                 int chargeActionIndex = path[i + 1].label.prevChargeAction;
                 if (chargeActionIndex != -1)
                 {
-                    var chargeAction = dh.ChargingActions[chargeActionIndex];
-                    double chargeAtStation = currSoC - chargeAction.ChargeUsedTo;
+                    VEDeadhead ved = new VEDeadhead(dh, currTime, vehicleType, chargeActionIndex, currSoC);
+                    ved.StartSoCInTask = currSoC;
+                    ved.EndSoCInTask = currSoC + ved.SoCDiff;
+                    taskElements.Add(ved);
 
-                    // Amount charged is always maximal
-                    ChargingCurve cc = chargeAction.ChargeLocation.ChargingCurves[vehicleType.Index];
-                    var maxCharge = cc.MaxChargeGained(chargeAtStation, chargeAction.TimeAtLocation, false);
-                    double SoCAtNextTrip = chargeAtStation + maxCharge.SoCGained - chargeAction.ChargeUsedFrom;
-                    int totalDuration = (int)maxCharge.TimeUsed + chargeAction.DrivingTimeTo + chargeAction.DrivingTimeFrom;
-
-
-                    taskElements.Add(new VEDeadhead()
-                    {
-                        Deadhead = dh,
-                        StartTime = currTime,
-                        EndTime = currTime + totalDuration,
-                        DrivingCost = chargeAction.DrivingCost,
-                        ChargeCost = maxCharge.Cost,
-                        ChargeGained = maxCharge.SoCGained,
-                        ChargeTime = (int)maxCharge.TimeUsed,
-                        EndSoCInTask = SoCAtNextTrip,
-                        SelectedAction = chargeActionIndex,
-                        StartSoCInTask = currSoC,
-                        SoCDiff = SoCAtNextTrip - currSoC,
-                    });
-
-                    currTime += totalDuration;
-                    currSoC = SoCAtNextTrip;
+                    currTime = ved.EndTime;
+                    currSoC = (double)ved!.EndSoCInTask;
                 }
                 else
                 {
-                    double SoCDiff = -(dh.DeadheadTemplate.Distance * vehicleType.DriveUsage);
-                    taskElements.Add(new VEDeadhead()
-                    {
-                        Deadhead = dh,
-                        StartTime = currTime,
-                        EndTime = currTime + dh.DeadheadTemplate.Duration,
-                        DrivingCost = dh.BaseDrivingCost,
-                        SelectedAction = -1,
-                        StartSoCInTask = currSoC,
-                        EndSoCInTask = currSoC + SoCDiff,
-                        SoCDiff = SoCDiff,
-                    });
+                    VEDeadhead ved = new VEDeadhead(dh, currTime, vehicleType);
+                    ved.StartSoCInTask = currSoC;
+                    ved.EndSoCInTask = currSoC + ved.SoCDiff;
 
+                    taskElements.Add(ved);
                     currTime += dh.DeadheadTemplate.Duration;
-                    currSoC += SoCDiff;
+                    currSoC += ved.SoCDiff;
                 }
 
                 int endTime = nextIndex == instance.DepotEndIndex ? EndTime : instance.Trips[nextIndex].StartTime;
                 Location location = nextIndex == instance.DepotEndIndex ? Depot : instance.Trips[nextIndex].From;
-                VEIdle vei = new VEIdle(location, currTime, endTime);
+                VEIdle vei = new VEIdle(location, currTime, endTime, vehicleType);
                 vei.StartSoCInTask = currSoC;
                 vei.EndSoCInTask = currSoC + vei.SoCDiff;
                 taskElements.Add(vei);
@@ -319,7 +291,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             if (Config.CONSOLE_LABELING) Console.WriteLine($"Generated column with reduced cost of {minCosts}");
 
-            return (minCosts, new VehicleTask(taskElements) { vehicleType = vehicleType });
+            return [(minCosts, new VehicleTask(taskElements) { vehicleType = vehicleType })];
         }
     }
 }
