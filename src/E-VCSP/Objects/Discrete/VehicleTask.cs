@@ -6,10 +6,10 @@ namespace E_VCSP.Objects.Discrete
 
     internal class VehicleElement
     {
-        internal required double DrivingCost;
-        internal required double SoCDiff;
-        internal required int StartTime;
-        internal required int EndTime;
+        internal double DrivingCost = double.MinValue;
+        internal double SoCDiff = double.MinValue;
+        internal int StartTime = int.MinValue;
+        internal int EndTime = int.MinValue;
 
         // Only filled in once element is part of finalized task.
         internal double? StartSoCInTask;
@@ -18,7 +18,16 @@ namespace E_VCSP.Objects.Discrete
 
     internal class VETrip : VehicleElement
     {
-        internal required Trip Trip;
+        internal Trip Trip;
+
+        public VETrip(Trip trip, VehicleType vt)
+        {
+            Trip = trip;
+            DrivingCost = trip.Distance * Config.M_COST;
+            SoCDiff = -trip.Distance * vt.DriveUsage;
+            StartTime = trip.StartTime;
+            EndTime = trip.EndTime;
+        }
 
         public override string ToString()
         {
@@ -34,6 +43,8 @@ namespace E_VCSP.Objects.Discrete
         internal double ChargeGained = 0;
         internal double ChargeCost = 0;
 
+
+
         public override string ToString()
         {
             return $"VE DH {Deadhead.DeadheadTemplate.Id}";
@@ -41,7 +52,16 @@ namespace E_VCSP.Objects.Discrete
     }
     internal class VEIdle : VehicleElement
     {
-        internal required Location Location;
+        internal Location Location;
+
+        public VEIdle(Location location, int startTime, int endTime)
+        {
+            Location = location;
+            StartTime = startTime;
+            EndTime = endTime;
+            DrivingCost = (endTime - startTime) * Config.IDLE_COST;
+            SoCDiff = 0; //todo
+        }
 
         public override string ToString()
         {
@@ -50,7 +70,16 @@ namespace E_VCSP.Objects.Discrete
     }
     internal class VEDepot : VehicleElement
     {
-        internal required Location Location;
+        internal Location Location;
+
+        public VEDepot(Location location, int startTime, int endTime)
+        {
+            Location = location;
+            StartTime = startTime;
+            EndTime = endTime;
+            DrivingCost = 0;
+            SoCDiff = 0;
+        }
 
         public override string ToString()
         {
@@ -60,6 +89,7 @@ namespace E_VCSP.Objects.Discrete
 
     internal class VehicleTask
     {
+        internal required VehicleType vehicleType;
         internal List<int> Covers;
         internal List<VehicleElement> Elements;
         internal int Index = -1;
@@ -78,7 +108,7 @@ namespace E_VCSP.Objects.Discrete
                 });
 
                 if (Elements[^1].EndSoCInTask != null)
-                    cost += Math.Min(0, ShortestPathLS.vehicleType.StartCharge - (double)Elements[^1]!.EndSoCInTask!) * ShortestPathLS.vehicleType.Capacity / 100 * Config.KWH_COST;
+                    cost += Math.Min(0, vehicleType.StartCharge - (double)Elements[^1]!.EndSoCInTask!) * vehicleType.Capacity / 100 * Config.KWH_COST;
 
                 return cost;
             }

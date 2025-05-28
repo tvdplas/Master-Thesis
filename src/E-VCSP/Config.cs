@@ -28,6 +28,7 @@
         internal static bool CONSOLE_GUROBI = false;
         internal static bool CONSOLE_LABELING = false;
         internal static bool CONSOLE_LS = false;
+        internal static bool CONSOLE_COVER = false;
 
         // General layout
         internal static Header GRAPH_LAYOUT = new();
@@ -56,6 +57,8 @@
         internal static bool ALLOW_VH_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
         internal static bool USE_COLUMN_GENERATION = true;
         internal static int MAX_COL_GEN_ITS = 5000;
+        internal static double LS_CHANCE = 0;
+        internal static double CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same
 
         internal static Header LOCAL_SEARCH = new();
         internal static int LS_OPT_IT_THRESHOLD = 10;
@@ -69,8 +72,6 @@
         internal static double LS_UNDERCHARGE_PENALTY_VAR = 0.5;
         internal static double LS_ADD_TRIP = 15;
         internal static double LS_REM_TRIP = 1;
-        internal static double LS_CHANGE_CHARGE = 2;
-        internal static double LS_INC_CHARGE = 4;
-        internal static double LS_DEC_CHARGE = 3;
+        internal static double LS_CHANGE_CHARGE = 5;
     }
 }
