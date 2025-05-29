@@ -86,7 +86,7 @@ namespace E_VCSP.Objects.Discrete
             StartTime = startTime;
             EndTime = endTime;
 
-            bool isGarage = location.CanCharge || location.BreakAllowed; // no need to use SoC at garage
+            bool isGarage = true || location.CanCharge || location.BreakAllowed; // no need to use SoC at garage
             DrivingCost = isGarage ? 0 : (endTime - startTime) * Config.IDLE_COST;
             SoCDiff = isGarage ? 0 : -(endTime - startTime) * vt.IdleUsage;
         }

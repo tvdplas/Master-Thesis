@@ -28,6 +28,30 @@ namespace E_VCSP.Solver.ColumnGenerators
         internal LLNode? Next;
         internal double SoCAtStart;
         internal double SoCAtEnd;
+        internal int DebugIndex;
+        internal static int DebugIndexCounter;
+
+        public LLNode()
+        {
+            DebugIndex = DebugIndexCounter++;
+        }
+
+        public override string ToString()
+        {
+            return $"{DebugIndex}: {VehicleElement}";
+        }
+
+        internal int TailCount()
+        {
+            LLNode? curr = this;
+            int c = 0;
+            while (curr != null)
+            {
+                c++;
+                curr = curr.Next;
+            }
+            return c;
+        }
 
         internal VehicleTask ToVehicleTask(VehicleType vehicleType)
         {

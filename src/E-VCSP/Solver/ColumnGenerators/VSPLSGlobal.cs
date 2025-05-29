@@ -72,7 +72,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             LLNode t2Head = tasks[t2Index];
 
             // Select a random point in time 
-            int time = rnd.Next(StartTime, EndTime);
+            int time = rnd.Next(StartTime + Config.MIN_NODE_TIME, EndTime - Config.MIN_NODE_TIME);
 
             // Go through the tasks; find the first trip after the crossover point
             //                  time
@@ -85,32 +85,38 @@ namespace E_VCSP.Solver.ColumnGenerators
             LLNode? curr = t1Head;
             while (curr != null)
             {
+                if (t1FirstAffected == null && (curr.NodeType == LLNodeType.Depot || curr.NodeType == LLNodeType.Trip) && curr.VehicleElement.StartTime >= time)
+                {
+                    t1FirstAffected = curr;
+                }
+
                 if (curr.NodeType == LLNodeType.Trip)
                 {
                     if (t1FirstAffected == null) t1TripsBefore++;
                     else t1TripsAfter++;
-                }
-
-                if (t1FirstAffected == null && (curr.NodeType == LLNodeType.Depot || curr.NodeType == LLNodeType.Trip) && curr.VehicleElement.StartTime >= time)
-                {
-                    t1FirstAffected = curr;
                 }
                 curr = curr.Next;
             }
             curr = t2Head;
             while (curr != null)
             {
+                if (t2FirstAffected == null && (curr.NodeType == LLNodeType.Depot || curr.NodeType == LLNodeType.Trip) && curr.VehicleElement.StartTime >= time)
+                {
+                    t2FirstAffected = curr;
+                }
+
                 if (curr.NodeType == LLNodeType.Trip)
                 {
                     if (t2FirstAffected == null) t2TripsBefore++;
                     else t2TripsAfter++;
                 }
-
-                if (t2FirstAffected == null && (curr.NodeType == LLNodeType.Depot || curr.NodeType == LLNodeType.Trip) && curr.VehicleElement.StartTime >= time)
-                {
-                    t2FirstAffected = curr;
-                }
                 curr = curr.Next;
+            }
+
+            if (t1TripsAfter == 0 && t2TripsAfter == 0)
+            {
+                // Skip; cant do anything interesting
+                return LSOpResult.Invalid;
             }
 
             if (t1FirstAffected == null || t2FirstAffected == null)
@@ -125,7 +131,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             // Trip 1 with new end                    idle  dh    trip/depot
             LLNode t1AdditionTarget = t1FirstAffected.Prev!.Prev!.Prev!;
-            LLNode t2AdditionTarget = t1FirstAffected.Prev!.Prev!.Prev!;
+            LLNode t2AdditionTarget = t2FirstAffected.Prev!.Prev!.Prev!;
 
 
             (bool feasible, double costDiff, LLNode? dh, LLNode? idle) glue(LLNode additionTarget, LLNode firstAffected)
@@ -140,15 +146,15 @@ namespace E_VCSP.Solver.ColumnGenerators
                 if (arc == null) return (false, double.MinValue, null, null);
 
                 // Arc exists; check if results in invalid charge by temporarily replacing at tail with fa (with dh, idle to glue
-                Location from1 = additionTargetAsTrip?.Trip?.From ?? Depot;
+                Location from = additionTargetAsTrip?.Trip?.From ?? Depot;
                 VEDeadhead? ved = null;
-                if (arc.Deadhead.ChargingActions.FindIndex(x => x.ChargeLocation == from1) != -1)
+                if (arc.Deadhead.ChargingActions.FindIndex(x => x.ChargeLocation == from) != -1)
                 {
                     ved = new VEDeadhead(
                         arc.Deadhead,
                         additionTarget.VehicleElement.EndTime,
                         vehicleType,
-                        arc.Deadhead.ChargingActions.FindIndex(x => x.ChargeLocation == from1),
+                        arc.Deadhead.ChargingActions.FindIndex(x => x.ChargeLocation == from),
                         additionTarget.SoCAtEnd
                     );
                 }
@@ -173,8 +179,8 @@ namespace E_VCSP.Solver.ColumnGenerators
                 idle.Next = firstAffected;
 
                 // save copies of previous "glue"
-                LLNode prevDh = t1AdditionTarget.Next!;
-                LLNode prevIdle = t1AdditionTarget.Next!.Next!;
+                LLNode prevDh = additionTarget.Next!;
+                LLNode prevIdle = firstAffected.Prev!;
 
                 // Current state: (?) is onesided link
                 // tat2at -> ..... -> ........ -> t2fa -> ....
@@ -185,23 +191,23 @@ namespace E_VCSP.Solver.ColumnGenerators
                 // Now going to compare costs of both solutions; charging costs + driving costs
                 double costDiff = 0;
 
-                (bool originalValid, double originalChargeCosts) = t1AdditionTarget.CalcSoCValues(vehicleType, false);
+                (bool originalValid, double originalChargeCosts) = additionTarget.CalcSoCValues(vehicleType, false);
                 //if (!originalValid) throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
                 costDiff -= originalChargeCosts;
-                costDiff -= t1AdditionTarget.CostOfTail();
+                costDiff -= additionTarget.CostOfTail();
 
                 // Change tail
-                t1AdditionTarget.Next = dh;
-                t2FirstAffected.Prev = idle;
+                additionTarget.Next = dh;
+                firstAffected.Prev = idle;
 
-                (bool changeValid, double newChargeCosts) = t1AdditionTarget.CalcSoCValues(vehicleType, false);
+                (bool changeValid, double newChargeCosts) = additionTarget.CalcSoCValues(vehicleType, false);
                 // Continue with calculation either way; otherwise revert might be skipped
                 costDiff += originalChargeCosts;
-                costDiff += t1AdditionTarget.CostOfTail();
+                costDiff += additionTarget.CostOfTail();
 
                 // Revert changes
-                t1AdditionTarget.Next = prevDh;
-                t2FirstAffected.Prev = prevIdle;
+                additionTarget.Next = prevDh;
+                firstAffected.Prev = prevIdle;
 
                 if (!changeValid) return (false, double.MinValue, null, null);
                 else return (true, costDiff, dh, idle);
@@ -244,25 +250,36 @@ namespace E_VCSP.Solver.ColumnGenerators
             curr = t1Head;
             while (curr != null)
             {
+                if (curr.Next != null && curr.Next.Prev != curr)
+                    throw new InvalidDataException("Links gaan niet goed");
+                if (curr.Prev != null && curr.Prev.Next != curr)
+                    throw new InvalidDataException("Links gaan niet goed");
+
                 if (curr.NodeType == LLNodeType.Trip)
                 {
                     t1HasTrip = true;
-                    break;
+                    //break;
                 }
                 curr = curr.Next;
             }
             curr = t2Head;
             while (curr != null)
             {
+                if (curr.Next != null && curr.Next.Prev != curr)
+                    throw new InvalidDataException("Links gaan niet goed");
+                if (curr.Prev != null && curr.Prev.Next != curr)
+                    throw new InvalidDataException("Links gaan niet goed");
+
                 if (curr.NodeType == LLNodeType.Trip)
                 {
                     t2HasTrip = true;
-                    break;
+                    //break;
                 }
                 curr = curr.Next;
             }
-            if (!t1HasTrip && !t2HasTrip) throw new InvalidOperationException("Something went wrong; somehow both tasks dont have trips anymore");
 
+            if (!t1HasTrip && !t2HasTrip)
+                throw new InvalidOperationException("Something went wrong; somehow both tasks dont have trips anymore");
             if (!t1HasTrip)
                 tasks.RemoveAt(t1Index);
             if (!t2HasTrip)
@@ -305,6 +322,16 @@ namespace E_VCSP.Solver.ColumnGenerators
                 double r = rnd.NextDouble() * sums[^1];
                 int operationIndex = sums.FindIndex(x => r <= x);
                 var res = operations[operationIndex].operation();
+
+                for (int i = 0; i < tasks.Count; i++)
+                {
+                    var t = tasks[i];
+                    var tailcount = t.TailCount();
+                    if (tailcount <= 4)
+                    {
+                        int x = 0; ;
+                    }
+                }
             }
 
             return tasks.Select(taskHead =>
