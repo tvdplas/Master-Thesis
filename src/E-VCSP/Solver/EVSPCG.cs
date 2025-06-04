@@ -468,8 +468,9 @@ namespace E_VCSP.Solver
                 lastReportedPercent = 0,    // Percentage of total reporting
                 currIts = 1,                // Number of CG / solution rounds had
                 totalGenerated = 0,         // Total number of columns generated
-                lsGenerated = 0,
-                spGenerated = 0,
+                singleGenerated = 0,
+                globalGenerated = 0,
+                lbGenerated = 0,
                 seqWithoutRC = 0,           // Number of sequential columns without reduced cost found
                 totWithoutRC = 0,           // Total columns generated with no RC
                 notFound = 0,               // Number of columns that could not be generated
@@ -478,13 +479,16 @@ namespace E_VCSP.Solver
 
             // Multithreaded shortestpath searching
             List<List<VehicleShortestPath>> instances = [
-                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_GLOBAL
+                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // SP
                 [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_SINGLE
-                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))] // SP
+                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_GLOBAL
             ];
+            List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_SINGLE_WEIGHT, Config.VSP_LS_GLOBAL_WEIGHT];
+            List<double> sums = [operationChances[0]];
+            for (int i = 1; i < operationChances.Count; i++) sums.Add(sums[i - 1] + operationChances[i]);
 
             Console.WriteLine("Column generation started");
-            Console.WriteLine("%\tT\tLS\tSP\tNF\tDN\tDO\tWRC");
+            Console.WriteLine("%\tT\tLB\tLSS\tLSG\tNF\tDN\tDO\tWRC\tMV");
 
             Random rnd = new();
 
@@ -500,27 +504,30 @@ namespace E_VCSP.Solver
                 // Generate batch of new tasks using pricing information from previous solve
                 List<(double, VehicleTask)>[] generatedTasks = new List<(double, VehicleTask)>[Config.THREADS];
 
-                //int selectedMethodÍndex = rnd.NextDouble() <= Config.VSP_LS_S_CHANCE ? 0 : 1;
-                int selectedMethodÍndex = 0; // LS_GLOBAL
+
+                double r = rnd.NextDouble() * sums[^1];
+                int selectedMethodÍndex = sums.FindIndex(x => r <= x);
                 List<VehicleShortestPath> selectedMethod = instances[selectedMethodÍndex];
-                switch (selectedMethodÍndex)
-                {
-                    case 0: lsGenerated += Config.THREADS; break;
-                    case 1: spGenerated += Config.THREADS; break;
-                    default: throw new InvalidOperationException("You forgot to add a case");
-                }
+
 
                 Parallel.For(0, Config.THREADS, (i) =>
                 {
                     generatedTasks[i] = selectedMethod[i].GenerateVehicleTasks();
                 });
                 totalGenerated += generatedTasks.Length;
+                switch (selectedMethodÍndex)
+                {
+                    case 0: lbGenerated += generatedTasks.Length; break;
+                    case 1: singleGenerated += generatedTasks.Length; break;
+                    case 2: globalGenerated += generatedTasks.Length; break;
+                    default: throw new InvalidOperationException("You forgot to add a case");
+                }
 
                 int percent = (int)((totalGenerated / (double)maxColumns) * 100);
                 if (percent >= lastReportedPercent + 10)
                 {
                     lastReportedPercent = percent - (percent % 10);
-                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lsGenerated}\t{spGenerated}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}");
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{model.ObjVal}");
                 }
 
                 foreach (var taskSet in generatedTasks)

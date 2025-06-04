@@ -29,7 +29,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             while (l < r)
             {
                 int m = (l + r) / 2;
-                if (front.Keys[m] >= label.currSoC - Config.CHARGE_EPSILON) r = m;
+                if (front.Keys[m] >= label.currSoC - Config.VSP_LB_CHARGE_EPSILON) r = m;
                 else l = m + 1;
             }
 
@@ -42,7 +42,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
                 // If domination is not found however we are within epsilon range of the inserted label, 
                 // add it to a seperate list of items we will be removing
-                if (Math.Abs(front.Values[i].currSoC - label.currSoC) < Config.CHARGE_EPSILON) sameCharge.Add(i);
+                if (Math.Abs(front.Values[i].currSoC - label.currSoC) < Config.VSP_LB_CHARGE_EPSILON) sameCharge.Add(i);
             }
 
             // Keep track of front size diff

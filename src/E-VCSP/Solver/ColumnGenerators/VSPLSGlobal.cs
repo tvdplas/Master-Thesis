@@ -61,7 +61,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         }
 
         /// <summary>
-        /// Attempt to do a 2opt operation; Select a random time in the day, swap all trip assignments after that point
+        /// Attempt to do a 2opt operation; Select a rnd time in the day, swap all trip assignments after that point
         /// </summary>
         private LSOpResult opt2()
         {
@@ -71,7 +71,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             LLNode t1Head = tasks[t1Index];
             LLNode t2Head = tasks[t2Index];
 
-            // Select a random point in time 
+            // Select a rnd point in time 
             int time = rnd.Next(StartTime + Config.MIN_NODE_TIME, EndTime - Config.MIN_NODE_TIME);
 
             // Go through the tasks; find the first trip after the crossover point
@@ -134,7 +134,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             LLNode t2AdditionTarget = t2FirstAffected.Prev!.Prev!.Prev!;
 
 
-            (bool feasible, double costDiff, LLNode? dh, LLNode? idle) glue(LLNode additionTarget, LLNode firstAffected)
+            (bool feasible, double costDiff, LLNode? dh, LLNode? idle) glue(LLNode head, LLNode additionTarget, LLNode firstAffected)
             {
                 // Attempt to glue the two trip parts together; if this results in infeasible deadhead / charging issues, return invalid
                 VETrip? additionTargetAsTrip = additionTarget.NodeType == LLNodeType.Trip ? ((VETrip)additionTarget.VehicleElement) : null;
@@ -191,8 +191,8 @@ namespace E_VCSP.Solver.ColumnGenerators
                 // Now going to compare costs of both solutions; charging costs + driving costs
                 double costDiff = 0;
 
-                (bool originalValid, double originalChargeCosts) = additionTarget.CalcSoCValues(vehicleType, false);
-                //if (!originalValid) throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
+                (bool originalValid, double originalChargeCosts) = head.CalcSoCValues(vehicleType, false);
+                if (!originalValid) throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
                 costDiff -= originalChargeCosts;
                 costDiff -= additionTarget.CostOfTail();
 
@@ -200,7 +200,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 additionTarget.Next = dh;
                 firstAffected.Prev = idle;
 
-                (bool changeValid, double newChargeCosts) = additionTarget.CalcSoCValues(vehicleType, false);
+                (bool changeValid, double newChargeCosts) = head.CalcSoCValues(vehicleType, false);
                 // Continue with calculation either way; otherwise revert might be skipped
                 costDiff += originalChargeCosts;
                 costDiff += additionTarget.CostOfTail();
@@ -213,8 +213,8 @@ namespace E_VCSP.Solver.ColumnGenerators
                 else return (true, costDiff, dh, idle);
             }
 
-            var res1 = glue(t1AdditionTarget, t2FirstAffected);
-            var res2 = glue(t2AdditionTarget, t1FirstAffected);
+            var res1 = glue(t1Head, t1AdditionTarget, t2FirstAffected);
+            var res2 = glue(t2Head, t2AdditionTarget, t1FirstAffected);
 
             if (!res1.feasible || !res2.feasible)
             {
@@ -250,11 +250,6 @@ namespace E_VCSP.Solver.ColumnGenerators
             curr = t1Head;
             while (curr != null)
             {
-                if (curr.Next != null && curr.Next.Prev != curr)
-                    throw new InvalidDataException("Links gaan niet goed");
-                if (curr.Prev != null && curr.Prev.Next != curr)
-                    throw new InvalidDataException("Links gaan niet goed");
-
                 if (curr.NodeType == LLNodeType.Trip)
                 {
                     t1HasTrip = true;
@@ -265,11 +260,6 @@ namespace E_VCSP.Solver.ColumnGenerators
             curr = t2Head;
             while (curr != null)
             {
-                if (curr.Next != null && curr.Next.Prev != curr)
-                    throw new InvalidDataException("Links gaan niet goed");
-                if (curr.Prev != null && curr.Prev.Next != curr)
-                    throw new InvalidDataException("Links gaan niet goed");
-
                 if (curr.NodeType == LLNodeType.Trip)
                 {
                     t2HasTrip = true;
@@ -287,6 +277,283 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             return (overallCostDiff < 0) ? LSOpResult.Improvement : LSOpResult.Accept;
         }
+
+        /// <summary>
+        /// Select two tasks, select a range of entries from the one to try and insert into the other
+        /// </summary>
+        private LSOpResult moveRange()
+        {
+            int t1Index = rnd.Next(tasks.Count);
+            int t2Index = rnd.Next(tasks.Count);
+            while (t1Index == t2Index) t2Index = rnd.Next(tasks.Count);
+            LLNode t1Head = tasks[t1Index];
+            LLNode t2Head = tasks[t2Index];
+
+            // Get trips from t2 in order to attempt to move to t1
+            List<LLNode> t2trips = new();
+            LLNode? curr = t2Head;
+            while (curr != null)
+            {
+                if (curr.NodeType == LLNodeType.Trip) t2trips.Add(curr);
+                curr = curr.Next;
+            }
+
+            if (t2trips.Count == 0) throw new InvalidDataException("No trips in t2; should be at least 1");
+
+            int t2StartIndex = rnd.Next(t2trips.Count),
+                t2EndIndex = rnd.Next(t2StartIndex, t2trips.Count);
+
+            LLNode t2Start = t2trips[t2StartIndex];
+            LLNode t2End = t2trips[t2EndIndex];
+
+
+            // Check if connecting the remainder of t2 is feasible
+            LLNode t2Prev = t2Start.Prev!.Prev!.Prev!;
+            LLNode t2Next = t2End.Next!.Next!.Next!;
+            VETrip? t2PrevAsTrip = t2Prev.NodeType == LLNodeType.Trip ? (VETrip)t2Prev.VehicleElement : null,
+                    t2NextAsTrip = t2Next.NodeType == LLNodeType.Trip ? (VETrip)t2Next.VehicleElement : null;
+            Arc? t2PrevTot2Next = adjFull[t2PrevAsTrip?.Trip?.Index ?? instance.DepotStartIndex][t2NextAsTrip?.Trip?.Index ?? instance.DepotEndIndex];
+
+            if (t2PrevTot2Next == null)
+            {
+                // Cannot repair t2 if trips are removed;
+                return LSOpResult.Invalid;
+            }
+
+            // Check if addition of t2 range into t1 is time-feasible;
+            // Can be checked by finding the trip preceding t2S in t1,
+            // then checking the trip coming after that to see if it is possible
+            // to travel from t2E to it.
+            LLNode t1Prev = t1Head; // depot can be preceding
+            curr = t1Head;
+            while (curr != null)
+            {
+                if (curr.NodeType == LLNodeType.Trip)
+                {
+                    // Already found last vehicle element preceding
+                    if (curr.VehicleElement.EndTime > t2Start.VehicleElement.StartTime) break;
+                    else t1Prev = curr;
+                }
+                curr = curr.Next;
+            }
+
+            LLNode t1Next = t1Prev.Next!.Next!.Next!;
+            VETrip t2StartRangeAsTrip = (VETrip)t2Start.VehicleElement,
+                   t2EndRangeAsTrip = (VETrip)t2End.VehicleElement;
+            VETrip? t1PrevAsTrip = t1Prev.NodeType == LLNodeType.Trip ? (VETrip)t1Prev.VehicleElement : null,
+                    t1NextAsTrip = t1Next.NodeType == LLNodeType.Trip ? (VETrip)t1Next.VehicleElement : null;
+
+            Arc? t1PrevTot2Start = adjFull[t1PrevAsTrip?.Trip?.Index ?? instance.DepotStartIndex][t2StartRangeAsTrip.Trip.Index];
+            Arc? t2EndTot1Next = adjFull[t2EndRangeAsTrip.Trip.Index][t1NextAsTrip?.Trip?.Index ?? instance.DepotEndIndex];
+
+            if (t1PrevTot2Start == null || t2EndTot1Next == null)
+            {
+                // Cannot connect the two trip parts
+                return LSOpResult.Invalid;
+            }
+
+            // Get new connecting pieces ready
+            // Previous state: 
+            // t1: ... -> t1Prev -(currDh1, currIdle1)> t1Next -> ...
+            // t2: ... -> t2Prev -(currDh2Prev, currIdle2Prev)> t2Start -> ... -> t2End -(currDh2Next, currIdle2Next)> t2Next -> ...
+            // Target state: 
+            // t1: ... -> t1Prev -(newDh2Start, newIdle2Start)> t2Start -> ... -> t2End -(newDh2End, newIdle2End)> t1Next -> ...
+            // t2: ... -> t2Prev -(newDh2, newIdle2)> t2Next -> ...
+
+            // Copies of previous dh/idle
+            LLNode currDh1 = t1Prev.Next!,
+                currIdle1 = t1Next.Prev!,
+                currDh2Prev = t2Prev.Next!,
+                currIdle2Prev = t2Start.Prev!,
+                currDh2Next = t2End.Next,
+                currIdle2Next = t2Next.Prev!;
+
+            // New glue
+            // t1Prev -> t2Start
+            VEDeadhead vedNewDh2Start = new(t1PrevTot2Start.Deadhead, t1Prev.VehicleElement.EndTime, vehicleType);
+            LLNode newDh2Start = new()
+            {
+                NodeType = LLNodeType.Deadhead,
+                Prev = t1Prev,
+                SoCAtStart = t1Prev.SoCAtEnd,
+                SoCAtEnd = t1Prev.SoCAtEnd + vedNewDh2Start.SoCDiff,
+                VehicleElement = vedNewDh2Start,
+            };
+            LLNode newIdle2Start = newDh2Start.AddAfter(LLNodeType.Idle, new VEIdle(vedNewDh2Start.Deadhead.DeadheadTemplate.To, vedNewDh2Start.EndTime, t2Start.VehicleElement.StartTime, vehicleType));
+            newIdle2Start.Next = t2Start;
+            // t2End -> t1Next
+            VEDeadhead vedNewDh2End = new(t2EndTot1Next.Deadhead, t2End.VehicleElement.EndTime, vehicleType);
+            LLNode newDh2End = new()
+            {
+                NodeType = LLNodeType.Deadhead,
+                Prev = t2End,
+                SoCAtStart = t2End.SoCAtEnd,
+                SoCAtEnd = t2End.SoCAtEnd + vedNewDh2End.SoCDiff,
+                VehicleElement = vedNewDh2End,
+            };
+            LLNode newIdle2End = newDh2End.AddAfter(LLNodeType.Idle, new VEIdle(vedNewDh2End.Deadhead.DeadheadTemplate.To, vedNewDh2End.EndTime, t1Next.VehicleElement.StartTime, vehicleType));
+            newIdle2End.Next = t1Next;
+            // t2Prev -> t2Next
+            VEDeadhead vedNewDh2 = new(t2PrevTot2Next.Deadhead, t2Prev.VehicleElement.EndTime, vehicleType);
+            LLNode newDh2 = new()
+            {
+                NodeType = LLNodeType.Deadhead,
+                Prev = t2Prev,
+                SoCAtStart = t2Prev.SoCAtEnd,
+                SoCAtEnd = t2Prev.SoCAtEnd + vedNewDh2.SoCDiff,
+                VehicleElement = vedNewDh2,
+            };
+            LLNode newIdle2 = newDh2.AddAfter(LLNodeType.Idle, new VEIdle(vedNewDh2.Deadhead.DeadheadTemplate.To, vedNewDh2.EndTime, t2Next.VehicleElement.StartTime, vehicleType));
+            newIdle2.Next = t2Next;
+
+
+            // Find previous costs
+            double costDiff = 0;
+            (bool t1OriginalValid, double t1OriginalChargeCosts) = t1Head.CalcSoCValues(vehicleType, false);
+            (bool t2OriginalValid, double t2OriginalChargeCosts) = t2Head.CalcSoCValues(vehicleType, false);
+            if (!t1OriginalValid || !t2OriginalValid) throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
+            costDiff -= t1OriginalChargeCosts;
+            costDiff -= t1Head.CostOfTail();
+            costDiff -= t2OriginalChargeCosts;
+            costDiff -= t2Head.CostOfTail();
+
+            // Perform operation 
+            t1Prev.Next = newDh2Start;
+            t1Next.Prev = newIdle2End;
+            t2Start.Prev = newIdle2Start;
+            t2End.Next = newDh2End;
+            t2Prev.Next = newDh2;
+            t2Next.Prev = newIdle2;
+
+            // Add new costs
+            (bool t1NewValid, double t1NewChargeCosts) = t1Head.CalcSoCValues(vehicleType, false);
+            (bool t2NewValid, double t2NewChargeCosts) = t2Head.CalcSoCValues(vehicleType, false);
+            costDiff += t1NewChargeCosts;
+            costDiff += t1Head.CostOfTail();
+            costDiff += t2NewChargeCosts;
+            costDiff += t2Head.CostOfTail();
+
+            // TODO: kan verwerkt worden in eerdere check
+            bool t2Remove = t2Head.TailCount() <= 4;
+            if (t2Remove)
+            {
+                costDiff -= tasks.Count > Config.MAX_VEHICLES
+                    ? Config.MAX_VEHICLES_OVER_COST + Config.PULLOUT_COST // TODO: check if this cost is correct
+                    : Config.PULLOUT_COST;
+            }
+
+            // Check acceptance
+            if (!t1NewValid || !t2NewValid || !accept(costDiff))
+            {
+                // Restore original structue
+                t1Prev.Next = currDh1;
+                t1Next.Prev = currIdle1;
+                t2Prev.Next = currDh2Prev;
+                t2Start.Prev = currIdle2Prev;
+                t2End.Next = currDh2Next;
+                t2Next.Prev = currIdle2Next;
+
+                (bool v1, _) = t1Head.CalcSoCValues(vehicleType, false);
+                (bool v2, _) = t2Head.CalcSoCValues(vehicleType, false);
+                if (!v1 || !v2) throw new InvalidDataException("heh");
+
+                return LSOpResult.Decline;
+            }
+
+            if (t2Remove) tasks.RemoveAt(t2Index);
+
+            return (costDiff < 0) ? LSOpResult.Improvement : LSOpResult.Accept;
+        }
+
+        private LSOpResult changeChargeAction()
+        {
+            int tIndex = rnd.Next(tasks.Count);
+            LLNode head = tasks[tIndex];
+            LLNode? curr = head;
+            List<LLNode> chargeTargets = [];
+            while (curr != null)
+            {
+                if (curr.NodeType == LLNodeType.Deadhead && ((VEDeadhead)curr.VehicleElement).Deadhead.ChargingActions.Count > 0)
+                {
+                    chargeTargets.Add(curr);
+                }
+                curr = curr.Next;
+            }
+
+            if (chargeTargets.Count == 0) return LSOpResult.Invalid;
+
+            LLNode target = chargeTargets[rnd.Next(chargeTargets.Count)];
+            VEDeadhead dh = (VEDeadhead)target.VehicleElement;
+
+            // Chose new action
+            int currAction = dh.SelectedAction;
+            int newAction = currAction;
+            while (newAction == currAction)
+                newAction = rnd.Next(-1, dh.Deadhead.ChargingActions.Count);
+            ChargingAction? action = newAction == -1 ? null : dh.Deadhead.ChargingActions[newAction];
+
+            // Determine new charge
+            int currChargeTime = dh.ChargeTime;
+            int newChargeTime = action == null ? 0 : action.TimeAtLocation;
+            int newTotalTime = action == null
+                ? dh.Deadhead.DeadheadTemplate.Duration
+                : action.DrivingTimeTo + action.DrivingTimeFrom + newChargeTime;
+
+            double newChargeGained = 0;
+            double newDrivingCost = dh.Deadhead.BaseDrivingCost;
+            double currSoCDiff = dh.SoCDiff;
+            double newSoCDiff = -dh.Deadhead.DeadheadTemplate.Distance * vehicleType.DriveUsage;
+            if (action != null)
+            {
+                double SoCAtCharger = target.SoCAtStart - action.ChargeUsedTo;
+                newChargeGained = action.ChargeLocation.ChargingCurves[vehicleType.Index]
+                    .MaxChargeGained(SoCAtCharger, newChargeTime, false).SoCGained;
+                newDrivingCost = action.DrivingCost;
+                newSoCDiff = newChargeGained - (action.ChargeUsedFrom + action.ChargeUsedTo);
+            }
+
+            double costDiff = 0;
+
+            costDiff -= dh.DrivingCost;
+            costDiff += newDrivingCost;
+
+            // Old SoC related costs
+            (bool currFeasible, double currChargingCost) = head.CalcSoCValues(vehicleType, false);
+            if (!currFeasible) throw new InvalidDataException("Current charging scheme wasn't valid");
+            costDiff -= currChargingCost;
+
+            // perform op
+            dh.SelectedAction = newAction;
+            dh.ChargeTime = newChargeTime;
+            dh.SoCDiff = newSoCDiff;
+
+            // New SoC related costs
+            (bool newFeasible, double newChargingCost) = head.CalcSoCValues(vehicleType, false);
+            costDiff += newChargingCost;
+
+            // TODO: idle costs moeten eigenlijk ook meegenomen worden aangezien de dh tijd verandert
+
+            if (!newFeasible || !accept(costDiff))
+            {
+                // Revert operation
+                dh.SelectedAction = currAction;
+                dh.ChargeTime = currChargeTime;
+                dh.SoCDiff = currSoCDiff;
+                (bool oldFeasible, _) = head.CalcSoCValues(vehicleType, false);
+                if (!oldFeasible) throw new InvalidOperationException("hoe dan");
+
+                return LSOpResult.Decline;
+            }
+
+            // Finalize operation with everything not needed for SoC calculations
+            dh.DrivingCost = newDrivingCost;
+            dh.SoCGained = newChargeGained;
+            dh.EndTime = dh.StartTime + newTotalTime;
+            target.Next!.VehicleElement.StartTime = dh.EndTime;
+
+            return costDiff < 0 ? LSOpResult.Improvement : LSOpResult.Accept;
+        }
+
 
 
         /// <summary>
@@ -306,8 +573,8 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             List<(Func<LSOpResult> operation, double chance)> operations = [
                 (opt2, Config.VSP_LS_G_2OPT),
-                //(removeTrip, Config.VSP_LS_G_REM_TRIP),
-                //(changeChargeAction, Config.VSP_LS_G_CHANGE_CHARGE),
+                (moveRange, Config.VSP_LS_G_MOVE_RANGE),
+                (changeChargeAction, Config.VSP_LS_G_CHANGE_CHARGE),
             ];
 
             List<double> sums = [operations[0].chance];
@@ -329,7 +596,13 @@ namespace E_VCSP.Solver.ColumnGenerators
                     var tailcount = t.TailCount();
                     if (tailcount <= 4)
                     {
-                        int x = 0; ;
+                        throw new InvalidOperationException("Invalid state");
+                    }
+
+                    (bool feasible, _) = t.CalcSoCValues(vehicleType, false);
+                    if (!feasible)
+                    {
+                        throw new InvalidOperationException("Invalid state");
                     }
                 }
             }

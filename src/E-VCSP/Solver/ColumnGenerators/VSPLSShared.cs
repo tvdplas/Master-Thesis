@@ -55,7 +55,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         internal VehicleTask ToVehicleTask(VehicleType vehicleType)
         {
-            this.CalcSoCValues(vehicleType);
+            this.CalcSoCValues(vehicleType, false);
             List<VehicleElement> elements = [];
             LLNode? curr = this;
             while (curr != null)
@@ -154,9 +154,10 @@ namespace E_VCSP.Solver.ColumnGenerators
             {
                 if (!expand && (curr.SoCAtStart > vehicleType.MaxCharge || curr.SoCAtStart < vehicleType.MinCharge))
                 {
-                    // SoC could not be calculated; invalid at some point
+                    // SoC at start of node is invalid
                     return (false, double.MinValue);
                 }
+
 
                 if (curr.NodeType == LLNodeType.Deadhead)
                 {
@@ -177,6 +178,13 @@ namespace E_VCSP.Solver.ColumnGenerators
                 }
 
                 curr.SoCAtEnd = curr.SoCAtStart + curr.VehicleElement.SoCDiff;
+
+                if (!expand && (curr.SoCAtEnd > vehicleType.MaxCharge || curr.SoCAtEnd < vehicleType.MinCharge))
+                {
+                    // SoC at end of node is invalid
+                    return (false, double.MinValue);
+                }
+
                 if (curr.Next != null)
                 {
                     curr.Next.SoCAtStart = curr.SoCAtEnd;
