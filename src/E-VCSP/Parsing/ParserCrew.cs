@@ -3,10 +3,10 @@ using E_VCSP.Objects;
 
 namespace E_VCSP.Parsing
 {
-    internal class Empty { };
-    internal class ParserCrew : ParserBase<Empty>
+    public class Empty { };
+    public class ParserCrew : ParserBase<Empty>
     {
-        internal ParserCrew()
+        public ParserCrew()
         {
             filename = "crew.csv";
             attributeNameMapping = new()
@@ -20,7 +20,7 @@ namespace E_VCSP.Parsing
             };
         }
 
-        internal override Empty ParseSingle(
+        public override Empty ParseSingle(
             int index,
             List<string> headers,
             List<string> line,
@@ -29,7 +29,7 @@ namespace E_VCSP.Parsing
         )
         {
             Location loc = GetOrCreateLocation(line[attributeIndexMapping["Id"]], locations);
-            loc.HandoverAllowed = line[attributeIndexMapping["HandoverAllowed"]] == "1";
+            loc.HandoverAllowed = line[attributeIndexMapping["HandoverAllowed"]] == "1" || true;
             loc.BreakAllowed = line[attributeIndexMapping["BreakAllowed"]] == "1";
             loc.BrutoNetto = ParseTime(line[attributeIndexMapping["BrutoNetto"]]);
             loc.SignOnTime = ParseTime(line[attributeIndexMapping["SignOnTime"]]);

@@ -2,10 +2,10 @@
 
 namespace E_VCSP.Parsing
 {
-    internal abstract class ParserBase<T>
+    public abstract class ParserBase<T>
     {
-        internal List<(string, string)>? attributeNameMapping;
-        internal string? filename;
+        public List<(string, string)>? attributeNameMapping;
+        public string? filename;
 
         /// <summary>
         /// Match attributes to column indexes in the input
@@ -14,7 +14,7 @@ namespace E_VCSP.Parsing
         /// <returns>Dictionary d such that d[attr_name] = col_index</returns>
         /// <exception cref="ArgumentNullException">No attribute to column name mapping provided</exception>
         /// <exception cref="Exception">Invalid mapping provided</exception>
-        internal Dictionary<string, int> GetAttributeIndexMapping(List<string> header)
+        public Dictionary<string, int> GetAttributeIndexMapping(List<string> header)
         {
             if (attributeNameMapping == null)
             {
@@ -38,7 +38,7 @@ namespace E_VCSP.Parsing
         /// <param name="s">Time string</param>
         /// <returns>Amount of seconds representing <paramref name="s"/></returns>
         /// <exception cref="ArgumentException">Input not in any of the listed formats.</exception>
-        internal int ParseTime(string s)
+        public int ParseTime(string s)
         {
             List<int> units = s.Split(':').Select(int.Parse).ToList();
             if (units.Count == 1)
@@ -64,7 +64,7 @@ namespace E_VCSP.Parsing
         /// <param name="id">Id of location</param>
         /// <param name="locations">Active list of locations</param>
         /// <returns>Location with id=<paramref name="id"/></returns>
-        internal static Location GetOrCreateLocation(string id, List<Location> locations)
+        public static Location GetOrCreateLocation(string id, List<Location> locations)
         {
             Location val;
             if (locations.Find(x => x.Id == id) is Location toLoc)
@@ -86,7 +86,7 @@ namespace E_VCSP.Parsing
         /// <param name="locations">List of currently known locations; Note that parsing may introduce new locations if the parsed objects contains any that were unknown before.</param>
         /// <returns>List of <typeparamref name="T"/></returns>
         /// <exception cref="ArgumentNullException"></exception>
-        internal List<T> Parse(string path, List<Location> locations)
+        public List<T> Parse(string path, List<Location> locations)
         {
             if (filename == null)
             {
@@ -119,7 +119,7 @@ namespace E_VCSP.Parsing
         /// <param name="attributeIndexMapping">Attribute name to line part index mapping.</param>
         /// <param name="locations">Active locations</param>
         /// <returns><typeparamref name="T"/> parsed from <paramref name="line"/>. May introduce new entries in <paramref name="locations"/> if they were not yet known.</returns>
-        internal abstract T ParseSingle(
+        public abstract T ParseSingle(
             int index,
             List<string> headers,
             List<string> line,

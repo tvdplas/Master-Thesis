@@ -3,9 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace E_VCSP.Parsing
 {
-    internal class ParserVehicleTypes : ParserBase<VehicleType>
+    public class ParserVehicleTypes : ParserBase<VehicleType>
     {
-        internal ParserVehicleTypes()
+        public ParserVehicleTypes()
         {
             filename = "vehicles.csv";
             attributeNameMapping = new()
@@ -19,7 +19,7 @@ namespace E_VCSP.Parsing
             };
         }
 
-        internal override VehicleType ParseSingle(
+        public override VehicleType ParseSingle(
             int index,
             List<string> headers,
             List<string> line,

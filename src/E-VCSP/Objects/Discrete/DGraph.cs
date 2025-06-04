@@ -3,12 +3,12 @@ using Microsoft.Msagl.Layout.Layered;
 
 namespace E_VCSP.Objects.Discrete
 {
-    internal class DGraph
+    public class DGraph
     {
-        internal DDepot DDepotStart;
-        internal DDepot DDepotEnd;
-        internal List<List<DTrip>> DTrips = new();
-        internal List<DDeadhead> DDeadheads = new();
+        public DDepot DDepotStart;
+        public DDepot DDepotEnd;
+        public List<List<DTrip>> DTrips = new();
+        public List<DDeadhead> DDeadheads = new();
 
         private double floorToDiscreteValue(double inp) => Math.Floor(inp / (100.0 / Config.DISCRETE_FACTOR)) * (100.0 / Config.DISCRETE_FACTOR);
 
@@ -17,7 +17,7 @@ namespace E_VCSP.Objects.Discrete
         /// </summary>
         /// <param name="instance">Instance to be transformed</param>
         /// <exception cref="InvalidDataException">Instance contains invalid data</exception>
-        internal DGraph(Instance instance)
+        public DGraph(Instance instance)
         {
             // TODO: beter kiezen
             VehicleType vh = instance.VehicleTypes[0];
@@ -211,7 +211,7 @@ namespace E_VCSP.Objects.Discrete
             Console.WriteLine("Transformation complete");
         }
 
-        internal Graph GenerateDiscreteGraph()
+        public Graph GenerateDiscreteGraph()
         {
             Console.WriteLine("Generating visual representation of graph");
             Graph graph = new();

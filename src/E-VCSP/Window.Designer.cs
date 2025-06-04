@@ -26,8 +26,14 @@ namespace E_VCSP
             graphViewer = new Microsoft.Msagl.GraphViewerGdi.GViewer();
             textBox1 = new TextBox();
             panel1 = new Panel();
+            button1 = new Button();
             solveButton = new Button();
             stopButton = new Button();
+            button2 = new Button();
+            button3 = new Button();
+            button4 = new Button();
+            button5 = new Button();
+            label1 = new Label();
             splitContainer1 = new SplitContainer();
             panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
@@ -113,6 +119,7 @@ namespace E_VCSP
             // 
             // panel1
             // 
+            panel1.Controls.Add(button1);
             panel1.Controls.Add(solveButton);
             panel1.Controls.Add(stopButton);
             panel1.Controls.Add(loadButton);
@@ -122,6 +129,16 @@ namespace E_VCSP
             panel1.Name = "panel1";
             panel1.Size = new Size(304, 558);
             panel1.TabIndex = 1;
+            // 
+            // button1
+            // 
+            button1.Location = new Point(166, 33);
+            button1.Name = "button1";
+            button1.Size = new Size(135, 23);
+            button1.TabIndex = 4;
+            button1.Text = "Toggle Graph View";
+            button1.UseVisualStyleBackColor = true;
+            button1.Click += toggleGraphView;
             // 
             // solveButton
             // 
@@ -144,10 +161,54 @@ namespace E_VCSP
             stopButton.UseVisualStyleBackColor = true;
             stopButton.Click += stopButtonClick;
             // 
+            // button2
+            // 
+            button2.Location = new Point(166, 33);
+            button2.Name = "button2";
+            button2.Size = new Size(135, 23);
+            button2.TabIndex = 4;
+            button2.Text = "Toggle Graph View";
+            button2.UseVisualStyleBackColor = true;
+            // 
+            // button3
+            // 
+            button3.Location = new Point(3, 33);
+            button3.Name = "button3";
+            button3.Size = new Size(75, 23);
+            button3.TabIndex = 2;
+            button3.Text = "Solve";
+            button3.UseVisualStyleBackColor = true;
+            // 
+            // button4
+            // 
+            button4.Enabled = false;
+            button4.Location = new Point(85, 33);
+            button4.Name = "button4";
+            button4.Size = new Size(75, 23);
+            button4.TabIndex = 3;
+            button4.Text = "Stop";
+            button4.UseVisualStyleBackColor = true;
+            // 
+            // button5
+            // 
+            button5.Location = new Point(4, 4);
+            button5.Name = "button5";
+            button5.Size = new Size(75, 23);
+            button5.TabIndex = 0;
+            button5.Text = "Load data";
+            button5.UseVisualStyleBackColor = true;
+            // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Location = new Point(83, 8);
+            label1.Name = "label1";
+            label1.Size = new Size(0, 15);
+            label1.TabIndex = 1;
+            // 
             // splitContainer1
             // 
             splitContainer1.Dock = DockStyle.Fill;
-            splitContainer1.IsSplitterFixed = true;
             splitContainer1.Location = new Point(304, 0);
             splitContainer1.Name = "splitContainer1";
             // 
@@ -194,5 +255,11 @@ namespace E_VCSP
         private Button solveButton;
         private Button stopButton;
         private CancellationTokenSource cancellationTokenSource;
+        private Button button1;
+        private Button button2;
+        private Button button3;
+        private Button button4;
+        private Button button5;
+        private Label label1;
     }
 }

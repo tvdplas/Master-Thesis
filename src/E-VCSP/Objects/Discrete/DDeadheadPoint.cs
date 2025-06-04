@@ -1,16 +1,16 @@
 ﻿namespace E_VCSP.Objects.Discrete
 {
-    internal abstract class DDeadheadPoint
+    public abstract class DDeadheadPoint
     {
-        internal string Id = "";
+        public string Id = "";
     }
-    internal class DTrip : DDeadheadPoint
+    public class DTrip : DDeadheadPoint
     {
-        internal required Trip Trip;
-        internal double StartingSoC;
+        public required Trip Trip;
+        public double StartingSoC;
     }
-    internal class DDepot : DDeadheadPoint
+    public class DDepot : DDeadheadPoint
     {
-        internal required Location Location;
+        public required Location Location;
     }
 }

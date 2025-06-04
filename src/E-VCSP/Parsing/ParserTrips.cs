@@ -3,9 +3,9 @@ using System.Globalization;
 
 namespace E_VCSP.Parsing
 {
-    internal class ParserTrips : ParserBase<Trip>
+    public class ParserTrips : ParserBase<Trip>
     {
-        internal ParserTrips()
+        public ParserTrips()
         {
             filename = "trips.csv";
             attributeNameMapping = new()
@@ -22,7 +22,7 @@ namespace E_VCSP.Parsing
             };
         }
 
-        internal override Trip ParseSingle(int index, List<string> headers, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
+        public override Trip ParseSingle(int index, List<string> headers, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
         {
             Location from = GetOrCreateLocation(line[attributeIndexMapping["FromId"]], locations);
             Location to = GetOrCreateLocation(line[attributeIndexMapping["ToId"]], locations);

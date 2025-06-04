@@ -2,23 +2,23 @@
 
 namespace E_VCSP.Objects
 {
-    internal class ChargeResult
+    public class ChargeResult
     {
-        internal double SoCGained;
-        internal double TimeUsed;
-        internal double Cost;
+        public double SoCGained;
+        public double TimeUsed;
+        public double Cost;
     }
 
     /// <summary>
     /// Describes a piecewise linear charging curve.
     /// </summary>
-    internal class ChargingCurve
+    public class ChargingCurve
     {
         private class CurvePiece
         {
-            internal int MinSoC;
-            internal int MaxSoC;
-            internal double Rate;
+            public int MinSoC;
+            public int MaxSoC;
+            public double Rate;
         }
 
         // Sorted list of curve pieces

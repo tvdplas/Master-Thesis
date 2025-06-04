@@ -1,18 +1,18 @@
 ﻿namespace E_VCSP.Objects
 {
-    internal class Trip
+    public class Trip
     {
-        internal required string Route;
-        internal required Location From;
-        internal required Location To;
-        internal int StartTime; // unit: seconds
-        internal int EndTime; // unit: seconds
-        internal int Duration; // unit: seconds
-        internal int Distance; // unit: meters
-        internal int MinimumLayover; // unit: seconds
-        internal required List<string> AllowedVehicleTypes;
-        internal required string Id;
-        internal required int Index = -1;
+        public required string Route;
+        public required Location From;
+        public required Location To;
+        public int StartTime; // unit: seconds
+        public int EndTime; // unit: seconds
+        public int Duration; // unit: seconds
+        public int Distance; // unit: meters
+        public int MinimumLayover; // unit: seconds
+        public required List<string> AllowedVehicleTypes;
+        public required string Id;
+        public required int Index = -1;
 
         public override string ToString()
         {

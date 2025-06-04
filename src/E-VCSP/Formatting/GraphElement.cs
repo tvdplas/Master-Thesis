@@ -6,11 +6,11 @@ using Color = Microsoft.Msagl.Drawing.Color;
 
 namespace E_VCSP.Formatting
 {
-    internal static class GraphElement
+    public static class GraphElement
     {
         static Random r = new();
 
-        internal static Node? ScheduleNode(int startTime, int endTime, string content, Color color)
+        public static Node? ScheduleNode(int startTime, int endTime, string content, Color color)
         {
             // No node displayed
             if ((endTime - startTime) / Config.MIN_NODE_TIME * Config.MIN_NODE_WIDTH < 2)
@@ -65,7 +65,7 @@ namespace E_VCSP.Formatting
                 };
             }
         }
-        internal static Node TripNode(DTrip t)
+        public static Node TripNode(DTrip t)
         {
             Node node = new Node(t.Id.ToString())
             {
@@ -91,7 +91,7 @@ namespace E_VCSP.Formatting
 
             return node;
         }
-        internal static Edge DeadheadEdge(string from, string to, double cost, Graph graph)
+        public static Edge DeadheadEdge(string from, string to, double cost, Graph graph)
         {
             Edge edge = new Edge(graph.FindNode(from), graph.FindNode(to), ConnectionToGraph.Connected);
             return edge;

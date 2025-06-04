@@ -4,7 +4,7 @@ using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    internal class VSPLSSingle : VehicleShortestPath
+    public class VSPLSSingle : VehicleShortestPath
     {
         private List<double> reducedCostsTrips = [];
 
@@ -381,7 +381,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return Math.Exp(-deltaScore / T) > random.NextDouble();
         }
 
-        internal override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
+        public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
         {
             Reset();
 

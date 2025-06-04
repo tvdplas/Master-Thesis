@@ -2,19 +2,19 @@
 
 namespace E_VCSP.Objects
 {
-    internal class Instance
+    public class Instance
     {
-        internal List<Location> ChargingLocations;
-        internal List<Location> Locations;
-        internal List<Trip> Trips;
-        internal List<VehicleType> VehicleTypes;
+        public List<Location> ChargingLocations;
+        public List<Location> Locations;
+        public List<Trip> Trips;
+        public List<VehicleType> VehicleTypes;
 
-        internal int DepotStartIndex = -1;
-        internal int DepotEndIndex = -1;
+        public int DepotStartIndex = -1;
+        public int DepotEndIndex = -1;
 
         public List<DeadheadTemplate> DeadheadTemplates;
 
-        internal Instance(string path)
+        public Instance(string path)
         {
             // Load initial set of locations with chargers; may not be complete.
             Locations = new ParserLocations().Parse(path, []) ?? [];

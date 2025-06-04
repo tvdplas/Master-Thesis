@@ -3,7 +3,7 @@ using E_VCSP.Objects.Discrete;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    internal enum LSOpResult
+    public enum LSOpResult
     {
         Improvement = 0,
         Accept = 1,
@@ -12,7 +12,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         Count,
     }
 
-    internal enum LLNodeType
+    public enum LLNodeType
     {
         Depot,
         Deadhead,
@@ -20,16 +20,16 @@ namespace E_VCSP.Solver.ColumnGenerators
         Idle,
     }
 
-    internal class LLNode
+    public class LLNode
     {
-        internal required LLNodeType NodeType; // Type of vehicle element in node
-        internal required VehicleElement VehicleElement;
-        internal LLNode? Prev;
-        internal LLNode? Next;
-        internal double SoCAtStart;
-        internal double SoCAtEnd;
-        internal int DebugIndex;
-        internal static int DebugIndexCounter;
+        public required LLNodeType NodeType; // Type of vehicle element in node
+        public required VehicleElement VehicleElement;
+        public LLNode? Prev;
+        public LLNode? Next;
+        public double SoCAtStart;
+        public double SoCAtEnd;
+        public int DebugIndex;
+        public static int DebugIndexCounter;
 
         public LLNode()
         {
@@ -41,7 +41,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return $"{DebugIndex}: {VehicleElement}";
         }
 
-        internal int TailCount()
+        public int TailCount()
         {
             LLNode? curr = this;
             int c = 0;
@@ -53,7 +53,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return c;
         }
 
-        internal VehicleTask ToVehicleTask(VehicleType vehicleType)
+        public VehicleTask ToVehicleTask(VehicleType vehicleType)
         {
             this.CalcSoCValues(vehicleType, false);
             List<VehicleElement> elements = [];
@@ -100,7 +100,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// Determine the problems in this and all following nodes in the task.
         /// </summary>
         /// <returns>Array of peaks &gt; maxSoC and valleys &lt; minSoC. Each peak / valley determined by maximum error at a charging location.</returns>
-        internal (double chargingCost, List<double> peaks, List<double> valleys) SoCError(VehicleType vehicleType)
+        public (double chargingCost, List<double> peaks, List<double> valleys) SoCError(VehicleType vehicleType)
         {
             double chargingCost = CalcSoCValues(vehicleType).chargingCosts;
             List<double> peaks = [], valleys = [];
@@ -145,7 +145,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// Set the SoC values of the rest of the trip. Uses <see cref="SoCAtEnd"/> of <c>this</c> as base for propegation. 
         /// </summary>
         /// <returns>Charge costs over the rest of the trip</returns>
-        internal (bool feasible, double chargingCosts) CalcSoCValues(VehicleType vehicleType, bool expand = true)
+        public (bool feasible, double chargingCosts) CalcSoCValues(VehicleType vehicleType, bool expand = true)
         {
             LLNode? curr = this;
 
@@ -207,7 +207,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// Cost of tail
         /// </summary>
         /// <returns>Overall costs of tail</returns>
-        internal double CostOfTail()
+        public double CostOfTail()
         {
             LLNode? curr = this.Next;
 
@@ -227,7 +227,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// </summary>
         /// <param name="count">Amount of nodes to remove</param>
         /// <returns>List of removed nodes</returns>
-        internal List<LLNode> RemoveAfter(int count)
+        public List<LLNode> RemoveAfter(int count)
         {
             List<LLNode> removedNodes = new(count);
             LLNode? curr = Next;
@@ -242,7 +242,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return removedNodes;
         }
 
-        internal LLNode AddAfter(LLNode node)
+        public LLNode AddAfter(LLNode node)
         {
             ArgumentNullException.ThrowIfNull(node);
 
@@ -262,7 +262,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return node;
         }
 
-        internal LLNode AddAfter(LLNodeType type, VehicleElement ve)
+        public LLNode AddAfter(LLNodeType type, VehicleElement ve)
         {
             return AddAfter(new LLNode()
             {

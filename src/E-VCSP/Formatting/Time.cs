@@ -1,8 +1,8 @@
 ﻿namespace E_VCSP.Formatting
 {
-    internal static class Time
+    public static class Time
     {
-        internal static string HHMMSS(int seconds)
+        public static string HHMMSS(int seconds)
         {
             string res = "";
             res += (seconds / 3600).ToString("00");

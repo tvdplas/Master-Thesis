@@ -2,7 +2,7 @@
 
 namespace E_VCSP.Formatting
 {
-    internal class ConsoleIntercept : TextWriter
+    public class ConsoleIntercept : TextWriter
     {
         private readonly TextBox _textBox;
         private bool _isNewLine = true; // Track if we are starting a new line

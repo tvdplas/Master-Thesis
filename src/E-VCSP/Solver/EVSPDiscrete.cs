@@ -7,10 +7,10 @@ using Color = Microsoft.Msagl.Drawing.Color;
 
 namespace E_VCSP.Solver
 {
-    internal class EVSPDiscrete : Solver
+    public class EVSPDiscrete : Solver
     {
 
-        internal DGraph DGraph;
+        public DGraph DGraph;
 
         private Dictionary<string, DDeadhead> deadheadVarMapping = new();
         private GRBModel? model;
@@ -20,7 +20,7 @@ namespace E_VCSP.Solver
             DGraph = new(instance);
         }
 
-        internal override bool Solve(CancellationToken cancellationToken)
+        public override bool Solve(CancellationToken cancellationToken)
         {
             GRBEnv env = new();
             env.LogToConsole = 1;
@@ -131,7 +131,7 @@ namespace E_VCSP.Solver
             return true;
         }
 
-        internal override Graph GenerateSolutionGraph()
+        public override Graph GenerateSolutionGraph(bool blockView)
         {
             if (model == null) throw new InvalidDataException("Cannot generate solution graph without model instance");
 

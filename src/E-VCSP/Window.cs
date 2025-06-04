@@ -15,6 +15,10 @@ namespace E_VCSP
 
         Instance? instance;
         Solver.Solver? solver;
+        bool working = false;
+        bool blockView = false;
+        int display = 0; // 0 = both, 1 = graph, 2 = console
+
 
         public MainView()
         {
@@ -154,6 +158,7 @@ namespace E_VCSP
             reload(); // Ensure instance and solver are ready
             if (solver == null) return;
 
+            working = true;
             solveButton.Enabled = false;
             stopButton.Enabled = true;
             cancellationTokenSource = new CancellationTokenSource();
@@ -162,15 +167,14 @@ namespace E_VCSP
             bool success = false;
             try
             {
-                // Run the solver on a background thread
-                success = await Task.Run(() => solver.Solve(token), token); // <<< Pass token
+                success = await Task.Run(() => solver.Solve(token), token);
 
                 if (success)
                 {
                     // Update UI thread safely
                     graphViewer.Invoke((System.Windows.Forms.MethodInvoker)delegate
                     {
-                        graphViewer.Graph = solver.GenerateSolutionGraph();
+                        graphViewer.Graph = solver.GenerateSolutionGraph(blockView);
                     });
                     Console.WriteLine("Solver finished successfully.");
                 }
@@ -190,7 +194,7 @@ namespace E_VCSP
             }
             finally
             {
-                // Ensure UI is updated even if errors occur
+                working = false;
                 if (this.IsHandleCreated) // Check if the form handle still exists
                 {
                     this.Invoke((MethodInvoker)delegate
@@ -232,6 +236,22 @@ namespace E_VCSP
                 configDump.AppendLine($"{field.Name}: {field.GetValue(null)}");
             File.WriteAllText(Config.RUN_LOG_FOLDER + "config.txt", configDump.ToString());
             Console.WriteLine($"Instance reloaded. Current config state dumped to {Config.RUN_LOG_FOLDER + "config.txt"}");
+        }
+
+        private void toggleGraphView(object sender, EventArgs e)
+        {
+            if (solver == null || working) return;
+            blockView = !blockView;
+            graphViewer.Graph = solver.GenerateSolutionGraph(blockView);
+        }
+
+        private void toggleDisplay(object sender, EventArgs e)
+        {
+            display = (display + 1) % 3;
+            if (display == 0)
+            {
+
+            }
         }
     }
 }

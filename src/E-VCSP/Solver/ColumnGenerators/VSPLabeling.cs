@@ -4,7 +4,7 @@ using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    internal record SPLabel(
+    public record SPLabel(
         int prevIndex, // Previously visited node index
         int prevId, // Label preceding this label 
         int prevChargeAction, // Charge action done at this node
@@ -13,7 +13,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         int labelId
     );
 
-    internal class Front
+    public class Front
     {
         private SortedList<double, SPLabel> front = [];
 
@@ -22,7 +22,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// </summary>
         /// <param name="label">Label to be inserted</param>
         /// <returns>The difference in amount of items currently in the front; min = -#items in front + 1, max = 1</returns>
-        internal int Insert(SPLabel label)
+        public int Insert(SPLabel label)
         {
             int l = 0, r = front.Count;
             // find first item that is larger than or equal to label currSoC
@@ -75,11 +75,11 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
             return diff;
         }
-        internal int Count => front.Count;
+        public int Count => front.Count;
 
-        internal void Clear() => front.Clear();
+        public void Clear() => front.Clear();
 
-        internal SPLabel Pop()
+        public SPLabel Pop()
         {
             int lastIndex = front.Count - 1;
             var label = front.Values[lastIndex];
@@ -88,13 +88,13 @@ namespace E_VCSP.Solver.ColumnGenerators
         }
     }
 
-    internal class VSPLabeling : VehicleShortestPath
+    public class VSPLabeling : VehicleShortestPath
     {
         private List<List<SPLabel>> allLabels = [];
         private List<Front> activeLabels = [];
         private List<double> reducedCosts = [];
 
-        internal VSPLabeling(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<Arc?>> adjFull, List<List<Arc>> adj) : base(model, instance, vehicleType, nodes, adjFull, adj) { }
+        public VSPLabeling(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<Arc?>> adjFull, List<List<Arc>> adj) : base(model, instance, vehicleType, nodes, adjFull, adj) { }
 
         private int addLabel(SPLabel spl, int index)
         {
@@ -121,7 +121,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
         }
 
-        internal override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
+        public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
         {
             reset();
 

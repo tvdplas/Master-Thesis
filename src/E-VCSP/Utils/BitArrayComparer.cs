@@ -2,7 +2,7 @@
 
 namespace E_VCSP.Utils
 {
-    internal class BitArrayComparer : IEqualityComparer<BitArray>
+    public class BitArrayComparer : IEqualityComparer<BitArray>
     {
         public bool Equals(BitArray? x, BitArray? y)
         {

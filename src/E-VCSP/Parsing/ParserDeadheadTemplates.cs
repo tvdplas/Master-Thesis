@@ -3,9 +3,9 @@ using System.Globalization;
 
 namespace E_VCSP.Parsing
 {
-    internal class ParserDeadheadTemplates : ParserBase<DeadheadTemplate>
+    public class ParserDeadheadTemplates : ParserBase<DeadheadTemplate>
     {
-        internal ParserDeadheadTemplates()
+        public ParserDeadheadTemplates()
         {
             filename = "deadheads.csv";
             attributeNameMapping = new()
@@ -17,7 +17,7 @@ namespace E_VCSP.Parsing
             };
         }
 
-        internal override DeadheadTemplate ParseSingle(int index, List<string> headers, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
+        public override DeadheadTemplate ParseSingle(int index, List<string> headers, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
         {
             Location from = GetOrCreateLocation(line[attributeIndexMapping["FromId"]], locations);
             Location to = GetOrCreateLocation(line[attributeIndexMapping["ToId"]], locations);

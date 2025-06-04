@@ -3,13 +3,13 @@
     /// <summary>
     /// Non-time bound deadhead.
     /// </summary>
-    internal class DeadheadTemplate
+    public class DeadheadTemplate
     {
-        internal required Location From;
-        internal required Location To;
-        internal int Duration;
-        internal int Distance;
-        internal required string Id;
+        public required Location From;
+        public required Location To;
+        public int Duration;
+        public int Distance;
+        public required string Id;
 
         public override string ToString()
         {

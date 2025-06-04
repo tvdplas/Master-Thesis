@@ -4,21 +4,21 @@ using System.Collections;
 namespace E_VCSP.Objects.Discrete
 {
 
-    internal class VehicleElement
+    public class VehicleElement
     {
-        internal double DrivingCost = double.MinValue;
-        internal double SoCDiff = double.MinValue;
-        internal int StartTime = int.MinValue;
-        internal int EndTime = int.MinValue;
+        public double DrivingCost = double.MinValue;
+        public double SoCDiff = double.MinValue;
+        public int StartTime = int.MinValue;
+        public int EndTime = int.MinValue;
 
         // Only filled in once element is part of finalized task.
-        internal double? StartSoCInTask;
-        internal double? EndSoCInTask;
+        public double? StartSoCInTask;
+        public double? EndSoCInTask;
     }
 
-    internal class VETrip : VehicleElement
+    public class VETrip : VehicleElement
     {
-        internal Trip Trip;
+        public Trip Trip;
 
         public VETrip(Trip trip, VehicleType vt)
         {
@@ -34,16 +34,16 @@ namespace E_VCSP.Objects.Discrete
             return $"VE Trip {Trip.Id}";
         }
     }
-    internal class VEDeadhead : VehicleElement
+    public class VEDeadhead : VehicleElement
     {
-        internal Deadhead Deadhead;
+        public Deadhead Deadhead;
 
-        internal int SelectedAction = -1;
-        internal int ChargeTime = 0;
-        internal double SoCGained = 0;
-        internal double ChargeCost = 0;
+        public int SelectedAction = -1;
+        public int ChargeTime = 0;
+        public double SoCGained = 0;
+        public double ChargeCost = 0;
 
-        internal VEDeadhead(Deadhead dh, int startTime, VehicleType vt)
+        public VEDeadhead(Deadhead dh, int startTime, VehicleType vt)
         {
             Deadhead = dh;
             StartTime = startTime;
@@ -52,7 +52,7 @@ namespace E_VCSP.Objects.Discrete
             SoCDiff = -dh.DeadheadTemplate.Distance * vt.DriveUsage;
         }
 
-        internal VEDeadhead(Deadhead dh, int startTime, VehicleType vt, int selectedAction, double startSoC)
+        public VEDeadhead(Deadhead dh, int startTime, VehicleType vt, int selectedAction, double startSoC)
         {
             Deadhead = dh;
             StartTime = startTime;
@@ -75,9 +75,9 @@ namespace E_VCSP.Objects.Discrete
             return $"VE DH {Deadhead.DeadheadTemplate.Id}";
         }
     }
-    internal class VEIdle : VehicleElement
+    public class VEIdle : VehicleElement
     {
-        internal Location Location;
+        public Location Location;
 
         public VEIdle(Location location, int startTime, int endTime, VehicleType vt)
         {
@@ -96,9 +96,9 @@ namespace E_VCSP.Objects.Discrete
             return $"VE Idle {Location.Id}";
         }
     }
-    internal class VEDepot : VehicleElement
+    public class VEDepot : VehicleElement
     {
-        internal Location Location;
+        public Location Location;
 
         public VEDepot(Location location, int startTime, int endTime)
         {
@@ -115,13 +115,13 @@ namespace E_VCSP.Objects.Discrete
         }
     }
 
-    internal class VehicleTask
+    public class VehicleTask
     {
-        internal required VehicleType vehicleType;
-        internal List<int> Covers;
-        internal List<VehicleElement> Elements;
-        internal int Index = -1;
-        internal double Cost
+        public required VehicleType vehicleType;
+        public List<int> Covers;
+        public List<VehicleElement> Elements;
+        public int Index = -1;
+        public double Cost
         {
             get
             {
@@ -142,14 +142,14 @@ namespace E_VCSP.Objects.Discrete
             }
         }
 
-        internal BitArray ToBitArray(int tripCount)
+        public BitArray ToBitArray(int tripCount)
         {
             BitArray ba = new(tripCount);
             for (int i = 0; i < Covers.Count; i++) ba[Covers[i]] = true;
             return ba;
         }
 
-        internal VehicleTask(List<VehicleElement> elements)
+        public VehicleTask(List<VehicleElement> elements)
         {
             Elements = elements;
             Covers = [.. elements.Where(e => e is VETrip).Select(e => ((VETrip)e).Trip.Index)];

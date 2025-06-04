@@ -1,14 +1,14 @@
 ﻿namespace E_VCSP.Objects.Discrete
 {
-    internal class DDeadhead
+    public class DDeadhead
     {
-        internal required DDeadheadPoint From;
-        internal required DDeadheadPoint To;
-        internal List<int> DrivingTimes = new();
-        internal int IdleTime;
-        internal int ChargingTime;
-        internal double ChargeGained;
-        internal double ChargeUsed;
-        internal double Costs;
+        public required DDeadheadPoint From;
+        public required DDeadheadPoint To;
+        public List<int> DrivingTimes = new();
+        public int IdleTime;
+        public int ChargingTime;
+        public double ChargeGained;
+        public double ChargeUsed;
+        public double Costs;
     }
 }

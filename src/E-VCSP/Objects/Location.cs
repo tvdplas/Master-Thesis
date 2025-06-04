@@ -1,23 +1,23 @@
 ﻿namespace E_VCSP.Objects
 {
-    internal class Location
+    public class Location
     {
-        internal required string Id;
-        internal int Index = -1;
+        public required string Id;
+        public int Index = -1;
 
-        internal double ChargeTotalPower = 0; // KWh
-        internal int ChargeSpots = 0;
-        internal List<ChargingCurve> ChargingCurves = new(); // indexed by vehicle id
+        public double ChargeTotalPower = 0; // KWh
+        public int ChargeSpots = 0;
+        public List<ChargingCurve> ChargingCurves = new(); // indexed by vehicle id
 
-        internal int SignOnTime = 0;
-        internal int SignOffTime = 0;
-        internal bool BreakAllowed = false;
-        internal bool HandoverAllowed = false;
-        internal int BrutoNetto = 0; // Difference in time between crew member downtime and actual counted break time
+        public int SignOnTime = 0;
+        public int SignOffTime = 0;
+        public bool BreakAllowed = false;
+        public bool HandoverAllowed = false;
+        public int BrutoNetto = 0; // Difference in time between crew member downtime and actual counted break time
 
-        internal bool IsDepot = false;
+        public bool IsDepot = false;
 
-        internal double ChargePowerPerSpot
+        public double ChargePowerPerSpot
         {
             get
             {
@@ -25,7 +25,7 @@
             }
         }
 
-        internal bool CanCharge
+        public bool CanCharge
         {
             get
             {
