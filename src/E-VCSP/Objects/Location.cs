@@ -17,6 +17,8 @@
 
         public bool IsDepot = false;
 
+        public int MinHandoverTime => Math.Max(SignOffTime, SignOnTime);
+
         public double ChargePowerPerSpot
         {
             get

@@ -1,5 +1,4 @@
 ﻿using E_VCSP.Objects;
-using E_VCSP.Objects.Discrete;
 using Gurobi;
 
 namespace E_VCSP.Solver

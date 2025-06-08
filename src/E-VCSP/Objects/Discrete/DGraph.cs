@@ -31,7 +31,7 @@ namespace E_VCSP.Objects.Discrete
                     double SoC = Math.Floor(j * 100.0 / Config.DISCRETE_FACTOR);
 
                     // Dont even add nodes whose charge is infeasible
-                    if (SoC < vh.MinCharge) continue;
+                    if (SoC < vh.MinSoC) continue;
 
                     DTrips[i].Add(new DTrip()
                     {
@@ -65,7 +65,7 @@ namespace E_VCSP.Objects.Discrete
                         // Check if charge is compatible between the two trips
                         double SoC = dt1.StartingSoC - SoCusedInDT1;
                         SoC -= dht_direct.Distance * vh.DriveUsage;
-                        if (SoC > vh.MinCharge)
+                        if (SoC > vh.MinSoC)
                         {
                             // May be compatible; Note that SoC < 0 may still be possible via indirect trip, therefore no early termination. 
                             SoC = floorToDiscreteValue(SoC);
@@ -106,10 +106,10 @@ namespace E_VCSP.Objects.Discrete
 
                         // Deadhead feasible; see how much charge can be gained.
                         double SoCAtCharge = dt1.StartingSoC - SoCusedInDT1 - (dht_toCharge.Distance * vh.DriveUsage);
-                        if (SoCAtCharge < vh.MinCharge) continue;
+                        if (SoCAtCharge < vh.MinSoC) continue;
 
                         ChargingCurve cc = chargeLoc.ChargingCurves[vh.Index];
-                        ChargeResult cr = cc.MaxChargeGained(SoCAtCharge, idleTime, false);
+                        ChargeResult cr = cc.MaxChargeGained(SoCAtCharge, idleTime);
 
                         // Now, check if the charge is actually compatible; In order to do so, we need to check if we can use some partial charge such that our target SOC is reached.
                         double SoCDiff = dt2.StartingSoC - (SoCAtCharge - (dht_fromCharge.Distance * vh.DriveUsage));
@@ -117,7 +117,7 @@ namespace E_VCSP.Objects.Discrete
                         if (alpha >= 0 && alpha <= 1)
                         {
                             // A feasible charge schedule was found; we now rerun the charge sequence in order to get costs
-                            ChargeResult crUsed = cc.ChargeCosts(SoCAtCharge, SoCAtCharge + SoCDiff, false);
+                            ChargeResult crUsed = cc.ChargeCosts(SoCAtCharge, SoCAtCharge + SoCDiff);
 
                             if (crUsed.TimeUsed < Config.MIN_CHARGE_TIME) continue;
 
@@ -164,7 +164,7 @@ namespace E_VCSP.Objects.Discrete
                 DeadheadTemplate? dh = instance.DeadheadTemplates.Find(dh => dh.From == depot && dh.To == dt.Trip.From);
                 if (dh == null) throw new InvalidDataException("Can't go from the deadhead to a trip; This might be wrong");
 
-                double SoCAtTrip = vh.StartCharge - (dh.Distance * vh.DriveUsage);
+                double SoCAtTrip = vh.StartSoC - (dh.Distance * vh.DriveUsage);
                 double discretizedSoC = floorToDiscreteValue(SoCAtTrip);
                 if (discretizedSoC == dt.StartingSoC)
                 {
@@ -176,7 +176,7 @@ namespace E_VCSP.Objects.Discrete
                         To = dt,
                         Costs = drivingCosts + pullOutCosts,
                         ChargeGained = 0,
-                        ChargeUsed = vh.StartCharge - SoCAtTrip,
+                        ChargeUsed = vh.StartSoC - SoCAtTrip,
                         ChargingTime = 0,
                         DrivingTimes = [dh.Duration],
                         IdleTime = 0,

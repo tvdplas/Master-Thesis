@@ -45,6 +45,7 @@
         public static double M_COST = 0.00001; // TODO: actual value
         public static double PULLOUT_COST = 10; // Costs to deploy a vehicle at the beginning of the day.
         public static double IDLE_COST = 0; // Cost per unit of time for being idle.
+        public static int MAX_DRIVE_TIME = 60 * 60 * 4; // conitnous driving time
         public static int MAX_VEHICLES = 6; // Maximum number of vehicles that can be used in the solution.
         public static int MAX_VEHICLES_OVER_COST = 1000; // Cost per vehicle of going over.
         public static int DISCRETE_FACTOR = 5;
@@ -70,16 +71,15 @@
         public static double VSP_LS_S_ENDING_T = 0.01;
         public static double VSP_LS_S_COOLING_RATE = 0.95;
         public static double VSP_LS_S_ITERATIONS = 10_000;
-        public static double VSP_LS_S_OVERCHARGE_PENALTY_FIX = 5;
-        public static double VSP_LS_S_OVERCHARGE_PENALTY_VAR = 0.5;
-        public static double VSP_LS_S_UNDERCHARGE_PENALTY_FIX = 5;
-        public static double VSP_LS_S_UNDERCHARGE_PENALTY_VAR = 0.5;
-        public static double VSP_LS_S_ADD_TRIP = 15;
-        public static double VSP_LS_S_REM_TRIP = 1;
-        public static double VSP_LS_S_CHANGE_CHARGE = 5;
+        public static double VSP_LS_S_ADD_TRIP = 20;
+        public static double VSP_LS_S_REM_TRIP = 2;
+        public static double VSP_LS_S_ADD_CHARGE = 10;
+        public static double VSP_LS_S_REMOVE_CHARGE = 1;
+        public static double VSP_LS_S_ADD_HNDVR = 5;
+        public static double VSP_LS_S_REMOVE_HNDVR = 0.5;
 
         public static Header VSP_LS_GLOBAL = new();
-        public static double VSP_LS_GLOBAL_WEIGHT = 1;
+        public static double VSP_LS_GLOBAL_WEIGHT = 0;
         public static double VSP_LS_G_STARTING_T = 50;
         public static double VSP_LS_G_ENDING_T = 0.01;
         public static double VSP_LS_G_COOLING_RATE = 0.98;

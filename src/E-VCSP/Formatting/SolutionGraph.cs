@@ -1,6 +1,5 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.Discrete;
-using E_VCSP.Solver;
 using Microsoft.Msagl.Drawing;
 using Color = Microsoft.Msagl.Drawing.Color;
 
@@ -30,71 +29,39 @@ namespace E_VCSP.Formatting
 
                 foreach (var element in task.Elements)
                 {
-                    string SoCAtStart = element.StartSoCInTask != null ? ((int)element.StartSoCInTask).ToString() : "";
-                    string SoCAtEnd = element.EndSoCInTask != null ? ((int)element.EndSoCInTask).ToString() : "";
+                    string SoCAtStart = ((int)element.StartSoCInTask).ToString();
+                    string SoCAtEnd = ((int)element.EndSoCInTask).ToString();
 
-                    if (element is VEDepot) continue;
-                    if (element is VETrip dvet)
-                    {
-                        Trip trip = dvet.Trip;
-                        var node = Formatting.GraphElement.ScheduleNode(
-                            element.StartTime,
-                            element.EndTime,
-                            $"{trip.From}@{SoCAtStart}% -> {trip.To}@{SoCAtEnd}% ({trip.Route})",
-                            Color.LightBlue);
-                        add(node);
-                    }
-                    if (element is VEIdle idle)
-                    {
-                        var node = Formatting.GraphElement.ScheduleNode(
-                            element.StartTime,
-                            element.EndTime,
-                            $"idle {idle.Location.Id}@{SoCAtStart}% -> {SoCAtEnd}%",
-                            Color.White);
-                        add(node);
-                    }
-                    if (element is VEDeadhead dved)
-                    {
-                        Deadhead ddh = dved.Deadhead;
+                    Color color = Color.Red;
+                    string text = "Forgot a case";
 
-                        if (dved.SelectedAction == -1)
-                        {
-                            var node = Formatting.GraphElement.ScheduleNode(
-                                element.StartTime,
-                                element.EndTime,
-                                $"{ddh.DeadheadTemplate.From}@{SoCAtStart}% -> {ddh.DeadheadTemplate.To}@{SoCAtEnd}%",
-                                Color.LightGreen);
-                            add(node);
-                        }
-                        else
-                        {
-                            ChargingAction ca = ddh.ChargingActions[dved.SelectedAction];
-                            int currTime = element.StartTime;
-                            double currSoC = element.StartSoCInTask ?? -10000000;
-                            var toCharger = Formatting.GraphElement.ScheduleNode(
-                                currTime,
-                                currTime + ca.DrivingTimeTo,
-                                $"{ddh.DeadheadTemplate.From}@{(int)currSoC} -> {ca.ChargeLocation}@{(int)(currSoC - ca.ChargeUsedTo)}",
-                                Color.GreenYellow);
-                            currTime += ca.DrivingTimeTo;
-                            currSoC -= ca.ChargeUsedTo;
-                            var charge = Formatting.GraphElement.ScheduleNode(
-                                currTime,
-                                currTime + dved.ChargeTime,
-                                $"{ca.ChargeLocation} {(int)currSoC}% -> {(int)(currSoC + dved.SoCGained)}%",
-                                Color.Yellow);
-                            currTime += dved.ChargeTime;
-                            currSoC += dved.SoCGained;
-                            var fromCharger = Formatting.GraphElement.ScheduleNode(
-                                currTime,
-                                currTime + ca.DrivingTimeFrom,
-                                $"{ca.ChargeLocation}@{(int)currSoC} -> {ddh.DeadheadTemplate.To}@{(int)(currSoC - ca.ChargeUsedFrom)}",
-                                Color.GreenYellow);
-                            add(toCharger);
-                            add(charge);
-                            add(fromCharger);
-                        }
+                    if (element is VEIdle vei)
+                    {
+                        text = $"idle {vei.StartLocation}@{SoCAtStart}% -> {SoCAtEnd}%";
+                        color = Color.White;
                     }
+                    else if (element is VETrip vet)
+                    {
+                        color = Color.LightBlue;
+                        text = $"{vet.Trip.From}@{SoCAtStart}% -> {vet.Trip.To}@{SoCAtEnd}% ({vet.Trip.Route})";
+                    }
+                    else if (element is VEDeadhead ved)
+                    {
+                        text = $"{ved.DeadheadTemplate.From}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
+                        color = Color.LightGreen;
+                    }
+                    else if (element is VECharge vec)
+                    {
+                        text = $"{vec.StartLocation} {SoCAtStart}% -> {SoCAtEnd}%";
+                        color = Color.Yellow;
+                    }
+                    Node? node = GraphElement.ScheduleNode(
+                        element.StartTime,
+                        element.EndTime,
+                        text,
+                        color
+                    );
+                    add(node);
                 }
                 taskNodes.Add((startTime, endTime, pathNodes));
             }
@@ -174,7 +141,7 @@ namespace E_VCSP.Formatting
                         block.StartTime,
                         block.EndTime,
                         $"{block.From} -> {block.To}",
-                        Color.LightBlue
+                        block.EndTime - block.StartTime > Config.MAX_DRIVE_TIME ? Color.Red : Color.LightBlue
                     );
                     add(node);
 

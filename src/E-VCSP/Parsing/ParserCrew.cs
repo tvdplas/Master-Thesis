@@ -29,7 +29,7 @@ namespace E_VCSP.Parsing
         )
         {
             Location loc = GetOrCreateLocation(line[attributeIndexMapping["Id"]], locations);
-            loc.HandoverAllowed = line[attributeIndexMapping["HandoverAllowed"]] == "1" || true;
+            loc.HandoverAllowed = line[attributeIndexMapping["HandoverAllowed"]] == "1";
             loc.BreakAllowed = line[attributeIndexMapping["BreakAllowed"]] == "1";
             loc.BrutoNetto = ParseTime(line[attributeIndexMapping["BrutoNetto"]]);
             loc.SignOnTime = ParseTime(line[attributeIndexMapping["SignOnTime"]]);

@@ -71,9 +71,9 @@ namespace E_VCSP.Objects
         /// <param name="expand">Allow expansion</param>
         /// <returns>Piece if one exists</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        CurvePiece? getPiece(double currSoC, bool expand)
+        CurvePiece? getPiece(double currSoC)
         {
-            CurvePiece? p = expand ? Pieces[^1] : null;
+            CurvePiece? p = null;
             for (int i = 0; i < Pieces.Count; i++)
             {
                 if (currSoC <= Pieces[i].MaxSoC)
@@ -92,41 +92,26 @@ namespace E_VCSP.Objects
         /// </summary>
         /// <param name="startSoC">SoC at start of charging operation</param>
         /// <param name="time">Time allowed for use in the operation</param>
-        /// <param name="expand">Expand charging curve to allow for &lt; 0 and &gt; 100% by taking closes linepiece.</param>
         /// <returns>Tuple with maxSoCGained, timetaken and total cost if charging actions is performed fully</returns>
-        public ChargeResult MaxChargeGained(double startSoC, int time, bool expand)
+        public ChargeResult MaxChargeGained(double startSoC, int time)
         {
 
             int timeRemaining = time;
             double currSoC = startSoC;
 
-            if (!expand && startSoC < 0) throw new InvalidDataException("Cannot start charging with SoC < 0. Did you forget to enable expansion?");
-
-            while (timeRemaining > 0 && (currSoC < (expand ? DUMMY_MAX_SOC : 100)))
+            while (timeRemaining > 0 && currSoC < 100)
             {
                 // Get the part of the charging curve which is currently applicable.
-                CurvePiece? p = getPiece(currSoC, expand);
-                if (p == null) throw new InvalidDataException("Charging curve is not defined for the current SoC");
+                CurvePiece p = getPiece(currSoC)!;
 
                 // Determine amount of time to get from current SoC to the piece max SoC
-                double maxSoCInPiece = expand && p.MaxSoC == 100 ? DUMMY_MAX_SOC : p.MaxSoC;
+                double maxSoCInPiece = p.MaxSoC;
                 int timeToMax = (int)Math.Ceiling(Math.Max(maxSoCInPiece - currSoC, 0) / (1.0 * p.Rate));
 
                 int usableTime = Math.Min(timeRemaining, timeToMax);
-
-                if (usableTime < 0)
-                {
-                    Console.WriteLine("hier gaat iets mis");
-                }
-
                 double gainableSoC = usableTime * p.Rate;
-                currSoC += Math.Min(gainableSoC, DUMMY_MAX_SOC); // numeric stability
+                currSoC += gainableSoC;
                 timeRemaining -= usableTime;
-            }
-
-            if (currSoC < startSoC)
-            {
-                Console.WriteLine("Charging is not charging");
             }
 
             return new ChargeResult()
@@ -143,21 +128,18 @@ namespace E_VCSP.Objects
         /// <param name="startSoC">SoC that vehicle starts at</param>
         /// <param name="targetSoC">Target SoC</param>
         /// <returns>Charge result representing the requested charge</returns>
-        public ChargeResult ChargeCosts(double startSoC, double targetSoC, bool expand)
+        public ChargeResult ChargeCosts(double startSoC, double targetSoC)
         {
             double currSoC = startSoC;
             int currTime = 0;
 
-            if (!expand && (startSoC < 0 || startSoC > 100 || targetSoC < 0 || targetSoC > 100))
-                throw new InvalidDataException("SoC out of bounds. Did you forget to enable expansion?");
-
             while (currSoC < targetSoC)
             {
                 // First piece that fits; default to last (slowest)
-                CurvePiece? p = getPiece(currSoC, expand);
+                CurvePiece? p = getPiece(currSoC);
                 if (p == null) throw new InvalidDataException("No piece found");
 
-                double maxSoCInPiece = expand && currSoC >= 100 ? DUMMY_MAX_SOC : p.MaxSoC;
+                double maxSoCInPiece = p.MaxSoC;
 
                 // Charge until end of piece or until desired SoC is reached
                 double SoCChargedInPiece = Math.Min(targetSoC - currSoC, maxSoCInPiece - currSoC);

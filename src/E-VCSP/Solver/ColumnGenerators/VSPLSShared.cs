@@ -1,5 +1,4 @@
 ﻿using E_VCSP.Objects;
-using E_VCSP.Objects.Discrete;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
@@ -12,216 +11,95 @@ namespace E_VCSP.Solver.ColumnGenerators
         Count,
     }
 
-    public enum LLNodeType
-    {
-        Depot,
-        Deadhead,
-        Trip,
-        Idle,
-    }
-
     public class LLNode
     {
-        public required LLNodeType NodeType; // Type of vehicle element in node
-        public required VehicleElement VehicleElement;
+        #region debug
+        public int DEBUG_INDEX;
+        public static int DEBUG_INDEX_COUNTER;
+        #endregion
+        /// <summary>
+        /// Vehicle element represented in node
+        /// </summary>
+        public required PartialVehicleElement VE;
+
+        /// <summary>
+        /// Previous vehicle element
+        /// </summary>
         public LLNode? Prev;
+        /// <summary>
+        /// Next vehicle element
+        /// </summary>
         public LLNode? Next;
-        public double SoCAtStart;
-        public double SoCAtEnd;
-        public int DebugIndex;
-        public static int DebugIndexCounter;
 
         public LLNode()
         {
-            DebugIndex = DebugIndexCounter++;
+            DEBUG_INDEX = DEBUG_INDEX_COUNTER++;
         }
 
         public override string ToString()
         {
-            return $"{DebugIndex}: {VehicleElement}";
+            return $"{DEBUG_INDEX}: {VE}";
         }
 
-        public int TailCount()
+        #region find
+        public LLNode? FindBefore(Func<LLNode, bool> predicate, bool first)
+        {
+            LLNode? curr = Prev;
+            LLNode? res = null;
+            while (curr != null)
+            {
+                if (predicate(curr))
+                {
+                    if (first) return curr;
+                    else res = curr;
+                }
+                curr = curr.Prev;
+            }
+            return res;
+        }
+
+        public LLNode? FindFirstBefore(Func<LLNode, bool> predicate) => FindBefore(predicate, true);
+        public LLNode? FindLastBefore(Func<LLNode, bool> predicate) => FindBefore(predicate, false);
+
+        public LLNode? FindAfter(Func<LLNode, bool> predicate, bool first)
+        {
+            LLNode? curr = Next;
+            LLNode? res = null;
+            while (curr != null)
+            {
+                if (predicate(curr))
+                {
+                    if (first) return curr;
+                    else res = curr;
+                }
+                curr = curr.Next;
+            }
+            return res;
+        }
+        public LLNode? FindFirstAfter(Func<LLNode, bool> predicate) => FindAfter(predicate, true);
+        public LLNode? FindLastAfter(Func<LLNode, bool> predicate) => FindAfter(predicate, false);
+
+        #endregion
+
+        #region count
+
+        public int Count(bool head)
         {
             LLNode? curr = this;
             int c = 0;
             while (curr != null)
             {
                 c++;
-                curr = curr.Next;
+                curr = head ? curr.Next : curr.Next;
             }
             return c;
         }
+        public int HeadCount() => Count(true);
+        public int TailCount() => Count(false);
 
-        public VehicleTask ToVehicleTask(VehicleType vehicleType)
-        {
-            this.CalcSoCValues(vehicleType, false);
-            List<VehicleElement> elements = [];
-            LLNode? curr = this;
-            while (curr != null)
-            {
-                VehicleElement ve = curr.VehicleElement;
-                ve.StartSoCInTask = curr.SoCAtStart;
-                ve.EndSoCInTask = curr.SoCAtEnd;
-                if (ve is VETrip) ve.DrivingCost = 0;
-                elements.Add(ve);
+        #endregion
 
-                if (curr.Next != null && curr.VehicleElement.EndTime != curr.Next.VehicleElement.StartTime)
-                {
-                    Console.WriteLine("Invalid; time discontionous");
-                }
-
-                if (curr.Next != null && curr.SoCAtEnd != curr.Next.SoCAtStart)
-                {
-                    Console.WriteLine("Invalid; soc discontinous");
-                }
-
-                if (ve.StartSoCInTask > vehicleType.MaxCharge || ve.StartSoCInTask < vehicleType.MinCharge ||
-                    ve.EndSoCInTask > vehicleType.MaxCharge || ve.EndSoCInTask < vehicleType.MinCharge
-                )
-                {
-                    Console.WriteLine("Invalid; soc out of vehicle bounds");
-                }
-
-                if (ve is VEDeadhead ved && (ved.SoCGained < 0 || ved.ChargeTime < 0))
-                {
-                    Console.WriteLine("Invalid; soc gained / charge time during deadhead are negative");
-                }
-
-                curr = curr.Next;
-            }
-
-            if (Config.CONSOLE_LS) Console.WriteLine($"Vehicle task found with {elements.Count} elements");
-
-            return new VehicleTask(elements) { vehicleType = vehicleType };
-        }
-
-        /// <summary>
-        /// Determine the problems in this and all following nodes in the task.
-        /// </summary>
-        /// <returns>Array of peaks &gt; maxSoC and valleys &lt; minSoC. Each peak / valley determined by maximum error at a charging location.</returns>
-        public (double chargingCost, List<double> peaks, List<double> valleys) SoCError(VehicleType vehicleType)
-        {
-            double chargingCost = CalcSoCValues(vehicleType).chargingCosts;
-            List<double> peaks = [], valleys = [];
-            LLNode? curr = this;
-            while (curr != null)
-            {
-                if (curr.NodeType == LLNodeType.Deadhead)
-                {
-                    VEDeadhead ved = (VEDeadhead)curr.VehicleElement;
-                    // Peaks / valleys may occur at charging stations
-                    if (ved.SelectedAction != -1)
-                    {
-                        ChargingAction ca = ved.Deadhead.ChargingActions[ved.SelectedAction];
-                        double SoCBeforeCharge = curr.SoCAtStart - ca.ChargeUsedTo;
-                        if (SoCBeforeCharge < vehicleType.MinCharge)
-                            valleys.Add(vehicleType.MinCharge - SoCBeforeCharge);
-
-                        ChargingCurve cc = ca.ChargeLocation.ChargingCurves[vehicleType.Index];
-                        var chargeResult = cc.MaxChargeGained(SoCBeforeCharge, ved.ChargeTime, true);
-                        double SoCAfterCharge = SoCBeforeCharge + chargeResult.SoCGained;
-
-                        if (SoCAfterCharge > vehicleType.MaxCharge)
-                            peaks.Add(SoCAfterCharge - vehicleType.MaxCharge);
-                    }
-                }
-
-
-                // Valley may also occur at the final depot visit
-                if (curr.Next == null)
-                {
-                    if (curr.SoCAtEnd < vehicleType.MinCharge)
-                        valleys.Add(vehicleType.MinCharge - curr.SoCAtEnd);
-                }
-
-                curr = curr.Next;
-            }
-
-            return (chargingCost, peaks, valleys);
-        }
-
-        /// <summary>
-        /// Set the SoC values of the rest of the trip. Uses <see cref="SoCAtEnd"/> of <c>this</c> as base for propegation. 
-        /// </summary>
-        /// <returns>Charge costs over the rest of the trip</returns>
-        public (bool feasible, double chargingCosts) CalcSoCValues(VehicleType vehicleType, bool expand = true)
-        {
-            LLNode? curr = this;
-
-            double chargeCosts = 0;
-            while (curr != null)
-            {
-                if (!expand && (curr.SoCAtStart > vehicleType.MaxCharge || curr.SoCAtStart < vehicleType.MinCharge))
-                {
-                    // SoC at start of node is invalid
-                    return (false, double.MinValue);
-                }
-
-
-                if (curr.NodeType == LLNodeType.Deadhead)
-                {
-                    VEDeadhead ved = (VEDeadhead)curr.VehicleElement;
-
-                    if (ved.SelectedAction != -1)
-                    {
-                        // Recalculate amount of SoC gained as charge gained may depend on charge at start of action
-                        ChargingAction ca = ved.Deadhead.ChargingActions[ved.SelectedAction];
-                        ChargingCurve cc = ca.ChargeLocation.ChargingCurves[vehicleType.Index];
-                        var chargeResult = cc.MaxChargeGained(curr.SoCAtStart - ca.ChargeUsedTo, ved.ChargeTime, expand);
-                        ved.ChargeCost = chargeResult.Cost;
-                        chargeCosts += chargeResult.Cost;
-                        double chargeSoCGained = chargeResult.SoCGained;
-                        double SoCDiff = chargeSoCGained - (ca.ChargeUsedFrom + ca.ChargeUsedTo);
-                        curr.VehicleElement.SoCDiff = SoCDiff;
-                    }
-                }
-
-                curr.SoCAtEnd = curr.SoCAtStart + curr.VehicleElement.SoCDiff;
-
-                if (!expand && (curr.SoCAtEnd > vehicleType.MaxCharge || curr.SoCAtEnd < vehicleType.MinCharge))
-                {
-                    // SoC at end of node is invalid
-                    return (false, double.MinValue);
-                }
-
-                if (curr.Next != null)
-                {
-                    curr.Next.SoCAtStart = curr.SoCAtEnd;
-                    curr = curr.Next;
-                }
-                else
-                {
-                    // Ensure that curr is always depot at end of while
-                    break;
-                }
-            }
-
-            // Add charging costs for recharge at depot node
-            chargeCosts += Math.Min(0, vehicleType.StartCharge - curr!.SoCAtEnd) * vehicleType.Capacity / 100 * Config.KWH_COST;
-
-            return (true, chargeCosts);
-        }
-
-        /// <summary>
-        /// Cost of tail
-        /// </summary>
-        /// <returns>Overall costs of tail</returns>
-        public double CostOfTail()
-        {
-            LLNode? curr = this.Next;
-
-            double cost = 0;
-            while (curr != null)
-            {
-                cost += curr.VehicleElement.DrivingCost;
-
-                curr = curr.Next;
-            }
-
-            return cost;
-        }
-
+        #region modify
         /// <summary>
         /// Removes <paramref name="count"/> nodes after <c>this</c>. Does <b>not</b> update structure of removed nodes.
         /// </summary>
@@ -246,31 +124,280 @@ namespace E_VCSP.Solver.ColumnGenerators
         {
             ArgumentNullException.ThrowIfNull(node);
 
-            if (this.VehicleElement.EndTime != node.VehicleElement.StartTime) throw new ArgumentException("Vehicle task is not continuous");
+            if (VE.EndTime != node.VE.StartTime)
+                throw new InvalidOperationException("Vehicle task is not continuous");
 
             // Set next correctly
-            if (this.Next != null)
+            if (Next != null)
             {
-                this.Next.Prev = node;
+                Next.Prev = node;
             }
 
             // Update ordering
-            node.Next = this.Next;
+            node.Next = Next;
             node.Prev = this;
             this.Next = node;
 
             return node;
         }
 
-        public LLNode AddAfter(LLNodeType type, VehicleElement ve)
+        public LLNode AddAfter(PartialVehicleElement ve)
         {
             return AddAfter(new LLNode()
             {
-                VehicleElement = ve,
-                NodeType = type,
-                SoCAtStart = this.SoCAtEnd,
-                SoCAtEnd = this.SoCAtEnd + ve.SoCDiff,
+                VE = ve,
             });
+        }
+        #endregion
+
+
+        /// <summary>
+        /// Determine charge and handover feasibility
+        /// </summary>
+        /// <param name="vt"></param>
+        /// <returns></returns>
+        public (
+            bool handoversFeasible,
+            bool chargeFeasible,
+            double drivingCost,
+            double chargingCost
+        ) validateTail(VehicleType vt)
+        {
+            if (this.Prev != null) throw new Exception("Not on head");
+
+            bool handoversFeasible = true;
+            bool chargeFeasible = true;
+            double drivingCost = 0;
+            double chargingCost = 0;
+
+            double currSoC = vt.StartSoC;
+            int drivingSince = ((PVETravel)Next!.VE).DepartureTime;
+
+            bool SoCInBounds() => currSoC <= vt.MaxSoC && currSoC >= vt.MinSoC;
+            void performCharge(int chargeTime, Location chargeLocation)
+            {
+                // In bounds before charge
+                chargeFeasible &= SoCInBounds();
+
+                ChargingCurve cc = chargeLocation.ChargingCurves[vt.Index];
+                ChargeResult cr = cc.MaxChargeGained(currSoC, chargeTime);
+                currSoC += cr.SoCGained;
+                chargingCost += cr.Cost;
+
+                // In bounds after charge
+                chargeFeasible &= SoCInBounds();
+            }
+
+            bool handoverValid(int currTime) => currTime - drivingSince <= Config.MAX_DRIVE_TIME;
+
+            LLNode? curr = this.Next!; // First travel after depot head
+
+            while (curr.Next != null) // end at depot
+            {
+                PartialVehicleElement VE = curr.VE;
+
+                // Only update soc and driving costs; everything interesting is handled elsewhere
+                if (VE.Type == PVEType.Travel)
+                {
+                    drivingCost += VE.DrivingCost;
+                    currSoC += VE.SoCDiff;
+                }
+                else
+                {
+                    PVETravel prevTravel = (PVETravel)curr.Prev!.VE;
+                    PVETravel nextTravel = (PVETravel)curr.Next!.VE;
+
+                    // Start by checking whether we are allowed to hand over at the start;
+                    // if so, update the time we are driving
+                    if (VE.Type == PVEType.Trip)
+                    {
+                        // Handover must happen before / after / both
+
+                        // Handover before
+                        bool handoverPossibleBefore = VE.StartLocation!.HandoverAllowed && VE.StartTime - prevTravel.ArrivalTime >= VE.StartLocation!.MinHandoverTime;
+                        if (handoverPossibleBefore)
+                        {
+                            handoversFeasible &= handoverValid(prevTravel.ArrivalTime);
+                            drivingSince = VE.StartTime;
+                        }
+
+                        // Handover after
+                        bool handoverPossibleAfter = VE.EndLocation!.HandoverAllowed && nextTravel.DepartureTime - VE.EndTime >= VE.EndLocation!.MinHandoverTime;
+                        if (handoverPossibleAfter)
+                        {
+                            handoversFeasible &= handoverValid(VE.EndTime);
+                            drivingSince = nextTravel.DepartureTime;
+                        }
+                    }
+                    else
+                    {
+                        // Check if time allows for handover
+                        bool handoverPossible = VE.StartLocation!.HandoverAllowed && nextTravel.DepartureTime - prevTravel.ArrivalTime >= VE.StartLocation!.MinHandoverTime;
+                        if (handoverPossible)
+                        {
+                            handoversFeasible &= handoverValid(prevTravel.ArrivalTime);
+                            drivingSince = nextTravel.DepartureTime;
+                        }
+                    }
+
+                    // Then, check for charging and update SoC / costs
+                    int chargeTimeBefore = 0, chargeTimeAfter = 0;
+                    if (VE.StartLocation!.CanCharge)
+                    {
+                        chargeTimeBefore = !prevTravel.IdleAtStart ? prevTravel.IdleTime : 0;
+                    }
+                    if (VE.EndLocation!.CanCharge)
+                    {
+                        chargeTimeAfter = nextTravel.IdleAtStart ? nextTravel.IdleTime : 0;
+                    }
+
+                    // Only charging, not actually driving anything in between. If so, ignore any costs there, and only charge
+                    bool onlyCharge =
+                        chargeTimeBefore + (VE.EndTime - VE.StartTime) + chargeTimeAfter >= Config.MIN_CHARGE_TIME // min charging time is met
+                        && (VE.Type == PVEType.HandoverDetour || VE.Type == PVEType.ChargeDetour) // Remains at same location
+                        && VE.StartLocation!.CanCharge; // can actually charge
+
+                    if (onlyCharge) performCharge(chargeTimeBefore + chargeTimeAfter, VE.StartLocation!);
+                    else
+                    {
+                        // Possible charge before
+                        if (chargeTimeBefore >= Config.MIN_CHARGE_TIME) performCharge(chargeTimeBefore, VE.StartLocation!);
+
+                        // Perform element
+                        drivingCost += VE.DrivingCost;
+                        currSoC += VE.SoCDiff;
+
+                        // Possible charge after
+                        if (chargeTimeAfter >= Config.MIN_CHARGE_TIME) performCharge(chargeTimeAfter, VE.EndLocation!);
+                    }
+                }
+
+                curr = curr.Next;
+            }
+
+            // Check if arrival at depot was valid
+            handoversFeasible &= handoverValid(((PVETravel)curr.Prev!.VE).ArrivalTime);
+
+            if (!handoversFeasible)
+            {
+                int x = 0;
+            }
+
+            // Check if SoC was valid
+            chargeFeasible &= SoCInBounds();
+
+            // Add night charging costsP
+            chargingCost += Math.Min(0, vt.StartSoC - currSoC) * vt.Capacity / 100 * Config.KWH_COST;
+
+            return (handoversFeasible, chargeFeasible, drivingCost, chargingCost);
+        }
+
+        public VehicleTask ToVehicleTask(VehicleType vt)
+        {
+            if (Prev != null) throw new InvalidOperationException("Not calling on head");
+
+
+            List<VehicleElement> elements = [];
+            if (this.Prev != null) throw new Exception("Not on head");
+
+            double currSoC = vt.StartSoC;
+
+            void performCharge(int startTime, int chargeTime, Location chargeLocation)
+            {
+                ChargingCurve cc = chargeLocation.ChargingCurves[vt.Index];
+                ChargeResult cr = cc.MaxChargeGained(currSoC, chargeTime);
+                elements.Add(new VECharge(chargeLocation, startTime, startTime + chargeTime, cr.SoCGained, cr.Cost) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + cr.SoCGained });
+                currSoC += cr.SoCGained;
+            }
+
+
+            LLNode? curr = this; // First travel after depot head
+            while (curr != null) // end at depot
+            {
+                PartialVehicleElement VE = curr.VE;
+
+                if (VE.Type == PVEType.Depot)
+                {
+                    VEIdle vei;
+                    if (curr.Prev == null)
+                    {
+                        vei = new(VE.StartLocation!, VE.StartTime, ((PVETravel)curr.Next!.VE).DepartureTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
+
+                    }
+                    else
+                    {
+                        vei = new(VE.StartLocation!, ((PVETravel)curr.Prev!.VE).ArrivalTime, VE.EndTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
+                    }
+                    elements.Add(vei);
+                    currSoC += VE.SoCDiff;
+                }
+                else if (VE.Type == PVEType.Travel)
+                {
+                    PVETravel pvet = (PVETravel)VE;
+                    VEDeadhead ved = new(pvet.DeadheadTemplate, pvet.DepartureTime, pvet.ArrivalTime, vt) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
+                    elements.Add(ved);
+                    currSoC += VE.SoCDiff;
+                }
+                else
+                {
+                    PVETravel prevTravel = (PVETravel)curr.Prev!.VE;
+                    PVETravel nextTravel = (PVETravel)curr.Next!.VE;
+
+                    // Then, check for charging and update SoC / costs
+                    int chargeTimeBefore = 0, chargeTimeAfter = 0;
+                    if (VE.StartLocation!.CanCharge)
+                    {
+                        chargeTimeBefore = !prevTravel.IdleAtStart ? prevTravel.IdleTime : 0;
+                    }
+                    if (VE.EndLocation!.CanCharge)
+                    {
+                        chargeTimeAfter = nextTravel.IdleAtStart ? nextTravel.IdleTime : 0;
+                    }
+
+                    // Only charging, not actually driving anything in between. If so, ignore any costs there, and only charge
+                    bool onlyCharge =
+                        chargeTimeBefore + (VE.EndTime - VE.StartTime) + chargeTimeAfter >= Config.MIN_CHARGE_TIME // min charging time is met
+                        && (VE.Type == PVEType.HandoverDetour || VE.Type == PVEType.ChargeDetour) // Remains at same location
+                        && VE.StartLocation!.CanCharge; // can actually charge
+
+                    if (onlyCharge) performCharge(prevTravel.ArrivalTime, chargeTimeBefore + (VE.EndTime - VE.StartTime) + chargeTimeAfter, VE.StartLocation!);
+                    else
+                    {
+                        bool chargeBefore = chargeTimeBefore >= Config.MIN_CHARGE_TIME;
+                        bool chargeAfter = chargeTimeAfter >= Config.MIN_CHARGE_TIME;
+
+                        // Possible charge before
+                        if (chargeBefore) performCharge(prevTravel.ArrivalTime, chargeTimeBefore, VE.StartLocation!);
+                        else if (VE.Type == PVEType.Trip)
+                        {
+                            elements.Add(new VEIdle(VE.StartLocation, prevTravel.ArrivalTime, VE.StartTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC });
+                        }
+
+                        // Perform element
+                        VehicleElement stop = VE.Type == PVEType.Trip
+                            ? new VETrip(((PVETrip)VE).Trip, vt) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff }
+                            : new VEIdle(
+                                VE.StartLocation,
+                                chargeBefore ? VE.StartTime : prevTravel.ArrivalTime,
+                                chargeAfter ? VE.EndTime : nextTravel.DepartureTime
+                            )
+                            { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
+                        elements.Add(stop);
+                        currSoC += VE.SoCDiff;
+
+                        // Possible charge after
+                        if (chargeAfter) performCharge(nextTravel.DepartureTime, chargeTimeAfter, VE.EndLocation!);
+                        else if (VE.Type == PVEType.Trip)
+                        {
+                            elements.Add(new VEIdle(VE.EndLocation, VE.EndTime, nextTravel.DepartureTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC });
+                        }
+                    }
+                }
+
+                curr = curr.Next;
+            }
+
+            return new VehicleTask(elements) { vehicleType = vt };
         }
     }
 }

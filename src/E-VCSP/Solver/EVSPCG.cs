@@ -207,16 +207,26 @@ namespace E_VCSP.Solver
             for (int i = 0; i < instance.Trips.Count; i++)
             {
                 Trip t = instance.Trips[i];
-                Deadhead dhTo = (adjFull[instance.DepotStartIndex][i]?.Deadhead) ?? throw new InvalidDataException("No arc from depot to trip");
-                Deadhead dhFrom = adjFull[i][instance.DepotEndIndex]?.Deadhead ?? throw new InvalidDataException("No arc from trip to depot");
+                DeadheadTemplate dhTo = adjFull[instance.DepotStartIndex][i]?.Deadhead?.DeadheadTemplate ?? throw new InvalidDataException("No arc from depot to trip");
+                DeadheadTemplate dhFrom = adjFull[i][instance.DepotEndIndex]?.Deadhead?.DeadheadTemplate ?? throw new InvalidDataException("No arc from trip to depot");
 
-                VEDeadhead toTrip = new(dhTo, instance.Trips[i].StartTime - dhTo.DeadheadTemplate.Duration, vehicleType);
-                VETrip trip = new(t, vehicleType);
-
-                double endSoC = vehicleType.StartCharge - (dhTo.DeadheadTemplate.Distance + dhFrom.DeadheadTemplate.Distance + t.Distance) * vehicleType.DriveUsage;
-                VEDeadhead fromTrip = new(dhFrom, t.EndTime, vehicleType)
+                double currSoC = vehicleType.StartSoC;
+                VEDeadhead toTrip = new(dhTo, instance.Trips[i].StartTime - dhTo.Duration, instance.Trips[i].StartTime, vehicleType)
                 {
-                    EndSoCInTask = endSoC
+                    StartSoCInTask = currSoC,
+                    EndSoCInTask = currSoC - dhTo.Distance * vehicleType.DriveUsage
+                };
+                currSoC -= dhTo.Distance * vehicleType.DriveUsage;
+                VETrip trip = new(t, vehicleType)
+                {
+                    StartSoCInTask = currSoC,
+                    EndSoCInTask = currSoC - t.Distance * vehicleType.DriveUsage
+                };
+                currSoC -= t.Distance * vehicleType.DriveUsage;
+                VEDeadhead fromTrip = new(dhFrom, instance.Trips[i].EndTime, instance.Trips[i].EndTime + dhFrom.Duration, vehicleType)
+                {
+                    StartSoCInTask = currSoC,
+                    EndSoCInTask = currSoC - dhFrom.Distance * vehicleType.DriveUsage
                 };
 
                 VehicleTask vehicleTask = new([toTrip, trip, fromTrip])
@@ -224,6 +234,7 @@ namespace E_VCSP.Solver
                     vehicleType = vehicleType,
                     Index = i,
                 };
+
                 tasks.Add(vehicleTask);
             }
         }
@@ -365,8 +376,8 @@ namespace E_VCSP.Solver
             // Multithreaded shortestpath searching
             List<List<VehicleShortestPath>> instances = [
                 [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // SP
-                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_SINGLE
-                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_GLOBAL
+                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_SINGLE
+                //[.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_GLOBAL
             ];
             List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_SINGLE_WEIGHT, Config.VSP_LS_GLOBAL_WEIGHT];
             List<double> sums = [operationChances[0]];
@@ -394,11 +405,19 @@ namespace E_VCSP.Solver
                 int selectedMethodÍndex = sums.FindIndex(x => r <= x);
                 List<VehicleShortestPath> selectedMethod = instances[selectedMethodÍndex];
 
-
-                Parallel.For(0, Config.THREADS, (i) =>
+                if (Config.THREADS > 1)
                 {
-                    generatedTasks[i] = selectedMethod[i].GenerateVehicleTasks();
-                });
+                    Parallel.For(0, Config.THREADS, (i) =>
+                    {
+                        generatedTasks[i] = selectedMethod[i].GenerateVehicleTasks();
+                    });
+                }
+                else
+                {
+                    generatedTasks[0] = selectedMethod[0].GenerateVehicleTasks();
+                }
+
+
                 totalGenerated += generatedTasks.Length;
                 switch (selectedMethodÍndex)
                 {

@@ -29,14 +29,14 @@
         /// <summary>
         /// Minimum SoC (range [0, 100])
         /// </summary>
-        public double MinCharge = 0;
+        public double MinSoC = 0;
         /// <summary>
         /// Maximum SoC (range [0, 100])
         /// </summary>
-        public double MaxCharge = 100;
+        public double MaxSoC = 100;
         /// <summary>
         /// Charge at start of day (range [0, 100])
         /// </summary>
-        public double StartCharge = 100;
+        public double StartSoC = 100;
     }
 }

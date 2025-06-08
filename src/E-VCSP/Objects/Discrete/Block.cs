@@ -19,16 +19,15 @@
         {
             List<BlockElement> elements = new();
 
-            if (ve is VEDepot) return elements;
-            else if (ve is VEIdle vei)
+            if (ve is VEIdle vei)
             {
                 elements.Add(new()
                 {
                     Type = BlockElementType.Idle,
                     EndTime = ve.EndTime,
                     StartTime = ve.StartTime,
-                    From = vei.Location,
-                    To = vei.Location,
+                    From = vei.StartLocation!,
+                    To = vei.EndLocation!,
                 });
             }
             else if (ve is VETrip vet)
@@ -45,51 +44,26 @@
             }
             else if (ve is VEDeadhead ved)
             {
-                if (ved.SelectedAction == -1)
+                elements.Add(new BEDeadhead()
                 {
-                    // Normal deadhead
-                    elements.Add(new BEDeadhead()
-                    {
-                        DeadheadTemplate = ved.Deadhead.DeadheadTemplate,
-                        EndTime = ved.EndTime,
-                        StartTime = ved.StartTime,
-                        From = ved.Deadhead.DeadheadTemplate.From,
-                        To = ved.Deadhead.DeadheadTemplate.To,
-                        Type = BlockElementType.Deadhead,
-                    });
-                }
-                else
+                    DeadheadTemplate = ved.DeadheadTemplate,
+                    EndTime = ved.EndTime,
+                    StartTime = ved.StartTime,
+                    From = ved.DeadheadTemplate.From,
+                    To = ved.DeadheadTemplate.To,
+                    Type = BlockElementType.Deadhead,
+                });
+            }
+            else if (ve is VECharge vec)
+            {
+                elements.Add(new BlockElement()
                 {
-                    // Seperate into dh1 -> charge -> dh2
-                    var action = ved.Deadhead.ChargingActions[ved.SelectedAction];
-
-                    elements.Add(new BEDeadhead()
-                    {
-                        DeadheadTemplate = action.TemplateTo,
-                        StartTime = ved.StartTime,
-                        EndTime = ved.StartTime + action.DrivingTimeTo,
-                        From = action.TemplateTo.From,
-                        To = action.TemplateTo.To,
-                        Type = BlockElementType.Deadhead,
-                    });
-                    elements.Add(new BlockElement()
-                    {
-                        EndTime = ved.StartTime + action.DrivingTimeTo + action.TimeAtLocation,
-                        StartTime = ved.StartTime + action.DrivingTimeTo,
-                        From = action.ChargeLocation,
-                        To = action.ChargeLocation,
-                        Type = BlockElementType.Charge,
-                    });
-                    elements.Add(new BEDeadhead()
-                    {
-                        DeadheadTemplate = action.TemplateFrom,
-                        StartTime = ved.StartTime + action.DrivingTimeTo + action.TimeAtLocation,
-                        EndTime = ved.EndTime,
-                        From = action.TemplateFrom.From,
-                        To = action.TemplateFrom.To,
-                        Type = BlockElementType.Deadhead,
-                    });
-                }
+                    EndTime = vec.EndTime,
+                    StartTime = vec.StartTime,
+                    From = vec.StartLocation!,
+                    To = vec.EndLocation!,
+                    Type = BlockElementType.Charge,
+                });
             }
             else
             {

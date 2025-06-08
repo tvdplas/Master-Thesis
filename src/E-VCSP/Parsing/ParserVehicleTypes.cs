@@ -41,8 +41,8 @@ namespace E_VCSP.Parsing
                 Capacity = Capacity,
                 DriveUsage = DriveUsage,
                 IdleUsage = IdleUsage,
-                MinCharge = double.Parse(line[attributeIndexMapping["MinCharge"]]) * 100,
-                MaxCharge = 1 * 100,
+                MinSoC = double.Parse(line[attributeIndexMapping["MinCharge"]]) * 100,
+                MaxSoC = 1 * 100,
             };
 
             // Get the columns for max charging speed
