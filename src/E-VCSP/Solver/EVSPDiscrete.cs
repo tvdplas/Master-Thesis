@@ -1,6 +1,6 @@
 ﻿using E_VCSP.Formatting;
-using E_VCSP.Objects;
 using E_VCSP.Objects.Discrete;
+using E_VCSP.Objects.ParsedData;
 using Gurobi;
 using Microsoft.Msagl.Drawing;
 using Color = Microsoft.Msagl.Drawing.Color;
@@ -120,7 +120,7 @@ namespace E_VCSP.Solver
             if (model.Status == GRB.Status.INFEASIBLE)
             {
                 Console.Write("Result was infeasible");
-                if (Config.DETERMINE_IIS)
+                if (Config.VSP_DETERMINE_IIS)
                 {
                     model.ComputeIIS();
                     model.Write("infeasible.ilp");

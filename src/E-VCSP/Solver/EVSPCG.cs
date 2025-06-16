@@ -1,6 +1,6 @@
 ﻿using E_VCSP.Formatting;
 using E_VCSP.Objects;
-using E_VCSP.Objects.Discrete;
+using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using Gurobi;
 using Microsoft.Msagl.Drawing;
@@ -124,7 +124,7 @@ namespace E_VCSP.Solver
             {
                 TripNode tn = (TripNode)nodes[i];
                 DeadheadTemplate? dht = locationDHTMapping[depot.Index][tn.Trip.From.Index] ?? throw new InvalidDataException("No travel possible from depot to trip");
-                double baseCost = Config.PULLOUT_COST + (dht.Distance * Config.M_COST);
+                double baseCost = Config.VH_PULLOUT_COST + (dht.Distance * Config.VH_M_COST);
 
                 // TODO: Charge directly after depot?
                 Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
@@ -136,7 +136,7 @@ namespace E_VCSP.Solver
             {
                 TripNode tn = (TripNode)nodes[i];
                 DeadheadTemplate? dht = locationDHTMapping[tn.Trip.To.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
-                double baseCost = dht.Distance * Config.M_COST;
+                double baseCost = dht.Distance * Config.VH_M_COST;
                 // TODO: Charge directly before depot?
                 Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
                 adjFull[i][^1] = new Arc() { To = nodes[^1], From = tn, Deadhead = dh };
@@ -145,7 +145,7 @@ namespace E_VCSP.Solver
             // depot -> depot arc
             {
                 DeadheadTemplate? dht = locationDHTMapping[depot.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from depot to depot");
-                double baseCost = dht.Distance * Config.M_COST;
+                double baseCost = dht.Distance * Config.VH_M_COST;
                 // TODO: Charge directly before depot?
                 Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
                 adjFull[^2][^1] = new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh };
@@ -166,7 +166,7 @@ namespace E_VCSP.Solver
                     if (dht == null) continue; // not a possible drive
                     if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
 
-                    double baseCost = dht.Distance * Config.M_COST;
+                    double baseCost = dht.Distance * Config.VH_M_COST;
                     List<ChargingAction> chargingActions = [];
                     foreach (Location chargeLocation in instance.ChargingLocations)
                     {
@@ -185,7 +185,7 @@ namespace E_VCSP.Solver
                             TemplateTo = dhtTo,
                             ChargeUsedTo = dhtTo.Distance * vehicleType.DriveUsage,
                             ChargeUsedFrom = dhtFrom.Distance * vehicleType.DriveUsage,
-                            DrivingCost = (dhtTo.Distance + dhtFrom.Distance) * Config.M_COST,
+                            DrivingCost = (dhtTo.Distance + dhtFrom.Distance) * Config.VH_M_COST,
                             DrivingTimeFrom = dhtFrom.Duration,
                             DrivingTimeTo = dhtTo.Duration,
                             DrivingDistanceTo = dhtTo.Distance,
@@ -239,7 +239,7 @@ namespace E_VCSP.Solver
             }
         }
 
-        private List<VehicleTask> getSelectedTasks()
+        private List<VehicleTask> getSelectedTasks(bool console)
         {
             if (model == null) throw new InvalidOperationException("Cannot generate solution graph without model instance");
 
@@ -262,16 +262,29 @@ namespace E_VCSP.Solver
             {
                 int val = covered[i];
                 if (val >= 1) coveredTotal++;
-                if (val >= 2) Console.WriteLine($"(!) Trip {instance.Trips[i]} covered {val} times");
+                if (val >= 2 && console) Console.WriteLine($"(!) Trip {instance.Trips[i]} covered {val} times");
             }
-            Console.WriteLine($"Covered {coveredTotal}/{instance.Trips.Count} trips");
-            if (coveredTotal < instance.Trips.Count) Console.WriteLine("(!) Not all trips covered");
+
+            if (console)
+            {
+                Console.WriteLine($"Covered {coveredTotal}/{instance.Trips.Count} trips");
+                if (coveredTotal < instance.Trips.Count) Console.WriteLine("(!) Not all trips covered");
+            }
+
             return tasks;
+        }
+
+        private List<Block> getBlocks()
+        {
+            return getSelectedTasks(false)
+                .SelectMany(t => Block.FromVehicleTask(t))
+                .Select((b, i) => { b.Index = i; return b; })
+                .ToList();
         }
 
         public override Graph GenerateSolutionGraph(bool blockView)
         {
-            List<VehicleTask> tasks = getSelectedTasks();
+            List<VehicleTask> tasks = getSelectedTasks(false);
 
             File.WriteAllText(Config.RUN_LOG_FOLDER + "vehicleTasks.json", JsonSerializer.Serialize(tasks));
 
@@ -302,7 +315,7 @@ namespace E_VCSP.Solver
 
             // Model
             GRBModel model = new(env);
-            model.Parameters.TimeLimit = Config.SOLVER_TIMEOUT_SEC;
+            model.Parameters.TimeLimit = Config.VSP_SOLVER_TIMEOUT_SEC;
             model.SetCallback(new CustomGRBCallback());
             ct.Register(() =>
             {
@@ -341,13 +354,13 @@ namespace E_VCSP.Solver
                 }
 
                 // Switch between set partition and cover
-                char sense = Config.ALLOW_VH_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
+                char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
                 model.AddConstr(expr, sense, 1, "cover_" + t.Id);
             }
 
             // Finalize max vehicle constraint with slack
             // Note: added after trips so trips have easier indexing. 
-            GRBVar vehicleCountSlack = model.AddVar(0, instance.Trips.Count - Config.MAX_VEHICLES, Config.MAX_VEHICLES_OVER_COST, GRB.CONTINUOUS, "vehicle_count_slack");
+            GRBVar vehicleCountSlack = model.AddVar(0, instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
             model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
 
             this.model = model;
@@ -360,7 +373,7 @@ namespace E_VCSP.Solver
             model.Optimize();
 
             // Tracking generated columns
-            int maxColumns = Config.THREADS * Config.MAX_COL_GEN_ITS,
+            int maxColumns = Config.VSP_COLS_PER_IT * Config.VSP_MAX_COL_GEN_ITS,
                 lastReportedPercent = 0,    // Percentage of total reporting
                 currIts = 1,                // Number of CG / solution rounds had
                 totalGenerated = 0,         // Total number of columns generated
@@ -375,8 +388,8 @@ namespace E_VCSP.Solver
 
             // Multithreaded shortestpath searching
             List<List<VehicleShortestPath>> instances = [
-                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // SP
-                [.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_SINGLE
+                [.. Enumerable.Range(0, Config.VSP_COLS_PER_IT).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // SP
+                [.. Enumerable.Range(0, Config.VSP_COLS_PER_IT).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_SINGLE
                 //[.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_GLOBAL
             ];
             List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_SINGLE_WEIGHT, Config.VSP_LS_GLOBAL_WEIGHT];
@@ -390,7 +403,7 @@ namespace E_VCSP.Solver
 
             // Continue until max number of columns is found, model isn't feasible during solve or break
             // due to RC constraint. 
-            while (currIts < Config.MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE)
+            while (currIts < Config.VSP_MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE)
             {
                 // Terminate column generation if cancelled
                 if (ct.IsCancellationRequested) return false;
@@ -398,16 +411,16 @@ namespace E_VCSP.Solver
                 var reducedCosts = model.GetConstrs().Select(x => x.Pi);
 
                 // Generate batch of new tasks using pricing information from previous solve
-                List<(double, VehicleTask)>[] generatedTasks = new List<(double, VehicleTask)>[Config.THREADS];
+                List<(double, VehicleTask)>[] generatedTasks = new List<(double, VehicleTask)>[Config.VSP_COLS_PER_IT];
 
 
                 double r = rnd.NextDouble() * sums[^1];
                 int selectedMethodÍndex = sums.FindIndex(x => r <= x);
                 List<VehicleShortestPath> selectedMethod = instances[selectedMethodÍndex];
 
-                if (Config.THREADS > 1)
+                if (Config.VSP_COLS_PER_IT > 1)
                 {
-                    Parallel.For(0, Config.THREADS, (i) =>
+                    Parallel.For(0, Config.VSP_COLS_PER_IT, (i) =>
                     {
                         generatedTasks[i] = selectedMethod[i].GenerateVehicleTasks();
                     });
@@ -522,9 +535,9 @@ namespace E_VCSP.Solver
                 }
 
 
-                if (seqWithoutRC >= Config.OPT_IT_THRESHOLD)
+                if (seqWithoutRC >= Config.VSP_OPT_IT_THRESHOLD)
                 {
-                    Console.WriteLine($"Stopped due to RC > 0 for {Config.OPT_IT_THRESHOLD} consecutive tasks");
+                    Console.WriteLine($"Stopped due to RC > 0 for {Config.VSP_OPT_IT_THRESHOLD} consecutive tasks");
                     break;
                 }
 
@@ -543,7 +556,7 @@ namespace E_VCSP.Solver
                     var.Set(GRB.CharAttr.VType, GRB.BINARY);
             }
 
-            if (!Config.ALLOW_VH_SLACK_FINAL_SOLVE)
+            if (!Config.VSP_ALLOW_SLACK_FINAL_SOLVE)
             {
                 // Remove ability to go over vehicle bounds -> hopefully speeds up solving at end.
                 model.GetVarByName("vehicle_count_slack").UB = 0;
@@ -564,7 +577,7 @@ namespace E_VCSP.Solver
             if (model.Status == GRB.Status.INFEASIBLE || model.Status == GRB.Status.INTERRUPTED)
             {
                 Console.WriteLine("Model infeasible / canceled");
-                if (Config.DETERMINE_IIS)
+                if (Config.VSP_DETERMINE_IIS)
                 {
                     model.ComputeIIS();
                     model.Write("infeasible_CG.ilp");
@@ -574,6 +587,8 @@ namespace E_VCSP.Solver
                 return false;
             }
 
+
+            instance.Blocks = getBlocks();
             Config.CONSOLE_GUROBI = configState;
             return true;
         }

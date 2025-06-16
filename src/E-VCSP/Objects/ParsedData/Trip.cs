@@ -1,4 +1,4 @@
-﻿namespace E_VCSP.Objects
+﻿namespace E_VCSP.Objects.ParsedData
 {
     public class Trip
     {

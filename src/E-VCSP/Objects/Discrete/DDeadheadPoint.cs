@@ -1,4 +1,6 @@
-﻿namespace E_VCSP.Objects.Discrete
+﻿using E_VCSP.Objects.ParsedData;
+
+namespace E_VCSP.Objects.Discrete
 {
     public abstract class DDeadheadPoint
     {

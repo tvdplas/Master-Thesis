@@ -1,4 +1,4 @@
-﻿using E_VCSP.Objects;
+﻿using E_VCSP.Objects.ParsedData;
 using System.Globalization;
 
 namespace E_VCSP.Parsing

@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects;
+using E_VCSP.Objects.ParsedData;
 using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators
@@ -168,7 +169,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                         {
                             options.Add((
                                 directTravelSoC,
-                                expandingLabel.currCosts - tripCost + arc.Deadhead.DeadheadTemplate.Distance * Config.M_COST,
+                                expandingLabel.currCosts - tripCost + arc.Deadhead.DeadheadTemplate.Distance * Config.VH_M_COST,
                                 -1
                             ));
                         }

@@ -26,8 +26,9 @@ namespace E_VCSP
             graphViewer = new Microsoft.Msagl.GraphViewerGdi.GViewer();
             textBox1 = new TextBox();
             panel1 = new Panel();
+            solveCSPButton = new Button();
             button1 = new Button();
-            solveButton = new Button();
+            solveVSPButton = new Button();
             stopButton = new Button();
             button2 = new Button();
             button3 = new Button();
@@ -119,8 +120,9 @@ namespace E_VCSP
             // 
             // panel1
             // 
+            panel1.Controls.Add(solveCSPButton);
             panel1.Controls.Add(button1);
-            panel1.Controls.Add(solveButton);
+            panel1.Controls.Add(solveVSPButton);
             panel1.Controls.Add(stopButton);
             panel1.Controls.Add(loadButton);
             panel1.Controls.Add(activeFolderLabel);
@@ -130,32 +132,43 @@ namespace E_VCSP
             panel1.Size = new Size(304, 558);
             panel1.TabIndex = 1;
             // 
+            // solveCSPButton
+            // 
+            solveCSPButton.Location = new Point(146, 33);
+            solveCSPButton.Name = "solveCSPButton";
+            solveCSPButton.Size = new Size(152, 23);
+            solveCSPButton.TabIndex = 5;
+            solveCSPButton.Text = "Solve CSP";
+            solveCSPButton.UseVisualStyleBackColor = true;
+            solveCSPButton.Click += solveCSPClick;
+            // 
             // button1
             // 
-            button1.Location = new Point(166, 33);
+            button1.Enabled = false;
+            button1.Location = new Point(146, 62);
             button1.Name = "button1";
-            button1.Size = new Size(135, 23);
+            button1.Size = new Size(155, 23);
             button1.TabIndex = 4;
             button1.Text = "Toggle Graph View";
             button1.UseVisualStyleBackColor = true;
             button1.Click += toggleGraphView;
             // 
-            // solveButton
+            // solveVSPButton
             // 
-            solveButton.Location = new Point(3, 33);
-            solveButton.Name = "solveButton";
-            solveButton.Size = new Size(75, 23);
-            solveButton.TabIndex = 2;
-            solveButton.Text = "Solve";
-            solveButton.UseVisualStyleBackColor = true;
-            solveButton.Click += solveButtonClick;
+            solveVSPButton.Location = new Point(4, 33);
+            solveVSPButton.Name = "solveVSPButton";
+            solveVSPButton.Size = new Size(136, 23);
+            solveVSPButton.TabIndex = 2;
+            solveVSPButton.Text = "Solve EVSP";
+            solveVSPButton.UseVisualStyleBackColor = true;
+            solveVSPButton.Click += solveVSPClick;
             // 
             // stopButton
             // 
             stopButton.Enabled = false;
-            stopButton.Location = new Point(85, 33);
+            stopButton.Location = new Point(4, 62);
             stopButton.Name = "stopButton";
-            stopButton.Size = new Size(75, 23);
+            stopButton.Size = new Size(136, 23);
             stopButton.TabIndex = 3;
             stopButton.Text = "Stop";
             stopButton.UseVisualStyleBackColor = true;
@@ -252,7 +265,7 @@ namespace E_VCSP
         private TextBox textBox1;
         private Panel panel1; // Panel for the Button and FolderBrowserDialog
         private SplitContainer splitContainer1; // SplitContainer for the TextBox and GraphViewer
-        private Button solveButton;
+        private Button solveVSPButton;
         private Button stopButton;
         private CancellationTokenSource cancellationTokenSource;
         private Button button1;
@@ -261,5 +274,6 @@ namespace E_VCSP
         private Button button4;
         private Button button5;
         private Label label1;
+        private Button solveCSPButton;
     }
 }

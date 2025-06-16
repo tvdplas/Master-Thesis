@@ -1,4 +1,6 @@
-﻿namespace E_VCSP.Objects.Discrete
+﻿using E_VCSP.Objects.ParsedData;
+
+namespace E_VCSP.Objects
 {
     public enum BlockElementType
     {
@@ -11,8 +13,8 @@
     {
         public int StartTime;
         public int EndTime;
-        public Location From;
-        public Location To;
+        public Location StartLocation;
+        public Location EndLocation;
         public BlockElementType Type;
 
         public static List<BlockElement> FromVE(VehicleElement ve)
@@ -26,8 +28,8 @@
                     Type = BlockElementType.Idle,
                     EndTime = ve.EndTime,
                     StartTime = ve.StartTime,
-                    From = vei.StartLocation!,
-                    To = vei.EndLocation!,
+                    StartLocation = vei.StartLocation!,
+                    EndLocation = vei.EndLocation!,
                 });
             }
             else if (ve is VETrip vet)
@@ -38,8 +40,8 @@
                     Trip = vet.Trip,
                     StartTime = vet.StartTime,
                     EndTime = vet.EndTime,
-                    From = vet.Trip.From,
-                    To = vet.Trip.To,
+                    StartLocation = vet.Trip.From,
+                    EndLocation = vet.Trip.To,
                 });
             }
             else if (ve is VEDeadhead ved)
@@ -49,8 +51,8 @@
                     DeadheadTemplate = ved.DeadheadTemplate,
                     EndTime = ved.EndTime,
                     StartTime = ved.StartTime,
-                    From = ved.DeadheadTemplate.From,
-                    To = ved.DeadheadTemplate.To,
+                    StartLocation = ved.DeadheadTemplate.From,
+                    EndLocation = ved.DeadheadTemplate.To,
                     Type = BlockElementType.Deadhead,
                 });
             }
@@ -60,8 +62,8 @@
                 {
                     EndTime = vec.EndTime,
                     StartTime = vec.StartTime,
-                    From = vec.StartLocation!,
-                    To = vec.EndLocation!,
+                    StartLocation = vec.StartLocation!,
+                    EndLocation = vec.EndLocation!,
                     Type = BlockElementType.Charge,
                 });
             }
@@ -93,19 +95,20 @@
         static List<BlockElementType> IDLE_TYPES = [BlockElementType.Idle, BlockElementType.Charge];
 
         List<BlockElement> Elements = new();
+        public int Index = -1;
 
-        public Location From
+        public Location StartLocation
         {
             get
             {
-                return Elements[0].From;
+                return Elements[0].StartLocation;
             }
         }
-        public Location To
+        public Location EndLocation
         {
             get
             {
-                return Elements[^1].To;
+                return Elements[^1].EndLocation;
             }
         }
 
@@ -137,8 +140,8 @@
 
                 if (
                     IDLE_TYPES.Contains(element.Type) // vehicle is idle
-                    && element.From.HandoverAllowed   // handover at this location is allowed
-                    && Math.Max(element.From.SignOffTime, element.From.SignOnTime) <= (element.EndTime - element.StartTime) // idle time is greater than signon/off time
+                    && element.StartLocation.HandoverAllowed   // handover at this location is allowed
+                    && Math.Max(element.StartLocation.SignOffTime, element.StartLocation.SignOnTime) <= element.EndTime - element.StartTime // idle time is greater than signon/off time
                 )
                 {
                     // Start new block; skip this element as we dont need idle time in block
@@ -150,9 +153,9 @@
                 additionTarget.Elements.Add(element);
             }
 
-            blocks = blocks.Where(b => b.Elements.Count > 0).ToList();
-
-            return blocks;
+            return blocks
+                .Where(b => b.Elements.Count > 0)
+                .ToList();
         }
     }
 }

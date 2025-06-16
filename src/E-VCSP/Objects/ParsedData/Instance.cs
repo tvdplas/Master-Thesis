@@ -1,6 +1,6 @@
 ﻿using E_VCSP.Parsing;
 
-namespace E_VCSP.Objects
+namespace E_VCSP.Objects.ParsedData
 {
     public class Instance
     {
@@ -13,6 +13,11 @@ namespace E_VCSP.Objects
         public int DepotEndIndex = -1;
 
         public List<DeadheadTemplate> DeadheadTemplates;
+
+        /// <summary>
+        /// TODO: should be moved. Blocks that are selected by VSP. Empty is no solve done
+        /// </summary>
+        public List<Block> Blocks = [];
 
         public Instance(string path)
         {

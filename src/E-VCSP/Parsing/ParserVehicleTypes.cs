@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects;
+using E_VCSP.Objects.ParsedData;
 using System.Text.RegularExpressions;
 
 namespace E_VCSP.Parsing

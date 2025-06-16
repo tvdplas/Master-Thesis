@@ -1,4 +1,5 @@
-﻿using Microsoft.Msagl.Drawing;
+﻿using E_VCSP.Objects.ParsedData;
+using Microsoft.Msagl.Drawing;
 using Microsoft.Msagl.Layout.Layered;
 
 namespace E_VCSP.Objects.Discrete
@@ -73,7 +74,7 @@ namespace E_VCSP.Objects.Discrete
                             {
                                 // Determine costs of deadhead; only driving time is used
                                 // TODO: idle wordt helemaal niet meegenomen
-                                double drivingCost = dht_direct.Distance * Config.M_COST;
+                                double drivingCost = dht_direct.Distance * Config.VH_M_COST;
                                 DDeadheads.Add(new()
                                 {
                                     From = dt1,
@@ -124,7 +125,7 @@ namespace E_VCSP.Objects.Discrete
                             // Add deadhead that takes into account 2x driving costs and charging costs
                             // TODO: add time-dependent prices, staat nu gewoon vast
 
-                            double drivingCosts = Config.M_COST * (dht_toCharge.Distance + dht_fromCharge.Distance);
+                            double drivingCosts = Config.VH_M_COST * (dht_toCharge.Distance + dht_fromCharge.Distance);
                             int idleTimeAfterCharge = idleTime - (int)Math.Ceiling(crUsed.TimeUsed);
                             DDeadheads.Add(new()
                             {
@@ -168,8 +169,8 @@ namespace E_VCSP.Objects.Discrete
                 double discretizedSoC = floorToDiscreteValue(SoCAtTrip);
                 if (discretizedSoC == dt.StartingSoC)
                 {
-                    double drivingCosts = dh.Distance * Config.M_COST;
-                    double pullOutCosts = Config.PULLOUT_COST;
+                    double drivingCosts = dh.Distance * Config.VH_M_COST;
+                    double pullOutCosts = Config.VH_PULLOUT_COST;
                     DDeadheads.Add(new()
                     {
                         From = DDepotStart,
@@ -194,7 +195,7 @@ namespace E_VCSP.Objects.Discrete
                 double SoCAtDepot = dt.StartingSoC - ((dt.Trip.Distance + dh.Distance) * vh.DriveUsage);
                 if (SoCAtDepot >= 0)
                 {
-                    double drivingCosts = dh.Distance * Config.M_COST;
+                    double drivingCosts = dh.Distance * Config.VH_M_COST;
                     DDeadheads.Add(new()
                     {
                         From = dt,

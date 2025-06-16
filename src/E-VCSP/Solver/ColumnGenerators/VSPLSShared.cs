@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects;
+using E_VCSP.Objects.ParsedData;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {

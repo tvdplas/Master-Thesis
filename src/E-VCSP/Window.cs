@@ -1,10 +1,9 @@
 
 using E_VCSP.Formatting;
-using E_VCSP.Objects;
+using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver;
 using System.Reflection;
 using System.Text;
-using MethodInvoker = System.Windows.Forms.MethodInvoker;
 
 namespace E_VCSP
 {
@@ -14,8 +13,12 @@ namespace E_VCSP
         public string activeFolder = "No folder selected";
 
         Instance? instance;
-        Solver.Solver? solver;
+
+        Solver.Solver? vspSolver;
+        Solver.Solver? cspSolver;
+
         bool working = false;
+
         bool blockView = false;
         int display = 0; // 0 = both, 1 = graph, 2 = console
 
@@ -39,8 +42,8 @@ namespace E_VCSP
             {
                 AutoScroll = true,
                 BorderStyle = BorderStyle.FixedSingle,
-                Location = new System.Drawing.Point(10, 70),
-                Size = new System.Drawing.Size(280, 470),
+                Location = new System.Drawing.Point(10, 105),
+                Size = new System.Drawing.Size(280, 435),
                 Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom,
                 Padding = new Padding(0, 0, 0, 100),
             };
@@ -139,8 +142,8 @@ namespace E_VCSP
                 activeFolder = loadFolderBrowser.SelectedPath;
                 activeFolderLabel.Text = activeFolder.Split("\\").Last();
                 Console.WriteLine($"Loaded folder: {activeFolder}");
-                reload();
             }
+            reload();
         }
 
         private void stopButtonClick(object sender, EventArgs e) // <<< Add this method
@@ -153,13 +156,13 @@ namespace E_VCSP
             }
         }
 
-        private async void solveButtonClick(object sender, EventArgs e) // <<< Change to async void
+        private async void solveVSPClick(object sender, EventArgs e) // <<< Change to async void
         {
             reload(); // Ensure instance and solver are ready
-            if (solver == null) return;
+            if (vspSolver == null) return;
 
             working = true;
-            solveButton.Enabled = false;
+            solveVSPButton.Enabled = false;
             stopButton.Enabled = true;
             cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
@@ -167,15 +170,12 @@ namespace E_VCSP
             bool success = false;
             try
             {
-                success = await Task.Run(() => solver.Solve(token), token);
+                success = await Task.Run(() => vspSolver.Solve(token), token);
 
                 if (success)
                 {
-                    // Update UI thread safely
-                    graphViewer.Invoke((System.Windows.Forms.MethodInvoker)delegate
-                    {
-                        graphViewer.Graph = solver.GenerateSolutionGraph(blockView);
-                    });
+                    graphViewer.Graph = vspSolver.GenerateSolutionGraph(blockView);
+                    solveCSPButton.Enabled = true;
                     Console.WriteLine("Solver finished successfully.");
                 }
                 else
@@ -187,24 +187,13 @@ namespace E_VCSP
             {
                 Console.WriteLine("Solver operation was cancelled.");
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"An error occurred during solving: {ex.Message}");
-                // Optionally show more details or log the exception
-            }
             finally
             {
                 working = false;
-                if (this.IsHandleCreated) // Check if the form handle still exists
-                {
-                    this.Invoke((MethodInvoker)delegate
-                    {
-                        solveButton.Enabled = true;
-                        stopButton.Enabled = false;
-                        cancellationTokenSource?.Dispose(); // Dispose the source
-                        cancellationTokenSource = null;
-                    });
-                }
+                solveVSPButton.Enabled = true;
+                stopButton.Enabled = false;
+                cancellationTokenSource?.Dispose(); // Dispose the source
+                cancellationTokenSource = null;
             }
         }
 
@@ -212,9 +201,14 @@ namespace E_VCSP
         {
             if (activeFolder == "No folder selected") return;
 
+            solveVSPButton.Enabled = true;
+            stopButton.Enabled = false;
+            solveCSPButton.Enabled = false;
+
+
             instance = new(activeFolder);
-            solver = Config.USE_COLUMN_GENERATION ? new EVSPCG(instance) : new EVSPDiscrete(instance);
-            if (instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN && solver is EVSPDiscrete sd)
+            vspSolver = Config.VSP_USE_CG ? new EVSPCG(instance) : new EVSPDiscrete(instance);
+            if (instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN && vspSolver is EVSPDiscrete sd)
             {
                 graphViewer.Graph = sd.DGraph.GenerateDiscreteGraph();
             }
@@ -240,9 +234,9 @@ namespace E_VCSP
 
         private void toggleGraphView(object sender, EventArgs e)
         {
-            if (solver == null || working) return;
+            if (vspSolver == null || working) return;
             blockView = !blockView;
-            graphViewer.Graph = solver.GenerateSolutionGraph(blockView);
+            graphViewer.Graph = vspSolver.GenerateSolutionGraph(blockView);
         }
 
         private void toggleDisplay(object sender, EventArgs e)
@@ -251,6 +245,47 @@ namespace E_VCSP
             if (display == 0)
             {
 
+            }
+        }
+
+        private async void solveCSPClick(object sender, EventArgs e)
+        {
+            if (instance == null || instance.Blocks.Count == 0) return;
+
+            cspSolver = new CSPCG(instance);
+
+            working = true;
+            solveCSPButton.Enabled = false;
+            stopButton.Enabled = true;
+            cancellationTokenSource = new CancellationTokenSource();
+            var token = cancellationTokenSource.Token;
+
+            bool success = false;
+            try
+            {
+                success = await Task.Run(() => cspSolver.Solve(token), token);
+
+                if (success)
+                {
+                    graphViewer.Graph = cspSolver.GenerateSolutionGraph(blockView);
+                    Console.WriteLine("CSP Solver finished successfully.");
+                }
+                else
+                {
+                    Console.WriteLine("Solver did not find a solution or was cancelled.");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("Solver operation was cancelled.");
+            }
+            finally
+            {
+                working = false;
+                solveCSPButton.Enabled = true;
+                stopButton.Enabled = false;
+                cancellationTokenSource?.Dispose(); // Dispose the source
+                cancellationTokenSource = null;
             }
         }
     }

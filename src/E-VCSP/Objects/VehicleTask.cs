@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using E_VCSP.Objects.ParsedData;
+using System.Collections;
 
 namespace E_VCSP.Objects
 {
@@ -83,7 +84,7 @@ namespace E_VCSP.Objects
         {
             Type = VEType.Trip;
             Trip = trip;
-            Cost = trip.Distance * Config.M_COST;
+            Cost = trip.Distance * Config.VH_M_COST;
             SoCDiff = -trip.Distance * vt.DriveUsage;
             StartTime = trip.StartTime;
             EndTime = trip.EndTime;
@@ -110,7 +111,7 @@ namespace E_VCSP.Objects
             StartLocation = dht.From;
             EndLocation = dht.To;
 
-            Cost = dht.Distance * Config.M_COST;
+            Cost = dht.Distance * Config.VH_M_COST;
             SoCDiff = -(dht.Distance * vt.DriveUsage);
         }
 

@@ -1,4 +1,6 @@
-﻿namespace E_VCSP.Objects
+﻿using E_VCSP.Objects.ParsedData;
+
+namespace E_VCSP.Objects
 {
     public enum PVEType
     {
@@ -82,7 +84,7 @@
         {
             Type = PVEType.Trip;
             Trip = trip;
-            DrivingCost = trip.Distance * Config.M_COST;
+            DrivingCost = trip.Distance * Config.VH_M_COST;
             SoCDiff = -trip.Distance * vt.DriveUsage;
             StartTime = trip.StartTime;
             EndTime = trip.EndTime;
@@ -136,10 +138,10 @@
 
             Location idleLocation = IdleAtStart ? DeadheadTemplate.From : DeadheadTemplate.To;
             bool idleAtGarage = idleLocation.BreakAllowed || idleLocation.IsDepot || idleLocation.CanCharge;
-            double idleCost = idleAtGarage ? 0 : Config.IDLE_COST * IdleTime;
+            double idleCost = idleAtGarage ? 0 : Config.VH_IDLE_COST * IdleTime;
             double idleSoCDiff = idleAtGarage ? 0 : -vt.IdleUsage * IdleTime;
 
-            DrivingCost = dht.Distance * Config.M_COST + idleCost;
+            DrivingCost = dht.Distance * Config.VH_M_COST + idleCost;
             SoCDiff = -(dht.Distance * vt.DriveUsage) + idleSoCDiff;
         }
 
