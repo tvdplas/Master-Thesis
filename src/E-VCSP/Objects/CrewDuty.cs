@@ -78,6 +78,7 @@ namespace E_VCSP.Objects
         Between, // Begin before 13, ends after 18:15. Max 10% overall
         Broken, // Begin after 5:30, end before 19:30, min 1.5 hours of rest inbetween
         Count,
+        Single, // Only a single block; only used for initialization
     }
 
     public class CrewDuty
@@ -92,9 +93,10 @@ namespace E_VCSP.Objects
             get
             {
                 // Driving / idle / charging costs throughout the day
-                double cost = Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CREW_HOURLY_COST);
+                double cost = Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST);
 
-                if (Type == DutyType.Broken) cost += Config.CREW_BROKEN_SHIFT_COST;
+                if (Type == DutyType.Broken) cost += Config.CR_BROKEN_SHIFT_COST;
+                if (Type == DutyType.Single) cost += 1_000_000;
 
                 return cost;
             }
@@ -112,6 +114,25 @@ namespace E_VCSP.Objects
             for (int i = 0; i < Covers.Count; i++) ba[Covers[i]] = true;
             return ba;
         }
+
+        public override string ToString()
+        {
+            string type = "";
+            switch (Type)
+            {
+                case DutyType.Early: type = "Early"; break;
+                case DutyType.Day: type = "Day"; break;
+                case DutyType.Late: type = "Late"; break;
+                case DutyType.Broken: type = "Broken"; break;
+                case DutyType.Between: type = "Between"; break;
+                case DutyType.Night: type = "Night"; break;
+                case DutyType.Single: type = "Single"; break;
+            }
+
+            return $"[{Index}] {type} duty";
+        }
+
+        public int Duration => Elements[^1].EndTime - Elements[^1].StartTime;
     }
 }
 

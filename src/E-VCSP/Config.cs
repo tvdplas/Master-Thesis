@@ -48,9 +48,18 @@
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double VH_IDLE_COST = 0; // Cost per unit of time for being idle.
         public static int MAX_DRIVE_TIME = 60 * 60 * 4; // conitnous driving time
-        public static double CREW_SHIFT_COST = 200; // Minimum price to pay a crew member
-        public static double CREW_HOURLY_COST = 65; // hourly cost of employee. based on qbuzz data
-        public static double CREW_BROKEN_SHIFT_COST = 20; // additional surcharge for broken shift. based on qbuzz data
+        public static double CR_SHIFT_COST = 20; // Minimum price to pay a crew member
+        public static double CR_HOURLY_COST = 65; // hourly cost of employee. based on qbuzz data
+        public static double CR_BROKEN_SHIFT_COST = 20; // additional surcharge for broken shift. based on qbuzz data
+        public static double CR_MAX_BROKEN_SHIFTS = 0.3;
+        public static double CR_MAX_BETWEEN_SHIFTS = 0.1;
+        public static double CR_MAX_OVER_LONG_SHIFT = 0.15;
+        public static int CR_TARGET_SHIFT_LENGTH = 8 * 60 * 60;
+        public static int CR_LONG_SHIFT_LENGTH = (int)(8.5 * 60 * 60);
+        public static int CR_MAX_SHIFT_LENGTH = 9 * 60 * 60;
+        public static int CR_MIN_BREAK_TIME = 15 * 60;
+        public static int CR_MAX_BREAK_TIME = (int)(1.5 * 60 * 60);
+        public static int CR_MAX_IDLE_TIME = 4 * 60 * 60;
         public static int DISCRETE_FACTOR = 5;
 
         public static Header VSP = new();
@@ -61,7 +70,7 @@
         public static bool VSP_ALLOW_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
 
         public static Header VSP_CG = new();
-        public static int VSP_COLS_PER_IT = 10;
+        public static int VSP_INSTANCES_PER_IT = 1;
         public static int VSP_MAX_COL_GEN_ITS = 100;
         public static int VSP_OPT_IT_THRESHOLD = 10; // Amount of columns sequentially generated without rc before cg is stopped
 
@@ -75,6 +84,7 @@
         public static double VSP_LS_S_ENDING_T = 0.01;
         public static double VSP_LS_S_COOLING_RATE = 0.95;
         public static double VSP_LS_S_ITERATIONS = 100_000;
+        public static int VSP_LS_S_NUM_COLS = 100;
         public static double VSP_LS_S_ADD_TRIP = 20;
         public static double VSP_LS_S_REM_TRIP = 2;
         public static double VSP_LS_S_ADD_CHARGE = 10;
@@ -87,14 +97,25 @@
         public static double VSP_LS_G_STARTING_T = 50;
         public static double VSP_LS_G_ENDING_T = 0.01;
         public static double VSP_LS_G_COOLING_RATE = 0.98;
-        public static double VSP_LS_G_ITERATIONS = 100_000;
-        public static double VSP_LS_G_2OPT = 15;
-        public static double VSP_LS_G_MOVE_RANGE = 15;
-        public static double VSP_LS_G_CHANGE_CHARGE = 15;
+        public static double VSP_LS_G_ITERATIONS = 10_000_000;
+        public static int VSP_LS_G_NUM_COLS = 10;
+        public static double VSP_LS_G_2OPT = 20;
+        public static double VSP_LS_G_MOVE_RANGE = 20;
+        public static double VSP_LS_G_ADD_CHARGE = 5;
+        public static double VSP_LS_G_REMOVE_CHARGE = 1;
+        public static double VSP_LS_G_ADD_HNDVR = 1;
+        public static double VSP_LS_G_REMOVE_HNDVR = 0.2;
 
         public static Header CSP = new();
         public static bool CSP_DETERMINE_IIS = false;
         public static int CSP_SOLVER_TIMEOUT_SEC = 300;
+        public static int CSP_OPT_IT_THRESHOLD = 10; // Amount of columns sequentially generated without rc before cg is stopped
         public static bool CSP_ALLOW_OVERCOVER = true; // determines >= in constraint
+        public static int CSP_INSTANCES_PER_IT = 1;
+        public static int CSP_MAX_COL_GEN_ITS = 100;
+
+        public static Header CSP_LABELING = new();
+        public static int CSP_LB_MAX_COLS = 50;
+        public static bool CSP_LB_ATTEMPT_DISJOINT = true; // try to find disjoint paths; if none can be found, return any arbitrary path
     }
 }

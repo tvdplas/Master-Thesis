@@ -177,6 +177,9 @@ namespace E_VCSP.Objects
                 // Costs of overnight recharge
                 cost += Math.Min(0, vehicleType.StartSoC - (double)Elements[^1]!.EndSoCInTask!) * vehicleType.Capacity / 100 * Config.KWH_COST;
 
+                // Cost of just using vehicle
+                cost += Config.VH_PULLOUT_COST;
+
                 return cost;
             }
         }

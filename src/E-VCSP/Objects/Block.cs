@@ -46,15 +46,19 @@ namespace E_VCSP.Objects
             }
             else if (ve is VEDeadhead ved)
             {
-                elements.Add(new BEDeadhead()
+                // Edge case for self arc "deadhead" 
+                if (ved.DeadheadTemplate.Duration > 0)
                 {
-                    DeadheadTemplate = ved.DeadheadTemplate,
-                    EndTime = ved.EndTime,
-                    StartTime = ved.StartTime,
-                    StartLocation = ved.DeadheadTemplate.From,
-                    EndLocation = ved.DeadheadTemplate.To,
-                    Type = BlockElementType.Deadhead,
-                });
+                    elements.Add(new BEDeadhead()
+                    {
+                        DeadheadTemplate = ved.DeadheadTemplate,
+                        EndTime = ved.EndTime,
+                        StartTime = ved.StartTime,
+                        StartLocation = ved.DeadheadTemplate.From,
+                        EndLocation = ved.DeadheadTemplate.To,
+                        Type = BlockElementType.Deadhead,
+                    });
+                }
             }
             else if (ve is VECharge vec)
             {

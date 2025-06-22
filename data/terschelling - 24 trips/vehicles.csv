@@ -1,0 +1,3 @@
+Type;Capaciteit;Verbruik (kWh/km);Verbruik bij stilstand (kWh per uur stilstand);Laadsnelheid (0-100%) kWh;Laagste toegestane lading;Aantal beschikbaar
+V12E;172.8;1.28;6.5;40;0.15;2
+V18S;230.4;1.84;9.3;40;0.15;4

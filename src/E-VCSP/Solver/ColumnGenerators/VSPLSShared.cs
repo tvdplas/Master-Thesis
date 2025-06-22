@@ -21,7 +21,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// Vehicle element represented in node
         /// </summary>
-        public required PartialVehicleElement VE;
+        public required PartialVehicleElement PVE;
 
         /// <summary>
         /// Previous vehicle element
@@ -39,7 +39,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         public override string ToString()
         {
-            return $"{DEBUG_INDEX}: {VE}";
+            return $"{DEBUG_INDEX}: {PVE}";
         }
 
         #region find
@@ -125,7 +125,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         {
             ArgumentNullException.ThrowIfNull(node);
 
-            if (VE.EndTime != node.VE.StartTime)
+            if (PVE.EndTime != node.PVE.StartTime)
                 throw new InvalidOperationException("Vehicle task is not continuous");
 
             // Set next correctly
@@ -146,7 +146,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         {
             return AddAfter(new LLNode()
             {
-                VE = ve,
+                PVE = ve,
             });
         }
         #endregion
@@ -172,7 +172,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             double chargingCost = 0;
 
             double currSoC = vt.StartSoC;
-            int drivingSince = ((PVETravel)Next!.VE).DepartureTime;
+            int drivingSince = ((PVETravel)Next!.PVE).DepartureTime;
 
             bool SoCInBounds() => currSoC <= vt.MaxSoC && currSoC >= vt.MinSoC;
             void performCharge(int chargeTime, Location chargeLocation)
@@ -193,9 +193,16 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             LLNode? curr = this.Next!; // First travel after depot head
 
+            int its = 0;
+
             while (curr.Next != null) // end at depot
             {
-                PartialVehicleElement VE = curr.VE;
+                if (its++ > 10000)
+                {
+                    throw new InvalidOperationException("te veel its");
+                }
+
+                PartialVehicleElement VE = curr.PVE;
 
                 // Only update soc and driving costs; everything interesting is handled elsewhere
                 if (VE.Type == PVEType.Travel)
@@ -205,8 +212,8 @@ namespace E_VCSP.Solver.ColumnGenerators
                 }
                 else
                 {
-                    PVETravel prevTravel = (PVETravel)curr.Prev!.VE;
-                    PVETravel nextTravel = (PVETravel)curr.Next!.VE;
+                    PVETravel prevTravel = (PVETravel)curr.Prev!.PVE;
+                    PVETravel nextTravel = (PVETravel)curr.Next!.PVE;
 
                     // Start by checking whether we are allowed to hand over at the start;
                     // if so, update the time we are driving
@@ -277,12 +284,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
 
             // Check if arrival at depot was valid
-            handoversFeasible &= handoverValid(((PVETravel)curr.Prev!.VE).ArrivalTime);
-
-            if (!handoversFeasible)
-            {
-                int x = 0;
-            }
+            handoversFeasible &= handoverValid(((PVETravel)curr.Prev!.PVE).ArrivalTime);
 
             // Check if SoC was valid
             chargeFeasible &= SoCInBounds();
@@ -315,19 +317,19 @@ namespace E_VCSP.Solver.ColumnGenerators
             LLNode? curr = this; // First travel after depot head
             while (curr != null) // end at depot
             {
-                PartialVehicleElement VE = curr.VE;
+                PartialVehicleElement VE = curr.PVE;
 
                 if (VE.Type == PVEType.Depot)
                 {
                     VEIdle vei;
                     if (curr.Prev == null)
                     {
-                        vei = new(VE.StartLocation!, VE.StartTime, ((PVETravel)curr.Next!.VE).DepartureTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
+                        vei = new(VE.StartLocation!, VE.StartTime, ((PVETravel)curr.Next!.PVE).DepartureTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
 
                     }
                     else
                     {
-                        vei = new(VE.StartLocation!, ((PVETravel)curr.Prev!.VE).ArrivalTime, VE.EndTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
+                        vei = new(VE.StartLocation!, ((PVETravel)curr.Prev!.PVE).ArrivalTime, VE.EndTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
                     }
                     elements.Add(vei);
                     currSoC += VE.SoCDiff;
@@ -341,8 +343,8 @@ namespace E_VCSP.Solver.ColumnGenerators
                 }
                 else
                 {
-                    PVETravel prevTravel = (PVETravel)curr.Prev!.VE;
-                    PVETravel nextTravel = (PVETravel)curr.Next!.VE;
+                    PVETravel prevTravel = (PVETravel)curr.Prev!.PVE;
+                    PVETravel nextTravel = (PVETravel)curr.Next!.PVE;
 
                     // Then, check for charging and update SoC / costs
                     int chargeTimeBefore = 0, chargeTimeAfter = 0;
@@ -399,6 +401,282 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
 
             return new VehicleTask(elements) { vehicleType = vt };
+        }
+    }
+
+    public class LSOperations
+    {
+        private Instance instance;
+        private List<List<DeadheadTemplate?>> locationDHT = [];
+        private VehicleType vehicleType;
+        private Random random = new();
+        public double T;
+
+        public LSOperations(Instance instance, List<List<DeadheadTemplate?>> locationDHT, VehicleType vt, double t)
+        {
+            this.instance = instance;
+            this.locationDHT = locationDHT;
+            this.vehicleType = vt;
+            T = t;
+        }
+
+
+        /// <summary>
+        /// Adds a stop to the task
+        /// </summary>
+        /// <param name="ve"></param>
+        /// <param name="reducedCostsDiff"></param>
+        /// <returns></returns>
+        public LSOpResult addStop(LLNode? head, PartialVehicleElement ve, double reducedCostsDiff)
+        {
+            if (ve.Type == PVEType.Depot || ve.Type == PVEType.Travel)
+                throw new InvalidOperationException("Are you sure?");
+
+            // Find addition targetss
+            LLNode? prev = head!.FindLastAfter((node) =>
+            {
+                PVEType type = node.PVE.Type;
+                return type != PVEType.Travel && node.PVE.EndTime <= ve.StartTime;
+            }) ?? head;
+            LLNode? next = prev!.FindFirstAfter((node) =>
+            {
+                PVEType type = node.PVE.Type;
+                return type != PVEType.Travel;
+            }) ?? head;
+            if (prev == null || next == null) throw new InvalidDataException("Could not find prev/next");
+            if (next != prev!.Next!.Next) throw new InvalidDataException("Vlgm gaat hier nog iets mis");
+
+            // See if travels can be made to connect prev -travel1> ve -travel2> next
+            DeadheadTemplate? travel1Template = locationDHT[prev.PVE.EndLocation!.Index][ve.StartLocation!.Index];
+            DeadheadTemplate? travel2Template = locationDHT[ve.EndLocation!.Index][next.PVE.StartLocation!.Index];
+
+            // No travel possible
+            if (travel1Template == null || travel2Template == null) return LSOpResult.Invalid;
+
+            // No time for new travels
+            if (travel1Template.Duration > ve.StartTime - prev.PVE.EndTime || travel2Template.Duration > next.PVE.StartTime - ve.EndTime) return LSOpResult.Invalid;
+
+            // New travel is time feasible 
+            // Will now check charge / handover time feasibility
+            double costDiff = reducedCostsDiff;
+
+            // Costs lost due to previous travel
+            LLNode oldTravel = prev.Next!;
+
+            // Old charge / driving costs
+            var oldRes = head!.validateTail(vehicleType);
+            if (!oldRes.handoversFeasible || !oldRes.chargeFeasible) throw new InvalidOperationException("you fucked up");
+            costDiff -= oldRes.drivingCost;
+            costDiff -= oldRes.chargingCost;
+
+            // Add new part into mix
+            LLNode travel1 = new LLNode()
+            {
+                PVE = new PVETravel(travel1Template, prev.PVE.EndTime, ve.StartTime, vehicleType)
+            };
+            travel1.Prev = prev;
+            LLNode stop = travel1.AddAfter(ve);
+            LLNode travel2 = stop.AddAfter(new PVETravel(travel2Template, ve.EndTime, next.PVE.StartTime, vehicleType));
+            travel2.Next = next;
+
+            prev.Next = travel1;
+            next.Prev = travel2;
+            var newRes = head!.validateTail(vehicleType);
+            bool changeFeasible = newRes.handoversFeasible && newRes.chargeFeasible;
+            costDiff += newRes.drivingCost;
+            costDiff += newRes.chargingCost;
+
+            bool decline = !accept(costDiff);
+
+            if (!changeFeasible || decline)
+            {
+                // revert
+                prev.Next = oldTravel;
+                next.Prev = oldTravel;
+
+                return decline ? LSOpResult.Decline : LSOpResult.Invalid;
+            }
+
+            return (costDiff < 0) ? LSOpResult.Improvement : LSOpResult.Accept;
+        }
+
+        public LSOpResult removeStop(LLNode? head, LLNode node, double reducedCostsDiff)
+        {
+            if (node.PVE.Type == PVEType.Depot || node.PVE.Type == PVEType.Travel)
+                throw new InvalidOperationException("Are you sure?");
+
+            // Find addition targets
+            LLNode prev = node.Prev!.Prev!;
+            LLNode next = node.Next!.Next!;
+
+            // See if travels can be made to connect prev -travel1> ve -travel2> next
+            DeadheadTemplate? travelTemplate = locationDHT[prev.PVE.EndLocation!.Index][next.PVE.StartLocation!.Index];
+
+            // No travel possible
+            if (travelTemplate == null) return LSOpResult.Invalid;
+
+            // No time for new travel
+            if (travelTemplate.Duration > next.PVE.StartTime - prev.PVE.EndTime) return LSOpResult.Invalid;
+
+            // New travel is time feasible 
+            double costDiff = reducedCostsDiff;
+
+            // Previous travels
+            LLNode oldTravel1 = prev.Next!;
+            LLNode oldTravel2 = next.Prev!;
+
+            // Old charge / driving costs
+            var oldRes = head!.validateTail(vehicleType);
+            if (!oldRes.handoversFeasible || !oldRes.chargeFeasible) throw new InvalidOperationException("you fucked up");
+            costDiff -= oldRes.drivingCost;
+            costDiff -= oldRes.chargingCost;
+
+            // Add new part into mix
+            LLNode travel = new LLNode()
+            {
+                PVE = new PVETravel(travelTemplate, prev.PVE.EndTime, next.PVE.StartTime, vehicleType)
+            };
+            travel.Prev = prev;
+            travel.Next = next;
+
+            prev.Next = travel;
+            next.Prev = travel;
+            var newRes = head!.validateTail(vehicleType);
+            bool changeFeasible = newRes.handoversFeasible && newRes.chargeFeasible;
+            costDiff += newRes.drivingCost;
+            costDiff += newRes.chargingCost;
+
+            bool decline = !accept(costDiff);
+
+            if (!changeFeasible || decline)
+            {
+                // revert
+                prev.Next = oldTravel1;
+                next.Prev = oldTravel2;
+
+                return decline ? LSOpResult.Decline : LSOpResult.Invalid;
+            }
+
+            return (costDiff < 0) ? LSOpResult.Improvement : LSOpResult.Accept;
+        }
+
+        /// <summary>
+        /// adds random charging stop
+        /// </summary>
+        public LSOpResult addChargeStop(LLNode? head)
+        {
+            // Select random trip
+            int selectIndex = random.Next(instance.ChargingLocations.Count);
+            Location selectedLocation = instance.ChargingLocations[selectIndex];
+
+            List<(int start, int end)> times = new();
+            LLNode? curr = head;
+            while (curr != null)
+            {
+                if (curr.PVE.Type == PVEType.Travel)
+                {
+                    if (!curr.Prev.PVE.EndLocation.CanCharge && !curr.Next.PVE.StartLocation.CanCharge)
+                    {
+                        times.Add((curr.PVE.StartTime, curr.PVE.EndTime));
+                    }
+                }
+                curr = curr.Next;
+            }
+
+            if (times.Count == 0) return LSOpResult.Invalid;
+
+            var timeSlot = times[random.Next(times.Count)];
+            var padding = Math.Max(0, (timeSlot.end - timeSlot.start - Config.MIN_NODE_TIME) / 2);
+
+            return addStop(head, new PVECharge(
+                selectedLocation,
+                Math.Min(timeSlot.start + padding, timeSlot.end),
+                Math.Min(timeSlot.start + padding + Config.MIN_NODE_TIME, timeSlot.end)),
+                0
+            );
+        }
+
+        /// <summary>
+        /// Removes random charging stop
+        /// </summary>
+        /// <returns></returns>
+        public LSOpResult removeChargeStop(LLNode? head)
+        {
+            List<LLNode> targets = new();
+
+            LLNode? curr = head;
+            while (curr != null)
+            {
+                if (curr.PVE.Type == PVEType.ChargeDetour) targets.Add(curr);
+                curr = curr.Next;
+            }
+
+            if (targets.Count == 0) return LSOpResult.Invalid;
+
+            return removeStop(head, targets[random.Next(targets.Count)], 0);
+        }
+
+        /// <summary>
+        /// adds random charging stop
+        /// </summary>
+        public LSOpResult addHandoverStop(LLNode? head)
+        {
+            // Select random trip
+            List<Location> handoverLocations = instance.Locations.Where(x => x.HandoverAllowed).ToList();
+            int selectIndex = random.Next(handoverLocations.Count);
+            Location selectedLocation = handoverLocations[selectIndex];
+
+            List<(int start, int end)> times = new();
+            LLNode? curr = head;
+            while (curr != null)
+            {
+                if (curr.PVE.Type == PVEType.Travel)
+                {
+                    if (!curr.Prev.PVE.EndLocation.HandoverAllowed && !curr.Next.PVE.StartLocation.HandoverAllowed)
+                    {
+                        times.Add((curr.PVE.StartTime, curr.PVE.EndTime));
+                    }
+                }
+                curr = curr.Next;
+            }
+
+            if (times.Count == 0) return LSOpResult.Invalid;
+
+            var timeSlot = times[random.Next(times.Count)];
+            var padding = Math.Max(0, (timeSlot.end - timeSlot.start - selectedLocation.MinHandoverTime) / 2);
+
+            return addStop(head, new PVEHandover(
+                selectedLocation,
+                Math.Min(timeSlot.start + padding, timeSlot.end),
+                Math.Min(timeSlot.start + padding + selectedLocation.MinHandoverTime, timeSlot.end)),
+                0
+            );
+        }
+
+        /// <summary>
+        /// Removes random charging stop
+        /// </summary>
+        /// <returns></returns>
+        public LSOpResult removeHandoverStop(LLNode? head)
+        {
+            List<LLNode> targets = new();
+
+            LLNode? curr = head;
+            while (curr != null)
+            {
+                if (curr.PVE.Type == PVEType.ChargeDetour) targets.Add(curr);
+                curr = curr.Next;
+            }
+
+            if (targets.Count == 0) return LSOpResult.Invalid;
+
+            return removeStop(head, targets[random.Next(targets.Count)], 0);
+        }
+
+        private bool accept(double deltaScore)
+        {
+            if (deltaScore < 0) return true;
+            return Math.Exp(-deltaScore / T) > random.NextDouble();
         }
     }
 }

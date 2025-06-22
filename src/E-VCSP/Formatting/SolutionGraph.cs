@@ -11,6 +11,8 @@ namespace E_VCSP.Formatting
             Graph graph = new();
 
             List<(int startTime, int endTime, List<Node?> nodes)> taskNodes = [];
+            tasks = tasks.OrderBy(x => x.Elements[0].StartTime).ToList();
+
 
             for (int i = 0; i < tasks.Count; i++)
             {
@@ -42,7 +44,7 @@ namespace E_VCSP.Formatting
                     else if (element is VETrip vet)
                     {
                         color = Color.LightBlue;
-                        text = $"{vet.Trip.From}@{SoCAtStart}% -> {vet.Trip.To}@{SoCAtEnd}% ({vet.Trip.Route})";
+                        text = $"{vet.Trip.From}@{SoCAtStart}% -> {vet.Trip.To}@{SoCAtEnd}% ({vet.Trip.Route} / {vet.Trip.Id})";
                     }
                     else if (element is VEDeadhead ved)
                     {
@@ -116,6 +118,8 @@ namespace E_VCSP.Formatting
         public static Graph GenerateBlockGraph(List<List<Block>> blockRows)
         {
             Graph graph = new();
+            blockRows = blockRows.OrderBy(x => x[0].StartTime).ToList();
+
 
             List<(int startTime, int endTime, List<Node?> nodes)> taskNodes = [];
 
@@ -211,6 +215,8 @@ namespace E_VCSP.Formatting
         {
             Graph graph = new();
 
+            duties = duties.OrderBy(x => x.Elements[0].StartTime).ToList();
+
             List<(int startTime, int endTime, List<Node?> nodes)> taskNodes = [];
 
             for (int i = 0; i < duties.Count; i++)
@@ -241,7 +247,7 @@ namespace E_VCSP.Formatting
                     else if (element is CDEBlock cdebl)
                     {
                         color = Color.LightBlue;
-                        text = $"{cdebl.StartLocation} -> {cdebl.EndLocation}";
+                        text = $"{cdebl.StartLocation} -> {cdebl.EndLocation} ({cdebl.Block.Index})";
                     }
                     else if (element is CDETravel cdet)
                     {
@@ -272,7 +278,7 @@ namespace E_VCSP.Formatting
                 var align = Formatting.GraphElement.ScheduleNode(
                     minTime - 1000,
                     minTime,
-                    $"Duty {duties[i].Index}\nCosts: {duties[i].Cost}",
+                    $"{duties[i]} {Formatting.Time.HHMMSS(duties[i].Elements[0].StartTime)}-{Formatting.Time.HHMMSS(duties[i].Elements[^1].EndTime)}\nCosts: {duties[i].Cost}",
                     Color.White);
                 graph.AddNode(align);
                 ns.Insert(0, align);

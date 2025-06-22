@@ -27,7 +27,7 @@ namespace E_VCSP
             textBox1 = new TextBox();
             panel1 = new Panel();
             solveCSPButton = new Button();
-            button1 = new Button();
+            viewToggleButton = new Button();
             solveVSPButton = new Button();
             stopButton = new Button();
             button2 = new Button();
@@ -121,7 +121,7 @@ namespace E_VCSP
             // panel1
             // 
             panel1.Controls.Add(solveCSPButton);
-            panel1.Controls.Add(button1);
+            panel1.Controls.Add(viewToggleButton);
             panel1.Controls.Add(solveVSPButton);
             panel1.Controls.Add(stopButton);
             panel1.Controls.Add(loadButton);
@@ -142,16 +142,16 @@ namespace E_VCSP
             solveCSPButton.UseVisualStyleBackColor = true;
             solveCSPButton.Click += solveCSPClick;
             // 
-            // button1
+            // viewToggleButton
             // 
-            button1.Enabled = false;
-            button1.Location = new Point(146, 62);
-            button1.Name = "button1";
-            button1.Size = new Size(155, 23);
-            button1.TabIndex = 4;
-            button1.Text = "Toggle Graph View";
-            button1.UseVisualStyleBackColor = true;
-            button1.Click += toggleGraphView;
+            viewToggleButton.Enabled = false;
+            viewToggleButton.Location = new Point(146, 62);
+            viewToggleButton.Name = "viewToggleButton";
+            viewToggleButton.Size = new Size(155, 23);
+            viewToggleButton.TabIndex = 4;
+            viewToggleButton.Text = "Toggle Graph View";
+            viewToggleButton.UseVisualStyleBackColor = true;
+            viewToggleButton.Click += toggleGraphView;
             // 
             // solveVSPButton
             // 
@@ -268,7 +268,7 @@ namespace E_VCSP
         private Button solveVSPButton;
         private Button stopButton;
         private CancellationTokenSource cancellationTokenSource;
-        private Button button1;
+        private Button viewToggleButton;
         private Button button2;
         private Button button3;
         private Button button4;

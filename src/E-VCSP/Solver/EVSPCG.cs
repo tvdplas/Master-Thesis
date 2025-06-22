@@ -274,9 +274,9 @@ namespace E_VCSP.Solver
             return tasks;
         }
 
-        private List<Block> getBlocks()
+        private List<Block> getBlocks(bool console)
         {
-            return getSelectedTasks(false)
+            return getSelectedTasks(console)
                 .SelectMany(t => Block.FromVehicleTask(t))
                 .Select((b, i) => { b.Index = i; return b; })
                 .ToList();
@@ -333,7 +333,7 @@ namespace E_VCSP.Solver
             for (int i = 0; i < tasks.Count; i++)
             {
                 string name = $"vt_{i}";
-                GRBVar v = model.AddVar(0, 1, tasks[i].Cost, GRB.CONTINUOUS, name);
+                GRBVar v = model.AddVar(0, GRB.INFINITY, tasks[i].Cost, GRB.CONTINUOUS, name);
                 maxVehicles += v;
 
                 // Bookkeeping to find variable based on name / cover easily
@@ -373,7 +373,7 @@ namespace E_VCSP.Solver
             model.Optimize();
 
             // Tracking generated columns
-            int maxColumns = Config.VSP_COLS_PER_IT * Config.VSP_MAX_COL_GEN_ITS,
+            int maxColumns = Config.VSP_INSTANCES_PER_IT * Config.VSP_MAX_COL_GEN_ITS,
                 lastReportedPercent = 0,    // Percentage of total reporting
                 currIts = 1,                // Number of CG / solution rounds had
                 totalGenerated = 0,         // Total number of columns generated
@@ -388,9 +388,9 @@ namespace E_VCSP.Solver
 
             // Multithreaded shortestpath searching
             List<List<VehicleShortestPath>> instances = [
-                [.. Enumerable.Range(0, Config.VSP_COLS_PER_IT).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // SP
-                [.. Enumerable.Range(0, Config.VSP_COLS_PER_IT).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_SINGLE
-                //[.. Enumerable.Range(0, Config.THREADS).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // LS_GLOBAL
+                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // SP
+                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_SINGLE
+                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_GLOBAL
             ];
             List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_SINGLE_WEIGHT, Config.VSP_LS_GLOBAL_WEIGHT];
             List<double> sums = [operationChances[0]];
@@ -411,16 +411,16 @@ namespace E_VCSP.Solver
                 var reducedCosts = model.GetConstrs().Select(x => x.Pi);
 
                 // Generate batch of new tasks using pricing information from previous solve
-                List<(double, VehicleTask)>[] generatedTasks = new List<(double, VehicleTask)>[Config.VSP_COLS_PER_IT];
+                List<(double, VehicleTask)>[] generatedTasks = new List<(double, VehicleTask)>[Config.VSP_INSTANCES_PER_IT];
 
 
                 double r = rnd.NextDouble() * sums[^1];
                 int selectedMethodÍndex = sums.FindIndex(x => r <= x);
                 List<VehicleShortestPath> selectedMethod = instances[selectedMethodÍndex];
 
-                if (Config.VSP_COLS_PER_IT > 1)
+                if (Config.VSP_INSTANCES_PER_IT > 1)
                 {
-                    Parallel.For(0, Config.VSP_COLS_PER_IT, (i) =>
+                    Parallel.For(0, Config.VSP_INSTANCES_PER_IT, (i) =>
                     {
                         generatedTasks[i] = selectedMethod[i].GenerateVehicleTasks();
                     });
@@ -430,13 +430,13 @@ namespace E_VCSP.Solver
                     generatedTasks[0] = selectedMethod[0].GenerateVehicleTasks();
                 }
 
-
                 totalGenerated += generatedTasks.Length;
+                int colsGenerated = generatedTasks.Sum(t => t.Count);
                 switch (selectedMethodÍndex)
                 {
-                    case 0: lbGenerated += generatedTasks.Length; break;
-                    case 1: singleGenerated += generatedTasks.Length; break;
-                    case 2: globalGenerated += generatedTasks.Length; break;
+                    case 0: lbGenerated += colsGenerated; break;
+                    case 1: singleGenerated += colsGenerated; break;
+                    case 2: globalGenerated += colsGenerated; break;
                     default: throw new InvalidOperationException("You forgot to add a case");
                 }
 
@@ -461,22 +461,13 @@ namespace E_VCSP.Solver
 
                         // Check if task is already in model 
                         BitArray ba = newTask.ToBitArray(instance.Trips.Count);
-                        if (Config.CONSOLE_COVER)
-                        {
-                            Console.WriteLine($"Cover: {String.Join("", Enumerable.Range(0, ba.Count).Select(i => ba[i] ? "1" : "0"))}");
-                        }
-
                         bool coverExists = coverTaskMapping.ContainsKey(ba);
-                        if (coverExists)
-                        {
-                            VehicleTask vt = coverTaskMapping[ba];
 
-                            // Same cover but higher cost can be ignored safely.
-                            if (vt.Cost < newTask.Cost)
-                            {
-                                discardedNewColumns++;
-                                continue;
-                            }
+                        // Cover already exists and is cheaper -> skip
+                        if (coverExists && coverTaskMapping[ba].Cost < newTask.Cost)
+                        {
+                            discardedNewColumns++;
+                            continue;
                         }
 
                         // Add column to model 
@@ -494,8 +485,7 @@ namespace E_VCSP.Solver
 
                                 // Bookkeeping; replace task in public datastructures
                                 tasks[index] = newTask;
-                                string name = $"vt_{index}";
-                                varnameTaskMapping[name] = newTask;
+                                varnameTaskMapping[$"vt_{index}"] = newTask;
                                 coverTaskMapping[ba] = newTask;
 
                                 // Adjust costs in model
@@ -513,18 +503,17 @@ namespace E_VCSP.Solver
                                 // Create new column to add to model
                                 var modelConstrs = model.GetConstrs();
                                 GRBConstr[] constrs = [.. modelConstrs.Where(
-                                (_, i) => newTask.Covers.Contains(i)    // Covers trip
-                                || i == modelConstrs.Length - 1        // Add to used vehicles
-                            )];
+                                    (_, i) => newTask.Covers.Contains(i)    // Covers trip
+                                    || i == modelConstrs.Length - 1        // Add to used vehicles
+                                )];
                                 GRBColumn col = new();
                                 col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
 
                                 // Add column to model
-                                taskVars.Add(model.AddVar(0, 1, newTask.Cost, GRB.CONTINUOUS, col, name));
+                                taskVars.Add(model.AddVar(0, GRB.INFINITY, newTask.Cost, GRB.CONTINUOUS, col, name));
                                 varnameTaskMapping[name] = tasks[^1];
                                 coverTaskMapping[ba] = tasks[^1];
                             }
-
                         }
                         else
                         {
@@ -535,16 +524,16 @@ namespace E_VCSP.Solver
                 }
 
 
+                // Continue.......
+                model.Update();
+                model.Optimize();
+                currIts++;
+
                 if (seqWithoutRC >= Config.VSP_OPT_IT_THRESHOLD)
                 {
                     Console.WriteLine($"Stopped due to RC > 0 for {Config.VSP_OPT_IT_THRESHOLD} consecutive tasks");
                     break;
                 }
-
-                // Continue.......
-                model.Update();
-                model.Optimize();
-                currIts++;
             }
 
             Console.WriteLine($"Value of relaxation: {model.ObjVal}");
@@ -552,7 +541,7 @@ namespace E_VCSP.Solver
             // Make model binary again
             foreach (GRBVar var in taskVars)
             {
-                if (var.VarName.StartsWith(""))
+                if (var.VarName.StartsWith("vt_"))
                     var.Set(GRB.CharAttr.VType, GRB.BINARY);
             }
 
@@ -588,7 +577,7 @@ namespace E_VCSP.Solver
             }
 
 
-            instance.Blocks = getBlocks();
+            instance.Blocks = getBlocks(true);
             Config.CONSOLE_GUROBI = configState;
             return true;
         }

@@ -175,6 +175,7 @@ namespace E_VCSP
                 if (success)
                 {
                     graphViewer.Graph = vspSolver.GenerateSolutionGraph(blockView);
+                    viewToggleButton.Enabled = true;
                     solveCSPButton.Enabled = true;
                     Console.WriteLine("Solver finished successfully.");
                 }
@@ -203,6 +204,7 @@ namespace E_VCSP
 
             solveVSPButton.Enabled = true;
             stopButton.Enabled = false;
+            viewToggleButton.Enabled = false;
             solveCSPButton.Enabled = false;
 
 
