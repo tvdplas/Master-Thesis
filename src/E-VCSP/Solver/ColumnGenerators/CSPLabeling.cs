@@ -125,7 +125,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         internal bool isFeasible(int currentEndTime, bool final)
         {
-            if (PrevBlockId == 1 && final)
+            if (PrevBlockId == 22 && final)
             {
                 int x = 0;
             }

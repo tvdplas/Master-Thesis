@@ -94,11 +94,10 @@ namespace E_VCSP.Solver
             GRBLinExpr maxBetween = new(); // max 10% between
             GRBLinExpr maxSingle = new(); // Use singles at a cost
 
-            GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, 1_000_000, GRB.CONTINUOUS, "noExcessiveLengthSlack");
-            GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, 1_000_000, GRB.CONTINUOUS, "limitedAverageLengthSlack");
-            GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, 1_000_000, GRB.CONTINUOUS, "maxBrokenSlack");
-            GRBVar maxBetweenSlack = model.AddVar(0, GRB.INFINITY, 1_000_000, GRB.CONTINUOUS, "maxBetweenSlack");
-            GRBVar maxSingleSlack = model.AddVar(0, GRB.INFINITY, 1_000_000_000, GRB.CONTINUOUS, "maxSingleSlack");
+            GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, 10, GRB.CONTINUOUS, "noExcessiveLengthSlack");
+            GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, 10, GRB.CONTINUOUS, "limitedAverageLengthSlack");
+            GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, 10, GRB.CONTINUOUS, "maxBrokenSlack");
+            GRBVar maxBetweenSlack = model.AddVar(0, GRB.INFINITY, 10, GRB.CONTINUOUS, "maxBetweenSlack");
 
             for (int i = 0; i < dutyVars.Count; i++)
             {
@@ -110,7 +109,6 @@ namespace E_VCSP.Solver
                 limitedAverageLength += v * (duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
                 maxBroken += v * Config.CR_MAX_BROKEN_SHIFTS - (duty.Type == DutyType.Broken ? v : 0);
                 maxBetween += v * Config.CR_MAX_BETWEEN_SHIFTS - (duty.Type == DutyType.Between ? v : 0);
-                maxSingle += v;
             }
 
 
@@ -118,7 +116,6 @@ namespace E_VCSP.Solver
             model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, "limited_average_length");
             model.AddConstr(maxBroken + maxBrokenSlack >= 0, "max_broken");
             model.AddConstr(maxBetween + maxBetweenSlack >= 0, "max_between");
-            //model.AddConstr(maxSingle - maxSingleSlack <= 0, "max_single");
 
             this.model = model;
             return (model, dutyVars);

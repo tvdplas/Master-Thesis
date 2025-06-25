@@ -94,6 +94,7 @@ namespace E_VCSP.Objects
             {
                 // Driving / idle / charging costs throughout the day
                 double cost = Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST);
+                cost += Config.CR_SHIFT_COST;
 
                 if (Type == DutyType.Broken) cost += Config.CR_BROKEN_SHIFT_COST;
                 if (Type == DutyType.Single) cost += 1_000_000;

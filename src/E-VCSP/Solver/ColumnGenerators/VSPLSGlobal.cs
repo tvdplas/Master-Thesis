@@ -27,7 +27,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             alpha = Config.VSP_LS_G_COOLING_RATE;
             Q = (int)Math.Round(-Config.VSP_LS_G_ITERATIONS / (Math.Log(Config.VSP_LS_G_STARTING_T / Config.VSP_LS_G_ENDING_T) / Math.Log(alpha)));
 
-            ops = new(instance, locationDHT, vehicleType, T);
+            ops = new(instance, adjFull, locationDHT, vehicleType, T);
 
 
             tasks.Clear();

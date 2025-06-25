@@ -49,8 +49,6 @@ namespace E_VCSP.Solver
     public class Deadhead
     {
         public required DeadheadTemplate DeadheadTemplate;
-        public required List<ChargingAction> ChargingActions;
-        public double BaseDrivingCost;
     }
 
     public class EVSPCG : Solver
@@ -127,7 +125,7 @@ namespace E_VCSP.Solver
                 double baseCost = Config.VH_PULLOUT_COST + (dht.Distance * Config.VH_M_COST);
 
                 // TODO: Charge directly after depot?
-                Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
+                Deadhead dh = new() { DeadheadTemplate = dht };
                 adjFull[^2][i] = new Arc() { From = nodes[^2], To = tn, Deadhead = dh };
                 adj[^2].Add(new Arc() { From = nodes[^2], To = tn, Deadhead = dh });
             }
@@ -138,7 +136,7 @@ namespace E_VCSP.Solver
                 DeadheadTemplate? dht = locationDHTMapping[tn.Trip.To.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
                 double baseCost = dht.Distance * Config.VH_M_COST;
                 // TODO: Charge directly before depot?
-                Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
+                Deadhead dh = new() { DeadheadTemplate = dht };
                 adjFull[i][^1] = new Arc() { To = nodes[^1], From = tn, Deadhead = dh };
                 adj[i].Add(new Arc() { To = nodes[^1], From = tn, Deadhead = dh });
             }
@@ -146,11 +144,13 @@ namespace E_VCSP.Solver
             {
                 DeadheadTemplate? dht = locationDHTMapping[depot.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from depot to depot");
                 double baseCost = dht.Distance * Config.VH_M_COST;
-                // TODO: Charge directly before depot?
-                Deadhead dh = new() { ChargingActions = [], BaseDrivingCost = baseCost, DeadheadTemplate = dht };
+
+                Deadhead dh = new() { DeadheadTemplate = dht };
                 adjFull[^2][^1] = new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh };
                 adj[^2].Add(new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh });
             }
+
+            int totalSimplified = 0;
 
             // Trip to trip arcs
             for (int i = 0; i < nodes.Count - 2; i++)
@@ -167,39 +167,43 @@ namespace E_VCSP.Solver
                     if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
 
                     double baseCost = dht.Distance * Config.VH_M_COST;
-                    List<ChargingAction> chargingActions = [];
-                    foreach (Location chargeLocation in instance.ChargingLocations)
-                    {
-                        DeadheadTemplate? dhtTo = locationDHTMapping[tn1.Trip.To.Index][chargeLocation.Index];
-                        DeadheadTemplate? dhtFrom = locationDHTMapping[chargeLocation.Index][tn2.Trip.From.Index];
 
-                        if (dhtTo == null || dhtFrom == null) continue;
-
-                        int chargeTime = tn2.Trip.StartTime - (tn1.Trip.EndTime + dhtTo.Duration + dhtFrom.Duration);
-                        if (chargeTime < Config.MIN_CHARGE_TIME) continue; // Charging at location not feasible
-
-                        chargingActions.Add(new ChargingAction()
-                        {
-                            ChargeLocation = chargeLocation,
-                            TemplateFrom = dhtFrom,
-                            TemplateTo = dhtTo,
-                            ChargeUsedTo = dhtTo.Distance * vehicleType.DriveUsage,
-                            ChargeUsedFrom = dhtFrom.Distance * vehicleType.DriveUsage,
-                            DrivingCost = (dhtTo.Distance + dhtFrom.Distance) * Config.VH_M_COST,
-                            DrivingTimeFrom = dhtFrom.Duration,
-                            DrivingTimeTo = dhtTo.Duration,
-                            DrivingDistanceTo = dhtTo.Distance,
-                            DrivingDistanceFrom = dhtFrom.Distance,
-                            TimeAtLocation = chargeTime,
-                        });
-                    }
-
-                    Deadhead dh = new() { ChargingActions = chargingActions, BaseDrivingCost = baseCost, DeadheadTemplate = dht };
+                    Deadhead dh = new() { DeadheadTemplate = dht };
 
                     adjFull[i][j] = new Arc() { To = tn2, From = tn1, Deadhead = dh };
                     adj[i].Add(new Arc() { To = tn2, From = tn1, Deadhead = dh });
                 }
+
+                // Preprocessing: filter by min length, if one is found with low time only use that 
+                int directArcIndex = -1, directArcTransferTime = Config.VSP_PRE_DIRECT_TIME;
+
+                for (int dai = 0; dai < adj[i].Count; dai++)
+                {
+                    Arc arc = adj[i][dai];
+                    if (arc.To.Index < instance.Trips.Count)
+                    {
+                        Trip t2 = ((TripNode)arc.To).Trip;
+                        if (t2.From.Id != tn1.Trip.To.Id) continue;
+
+                        int timeDiff = t2.StartTime - tn1.Trip.EndTime;
+                        if (timeDiff <= directArcTransferTime)
+                        {
+                            directArcIndex = dai;
+                            directArcTransferTime = timeDiff;
+                        }
+                    }
+                }
+
+                if (directArcIndex != -1)
+                {
+                    totalSimplified++;
+                    int tripIndex = adj[i][directArcIndex].To.Index;
+                    adj[i] = adj[i].Where((x, i) => x.To.Index >= instance.Trips.Count || i == directArcIndex).ToList();
+                    adjFull[i] = adjFull[i].Select((x, i) => x == null || x.To.Index >= instance.Trips.Count || x.To.Index == tripIndex ? x : null).ToList();
+                }
             }
+
+            Console.WriteLine($"Simplified the arcs of {totalSimplified} trips");
         }
 
         private void GenerateInitialTasks()
@@ -382,6 +386,7 @@ namespace E_VCSP.Solver
                 lbGenerated = 0,
                 seqWithoutRC = 0,           // Number of sequential columns without reduced cost found
                 totWithoutRC = 0,           // Total columns generated with no RC
+                addedNew = 0,
                 notFound = 0,               // Number of columns that could not be generated
                 discardedNewColumns = 0,    // Number of columns discarded due to better one in model
                 discardedOldColumns = 0;    // Number of columns in model discarded due to better one found
@@ -395,9 +400,12 @@ namespace E_VCSP.Solver
             List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_SINGLE_WEIGHT, Config.VSP_LS_GLOBAL_WEIGHT];
             List<double> sums = [operationChances[0]];
             for (int i = 1; i < operationChances.Count; i++) sums.Add(sums[i - 1] + operationChances[i]);
+            List<int> predefinedOperations = Config.VSP_OPERATION_SEQUENCE
+                .Where(x => '0' <= x && x <= '9')
+                .Select(x => int.Parse(x.ToString())).Reverse().ToList();
 
             Console.WriteLine("Column generation started");
-            Console.WriteLine("%\tT\tLB\tLSS\tLSG\tNF\tDN\tDO\tWRC\tMV");
+            Console.WriteLine("%\tT\tLB\tLSS\tLSG\tAN\tNF\tDN\tDO\tWRC\tMV");
 
             Random rnd = new();
 
@@ -413,10 +421,19 @@ namespace E_VCSP.Solver
                 // Generate batch of new tasks using pricing information from previous solve
                 List<(double, VehicleTask)>[] generatedTasks = new List<(double, VehicleTask)>[Config.VSP_INSTANCES_PER_IT];
 
+                int selectedMethodIndex = -1;
+                if (predefinedOperations.Count > 0)
+                {
+                    selectedMethodIndex = predefinedOperations[^1];
+                    predefinedOperations.RemoveAt(predefinedOperations.Count - 1);
+                }
+                else
+                {
+                    double r = rnd.NextDouble() * sums[^1];
+                    selectedMethodIndex = sums.FindIndex(x => r <= x);
+                }
 
-                double r = rnd.NextDouble() * sums[^1];
-                int selectedMethodÍndex = sums.FindIndex(x => r <= x);
-                List<VehicleShortestPath> selectedMethod = instances[selectedMethodÍndex];
+                List<VehicleShortestPath> selectedMethod = instances[selectedMethodIndex];
 
                 if (Config.VSP_INSTANCES_PER_IT > 1)
                 {
@@ -432,7 +449,7 @@ namespace E_VCSP.Solver
 
                 totalGenerated += generatedTasks.Length;
                 int colsGenerated = generatedTasks.Sum(t => t.Count);
-                switch (selectedMethodÍndex)
+                switch (selectedMethodIndex)
                 {
                     case 0: lbGenerated += colsGenerated; break;
                     case 1: singleGenerated += colsGenerated; break;
@@ -444,7 +461,7 @@ namespace E_VCSP.Solver
                 if (percent >= lastReportedPercent + 10)
                 {
                     lastReportedPercent = percent - (percent % 10);
-                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{model.ObjVal}");
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{model.ObjVal}");
                 }
 
                 foreach (var taskSet in generatedTasks)
@@ -470,8 +487,13 @@ namespace E_VCSP.Solver
                             continue;
                         }
 
-                        // Add column to model 
-                        if (reducedCost < 0)
+                        // Do not add column to model
+                        if (reducedCost > 0)
+                        {
+                            seqWithoutRC++;
+                            totWithoutRC++;
+                        }
+                        else
                         {
                             // Reset non-reduced costs iterations
                             seqWithoutRC = 0;
@@ -513,12 +535,8 @@ namespace E_VCSP.Solver
                                 taskVars.Add(model.AddVar(0, GRB.INFINITY, newTask.Cost, GRB.CONTINUOUS, col, name));
                                 varnameTaskMapping[name] = tasks[^1];
                                 coverTaskMapping[ba] = tasks[^1];
+                                addedNew++;
                             }
-                        }
-                        else
-                        {
-                            seqWithoutRC++;
-                            totWithoutRC++;
                         }
                     }
                 }

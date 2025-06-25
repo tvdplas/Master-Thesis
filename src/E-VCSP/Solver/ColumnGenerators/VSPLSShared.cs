@@ -408,15 +408,17 @@ namespace E_VCSP.Solver.ColumnGenerators
     {
         private Instance instance;
         private List<List<DeadheadTemplate?>> locationDHT = [];
+        private List<List<Arc?>> adjFull = [];
         private VehicleType vehicleType;
         private Random random = new();
         public double T;
 
-        public LSOperations(Instance instance, List<List<DeadheadTemplate?>> locationDHT, VehicleType vt, double t)
+        public LSOperations(Instance instance, List<List<Arc?>> adjFull, List<List<DeadheadTemplate?>> locationDHT, VehicleType vt, double t)
         {
             this.instance = instance;
             this.locationDHT = locationDHT;
             this.vehicleType = vt;
+            this.adjFull = adjFull;
             T = t;
         }
 
@@ -447,8 +449,29 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (next != prev!.Next!.Next) throw new InvalidDataException("Vlgm gaat hier nog iets mis");
 
             // See if travels can be made to connect prev -travel1> ve -travel2> next
-            DeadheadTemplate? travel1Template = locationDHT[prev.PVE.EndLocation!.Index][ve.StartLocation!.Index];
-            DeadheadTemplate? travel2Template = locationDHT[ve.EndLocation!.Index][next.PVE.StartLocation!.Index];
+            DeadheadTemplate? travel1Template = null;
+            DeadheadTemplate? travel2Template = null;
+
+            if (false && prev.PVE.Type == PVEType.Trip && ve.Type == PVEType.Trip)
+            {
+                // Check possible deadheads instead of direct location transfer
+                travel1Template = adjFull[((PVETrip)prev.PVE).Trip.Index][((PVETrip)ve).Trip.Index]?.Deadhead?.DeadheadTemplate;
+            }
+            else
+            {
+                travel1Template = locationDHT[prev.PVE.EndLocation!.Index][ve.StartLocation!.Index];
+            }
+
+            if (false && ve.Type == PVEType.Trip && next.PVE.Type == PVEType.Trip)
+            {
+                // Check possible deadheads instead of direct location transfer
+                travel2Template = adjFull[((PVETrip)ve).Trip.Index][((PVETrip)next.PVE).Trip.Index]?.Deadhead?.DeadheadTemplate;
+            }
+            else
+            {
+                travel2Template = locationDHT[ve.StartLocation!.Index][next.PVE.EndLocation!.Index];
+            }
+
 
             // No travel possible
             if (travel1Template == null || travel2Template == null) return LSOpResult.Invalid;
@@ -510,7 +533,16 @@ namespace E_VCSP.Solver.ColumnGenerators
             LLNode next = node.Next!.Next!;
 
             // See if travels can be made to connect prev -travel1> ve -travel2> next
-            DeadheadTemplate? travelTemplate = locationDHT[prev.PVE.EndLocation!.Index][next.PVE.StartLocation!.Index];
+            DeadheadTemplate? travelTemplate = null;
+            if (false && prev.PVE.Type == PVEType.Trip && next.PVE.Type == PVEType.Trip)
+            {
+                // Check possible deadheads instead of direct location transfer
+                travelTemplate = adjFull[((PVETrip)prev.PVE).Trip.Index][((PVETrip)next.PVE).Trip.Index]?.Deadhead?.DeadheadTemplate;
+            }
+            else
+            {
+                travelTemplate = locationDHT[prev.PVE.EndLocation!.Index][next.PVE.StartLocation!.Index];
+            }
 
             // No travel possible
             if (travelTemplate == null) return LSOpResult.Invalid;

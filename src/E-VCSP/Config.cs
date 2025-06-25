@@ -68,23 +68,25 @@
         public static int VSP_SOLVER_TIMEOUT_SEC = 300;
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static bool VSP_ALLOW_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
+        public static int VSP_PRE_DIRECT_TIME = 300;
 
         public static Header VSP_CG = new();
         public static int VSP_INSTANCES_PER_IT = 1;
-        public static int VSP_MAX_COL_GEN_ITS = 100;
-        public static int VSP_OPT_IT_THRESHOLD = 10; // Amount of columns sequentially generated without rc before cg is stopped
+        public static int VSP_MAX_COL_GEN_ITS = 250;
+        public static int VSP_OPT_IT_THRESHOLD = 1000; // Amount of columns sequentially generated without rc before cg is stopped
+        public static string VSP_OPERATION_SEQUENCE = "-"; // Defines an initial operation sequence
 
         public static Header VSP_CG_LABELING = new();
         public static double VSP_LB_WEIGHT = 0;
         public static double VSP_LB_CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same
 
         public static Header VSP_CG_LS_SINGLE = new();
-        public static double VSP_LS_SINGLE_WEIGHT = 20;
-        public static double VSP_LS_S_STARTING_T = 25;
+        public static double VSP_LS_SINGLE_WEIGHT = 1;
+        public static double VSP_LS_S_STARTING_T = 50;
         public static double VSP_LS_S_ENDING_T = 0.01;
         public static double VSP_LS_S_COOLING_RATE = 0.95;
-        public static double VSP_LS_S_ITERATIONS = 100_000;
-        public static int VSP_LS_S_NUM_COLS = 100;
+        public static double VSP_LS_S_ITERATIONS = 500_000;
+        public static int VSP_LS_S_NUM_COLS = 5;
         public static double VSP_LS_S_ADD_TRIP = 20;
         public static double VSP_LS_S_REM_TRIP = 2;
         public static double VSP_LS_S_ADD_CHARGE = 10;

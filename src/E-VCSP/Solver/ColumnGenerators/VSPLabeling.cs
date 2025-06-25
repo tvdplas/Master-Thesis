@@ -155,46 +155,105 @@ namespace E_VCSP.Solver.ColumnGenerators
                 {
                     Arc arc = adj[expandingLabelIndex][i];
                     int targetIndex = arc.To.Index;
+                    Trip? targetTrip = expandingLabelIndex < instance.Trips.Count ? instance.Trips[targetIndex] : null;
 
-                    int tripDistance = expandingLabelIndex < instance.Trips.Count - 2 ? instance.Trips[expandingLabelIndex].Distance : 0;
-                    double tripCost = expandingLabelIndex < instance.Trips.Count - 2 ? reducedCosts[expandingLabelIndex] : 0;
+                    bool depotStart = expandingLabelIndex >= instance.Trips.Count,
+                         depotEnd = targetIndex >= instance.Trips.Count;
+
+                    int idleTime = depotStart || depotEnd
+                        ? 0
+                        : instance.Trips[targetIndex].StartTime - instance.Trips[expandingLabelIndex].EndTime - arc.Deadhead.DeadheadTemplate.Duration;
+
+                    int canCharge = 0;
+                    if (idleTime > 0 && !depotStart && instance.Trips[expandingLabelIndex].To.CanCharge) canCharge += 1;
+                    if (idleTime > 0 && !depotEnd && instance.Trips[targetIndex].From.CanCharge) canCharge += 2;
+
+                    Location? chargeLocation = null;
+                    if (idleTime > 0 && canCharge > 0)
+                    {
+                        chargeLocation = canCharge > 2 ? instance.Trips[targetIndex].From : instance.Trips[expandingLabelIndex].To;
+                    }
+
+                    double SoC = expandingLabel.currSoC;
+                    double costs = arc.Deadhead.DeadheadTemplate.Distance * Config.VH_M_COST;
+                    if (targetIndex < instance.Trips.Count) costs -= reducedCosts[expandingLabelIndex];
+
+                    if (canCharge == 1)
+                    {
+                        var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
+                        costs += res.Cost;
+                        SoC += res.SoCGained;
+                    }
+
+                    SoC -= arc.Deadhead.DeadheadTemplate.Distance * vehicleType.DriveUsage;
+                    if (SoC < vehicleType.MinSoC) continue;
+
+                    if (canCharge >= 2)
+                    {
+                        var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
+                        costs += res.Cost;
+                        SoC += res.SoCGained;
+                    }
+
                     List<(double newSoC, double cost, int chargingIndex)> options = [];
+                    // TODO add additional charging detours
+                    options.Add((
+                        SoC,
+                        expandingLabel.currCosts + costs,
+                        chargeLocation?.Index ?? -1
+                    ));
 
-                    if (arc.Deadhead.ChargingActions.Count == 0)
-                    {
-                        // Add label for driving deadhead directly
-                        double directTravelSoC = expandingLabel.currSoC -
-                            (tripDistance + arc.Deadhead.DeadheadTemplate.Distance) * vehicleType.DriveUsage;
-                        if (directTravelSoC >= vehicleType.MinSoC)
-                        {
-                            options.Add((
-                                directTravelSoC,
-                                expandingLabel.currCosts - tripCost + arc.Deadhead.DeadheadTemplate.Distance * Config.VH_M_COST,
-                                -1
-                            ));
-                        }
-                    }
-                    else
-                    {
-                        // Add labels for each of the possible charging actions between the expanding trip and target trip
-                        for (int j = 0; j < arc.Deadhead.ChargingActions.Count; j++)
-                        {
-                            var chargeAction = arc.Deadhead.ChargingActions[j];
-                            double chargeAtStation = expandingLabel.currSoC - (tripDistance * vehicleType.DriveUsage + chargeAction.ChargeUsedTo);
-                            if (chargeAtStation < vehicleType.MinSoC) continue; // Not feasible, not enough soc to reach charger
 
-                            ChargingCurve cc = chargeAction.ChargeLocation.ChargingCurves[vehicleType.Index];
-                            var maxCharge = cc.MaxChargeGained(chargeAtStation, chargeAction.TimeAtLocation);
-                            double SoCAtNextTrip = chargeAtStation + maxCharge.SoCGained - chargeAction.ChargeUsedFrom;
-                            if (SoCAtNextTrip < vehicleType.MinSoC) continue; // Not feasible, soc at next trip is too low
+                    // Create an arc between the two; if one of the two is a charging location, assume maximum charging time there. 
 
-                            options.Add((
-                                SoCAtNextTrip,
-                                expandingLabel.currCosts - tripCost + chargeAction.DrivingCost + maxCharge.Cost,
-                                j
-                            ));
-                        }
-                    }
+
+                    // 0: no charge, 1: charge at source, 2: charge at target, 3: charge at either
+
+
+                    double tripCost = expandingLabelIndex < instance.Trips.Count ? reducedCosts[expandingLabelIndex] : 0;
+
+
+
+
+
+
+
+
+                    //if (arc.Deadhead.ChargingActions.Count == 0)
+                    //{
+                    //    // Add label for driving deadhead directly
+                    //    double directTravelSoC = expandingLabel.currSoC -
+                    //        (tripDistance + arc.Deadhead.DeadheadTemplate.Distance) * vehicleType.DriveUsage;
+                    //    if (directTravelSoC >= vehicleType.MinSoC)
+                    //    {
+                    //        options.Add((
+                    //            directTravelSoC,
+                    //            expandingLabel.currCosts - tripCost + arc.Deadhead.DeadheadTemplate.Distance * Config.VH_M_COST,
+                    //            -1
+                    //        ));
+                    //    }
+                    //}
+                    //else
+                    //{
+                    //    // Add labels for each of the possible charging actions between the expanding trip and target trip
+                    //    for (int j = 0; j < arc.Deadhead.ChargingActions.Count; j++)
+                    //    {
+                    //        var chargeAction = arc.Deadhead.ChargingActions[j];
+                    //        double chargeAtStation = expandingLabel.currSoC - (tripDistance * vehicleType.DriveUsage + chargeAction.ChargeUsedTo);
+                    //        if (chargeAtStation < vehicleType.MinSoC) continue; // Not feasible, not enough soc to reach charger
+
+                    //        ChargingCurve cc = chargeAction.ChargeLocation.ChargingCurves[vehicleType.Index];
+                    //        var maxCharge = cc.MaxChargeGained(chargeAtStation, chargeAction.TimeAtLocation);
+                    //        double SoCAtNextTrip = chargeAtStation + maxCharge.SoCGained - chargeAction.ChargeUsedFrom;
+                    //        if (SoCAtNextTrip < vehicleType.MinSoC) continue; // Not feasible, soc at next trip is too low
+
+                    //        options.Add((
+                    //            SoCAtNextTrip,
+                    //            expandingLabel.currCosts - tripCost + chargeAction.DrivingCost + maxCharge.Cost,
+                    //            j
+                    //        ));
+                    //    }
+                    //}
 
                     // For each label possibility, check if it is not already dominated at the target node. 
                     foreach (var option in options)

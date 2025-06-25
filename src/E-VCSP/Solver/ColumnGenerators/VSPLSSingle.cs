@@ -35,7 +35,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             T = Config.VSP_LS_S_STARTING_T;
             alpha = Config.VSP_LS_S_COOLING_RATE;
             Q = (int)Math.Round(-Config.VSP_LS_S_ITERATIONS / (Math.Log(Config.VSP_LS_S_STARTING_T / Config.VSP_LS_S_ENDING_T) / Math.Log(alpha)));
-            ops = new(instance, locationDHT, vehicleType, T);
+            ops = new(instance, adjFull, locationDHT, vehicleType, T);
             activeTrips = [];
             inactiveTrips = [.. instance.Trips.Select(x => x.Index)];
             reducedCostsTrips = [];
