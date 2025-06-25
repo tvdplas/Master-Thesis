@@ -6,7 +6,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 {
     public class VSPLSGlobal : VehicleShortestPath
     {
-        public VSPLSGlobal(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<Arc?>> adjFull, List<List<Arc>> adj, List<List<DeadheadTemplate?>> locationDHT) : base(model, instance, vehicleType, nodes, adjFull, adj)
+        public VSPLSGlobal(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj, List<List<DeadheadTemplate?>> locationDHT) : base(model, instance, vehicleType, nodes, adjFull, adj)
         {
             this.locationDHT = locationDHT;
         }
@@ -44,17 +44,17 @@ namespace E_VCSP.Solver.ColumnGenerators
             {
                 Trip t = instance.Trips[i];
                 if (Depot == null) throw new InvalidDataException("No depot found when constructing depot vehicleelements in LS ShortestPath");
-                Arc depotTripArc = adjFull[instance.DepotStartIndex][i] ?? throw new InvalidDataException("No depot trip arc found in initial LSGLobal");
-                Arc tripDepotArc = adjFull[i][instance.DepotEndIndex] ?? throw new InvalidDataException("No trip depot arc found in initial LSGLobal");
+                VSPArc depotTripArc = adjFull[instance.DepotStartIndex][i] ?? throw new InvalidDataException("No depot trip arc found in initial LSGLobal");
+                VSPArc tripDepotArc = adjFull[i][instance.DepotEndIndex] ?? throw new InvalidDataException("No trip depot arc found in initial LSGLobal");
 
                 // Create depot -> dh1 -> idle1 -> trip -> dh2 -> idle2 -> depot
                 LLNode depotStart = new()
                 {
                     PVE = new PVEDepot(Depot, StartTime - Config.MIN_NODE_TIME, StartTime),
                 };
-                LLNode travel1 = depotStart.AddAfter(new PVETravel(depotTripArc.Deadhead.DeadheadTemplate, StartTime, t.StartTime, vehicleType));
+                LLNode travel1 = depotStart.AddAfter(new PVETravel(depotTripArc.DeadheadTemplate, StartTime, t.StartTime, vehicleType));
                 LLNode trip = travel1.AddAfter(new PVETrip(t, vehicleType));
-                LLNode travel2 = trip.AddAfter(new PVETravel(tripDepotArc.Deadhead.DeadheadTemplate, t.EndTime, EndTime, vehicleType));
+                LLNode travel2 = trip.AddAfter(new PVETravel(tripDepotArc.DeadheadTemplate, t.EndTime, EndTime, vehicleType));
                 LLNode depotEnd = travel2.AddAfter(new PVEDepot(Depot, EndTime, EndTime + Config.MIN_NODE_TIME));
 
                 tasks.Add(depotStart);
@@ -144,7 +144,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 int toIndex = firstAffected.PVE.Type == PVEType.Trip
                     ? ((PVETrip)firstAffected.PVE).Trip.Index
                     : instance.DepotEndIndex;
-                Arc? arc = adjFull[fromIndex][toIndex];
+                VSPArc? arc = adjFull[fromIndex][toIndex];
                 if (arc == null) return (false, double.MinValue, null);
 
                 // Arc exists; check if results in invalid charge by temporarily replacing at tail with fa (with travel to glue)
@@ -154,7 +154,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 {
                     Prev = additionTarget,
                     Next = firstAffected,
-                    PVE = new PVETravel(arc.Deadhead.DeadheadTemplate, additionTarget.PVE.EndTime, firstAffected.PVE.StartTime, vehicleType)
+                    PVE = new PVETravel(arc.DeadheadTemplate, additionTarget.PVE.EndTime, firstAffected.PVE.StartTime, vehicleType)
                 };
 
                 // save copies of previous "glue"
@@ -295,7 +295,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             PVETrip? t2PrevAsTrip = t2Prev.PVE.Type == PVEType.Trip ? (PVETrip)t2Prev.PVE : null,
                     t2NextAsTrip = t2Next.PVE.Type == PVEType.Trip ? (PVETrip)t2Next.PVE : null;
-            Arc? t2PrevTot2Next = adjFull[t2PrevAsTrip?.Trip?.Index ?? instance.DepotStartIndex][t2NextAsTrip?.Trip?.Index ?? instance.DepotEndIndex];
+            VSPArc? t2PrevTot2Next = adjFull[t2PrevAsTrip?.Trip?.Index ?? instance.DepotStartIndex][t2NextAsTrip?.Trip?.Index ?? instance.DepotEndIndex];
 
             if (t2PrevTot2Next == null)
             {
@@ -316,8 +316,8 @@ namespace E_VCSP.Solver.ColumnGenerators
             PVETrip? t1PrevAsTrip = t1Prev.PVE.Type == PVEType.Trip ? (PVETrip)t1Prev.PVE : null,
                     t1NextAsTrip = t1Next.PVE.Type == PVEType.Trip ? (PVETrip)t1Next.PVE : null;
 
-            Arc? t1PrevTot2Start = adjFull[t1PrevAsTrip?.Trip?.Index ?? instance.DepotStartIndex][t2StartRangeAsTrip.Trip.Index];
-            Arc? t2EndTot1Next = adjFull[t2EndRangeAsTrip.Trip.Index][t1NextAsTrip?.Trip?.Index ?? instance.DepotEndIndex];
+            VSPArc? t1PrevTot2Start = adjFull[t1PrevAsTrip?.Trip?.Index ?? instance.DepotStartIndex][t2StartRangeAsTrip.Trip.Index];
+            VSPArc? t2EndTot1Next = adjFull[t2EndRangeAsTrip.Trip.Index][t1NextAsTrip?.Trip?.Index ?? instance.DepotEndIndex];
 
             if (t1PrevTot2Start == null || t2EndTot1Next == null)
             {
@@ -345,21 +345,21 @@ namespace E_VCSP.Solver.ColumnGenerators
             // t1Prev -> t2Start
             LLNode newStartTravel = new()
             {
-                PVE = new PVETravel(t1PrevTot2Start.Deadhead.DeadheadTemplate, t1Prev.PVE.EndTime, t2Start.PVE.StartTime, vehicleType),
+                PVE = new PVETravel(t1PrevTot2Start.DeadheadTemplate, t1Prev.PVE.EndTime, t2Start.PVE.StartTime, vehicleType),
                 Prev = t1Prev,
                 Next = t2Start,
             };
             // t2End -> t1Next
             LLNode newEndTravel = new()
             {
-                PVE = new PVETravel(t2EndTot1Next.Deadhead.DeadheadTemplate, t2End.PVE.EndTime, t1Next.PVE.StartTime, vehicleType),
+                PVE = new PVETravel(t2EndTot1Next.DeadheadTemplate, t2End.PVE.EndTime, t1Next.PVE.StartTime, vehicleType),
                 Prev = t2End,
                 Next = t1Next,
             };
             // t2Prev -> t2Next
             LLNode newTravel = new()
             {
-                PVE = new PVETravel(t2PrevTot2Next.Deadhead.DeadheadTemplate, t2Prev.PVE.EndTime, t2Next.PVE.StartTime, vehicleType),
+                PVE = new PVETravel(t2PrevTot2Next.DeadheadTemplate, t2Prev.PVE.EndTime, t2Next.PVE.StartTime, vehicleType),
                 Prev = t2Prev,
                 Next = t2Next,
             };

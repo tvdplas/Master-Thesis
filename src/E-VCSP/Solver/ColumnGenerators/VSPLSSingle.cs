@@ -22,7 +22,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         private List<int> inactiveTrips = [];
         private LSOperations ops;
 
-        public VSPLSSingle(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<Arc?>> adjFull, List<List<Arc>> adj, List<List<DeadheadTemplate?>> locationDHT)
+        public VSPLSSingle(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj, List<List<DeadheadTemplate?>> locationDHT)
             : base(model, instance, vehicleType, nodes, adjFull, adj)
         {
             this.locationDHT = locationDHT;
@@ -51,8 +51,8 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         private void InitVehicleTask()
         {
-            Arc arc = adjFull[instance.DepotStartIndex][instance.DepotEndIndex] ?? throw new InvalidDataException();
-            DeadheadTemplate dht = arc.Deadhead.DeadheadTemplate;
+            VSPArc arc = adjFull[instance.DepotStartIndex][instance.DepotEndIndex] ?? throw new InvalidDataException();
+            DeadheadTemplate dht = arc.DeadheadTemplate;
 
             // Create depot nodes, connecting dh + idle time to ensure that there is always a feasible start / end to the vehicle task
             head = new LLNode()

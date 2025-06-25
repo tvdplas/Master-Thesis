@@ -11,15 +11,15 @@ namespace E_VCSP.Solver
         public Instance instance;
         public VehicleType vehicleType;
         public List<EVSPNode> nodes = [];
-        public List<List<Arc?>> adjFull = [];
-        public List<List<Arc>> adj = [];
+        public List<List<VSPArc?>> adjFull = [];
+        public List<List<VSPArc>> adj = [];
 
         public int StartTime = int.MaxValue;
         public int EndTime = int.MinValue;
 
         public Location Depot;
 
-        protected VehicleShortestPath(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<Arc?>> adjFull, List<List<Arc>> adj)
+        protected VehicleShortestPath(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj)
         {
             this.model = model;
             this.instance = instance;
@@ -31,11 +31,11 @@ namespace E_VCSP.Solver
             foreach (Trip t in instance.Trips)
             {
                 // Depot to trip
-                int minDepTime = t.StartTime - adjFull[instance.DepotStartIndex][t.Index]!.Deadhead.DeadheadTemplate.Duration;
+                int minDepTime = t.StartTime - adjFull[instance.DepotStartIndex][t.Index]!.DeadheadTemplate.Duration;
                 StartTime = Math.Min(minDepTime, StartTime);
 
                 // Trip to depot
-                int maxArrTime = t.EndTime + adjFull[t.Index][instance.DepotEndIndex]!.Deadhead.DeadheadTemplate.Duration;
+                int maxArrTime = t.EndTime + adjFull[t.Index][instance.DepotEndIndex]!.DeadheadTemplate.Duration;
                 EndTime = Math.Max(maxArrTime, EndTime);
             }
 

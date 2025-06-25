@@ -24,11 +24,11 @@ namespace E_VCSP.Solver
         public required Location Depot;
     }
 
-    public class Arc
+    public class VSPArc
     {
         public required EVSPNode From;
         public required EVSPNode To;
-        public required Deadhead Deadhead;
+        public required DeadheadTemplate DeadheadTemplate;
     }
 
     public class ChargingAction
@@ -46,11 +46,6 @@ namespace E_VCSP.Solver
         public int TimeAtLocation;
     }
 
-    public class Deadhead
-    {
-        public required DeadheadTemplate DeadheadTemplate;
-    }
-
     public class EVSPCG : Solver
     {
         private Instance instance;
@@ -58,8 +53,8 @@ namespace E_VCSP.Solver
         private List<VehicleTask> tasks = [];
 
         private List<EVSPNode> nodes = [];
-        private List<List<Arc?>> adjFull = [];
-        private List<List<Arc>> adj = [];
+        private List<List<VSPArc?>> adjFull = [];
+        private List<List<VSPArc>> adj = [];
 
         private List<List<DeadheadTemplate?>> locationDHTMapping = [];
         private Dictionary<string, VehicleTask> varnameTaskMapping = [];
@@ -124,30 +119,22 @@ namespace E_VCSP.Solver
                 DeadheadTemplate? dht = locationDHTMapping[depot.Index][tn.Trip.From.Index] ?? throw new InvalidDataException("No travel possible from depot to trip");
                 double baseCost = Config.VH_PULLOUT_COST + (dht.Distance * Config.VH_M_COST);
 
-                // TODO: Charge directly after depot?
-                Deadhead dh = new() { DeadheadTemplate = dht };
-                adjFull[^2][i] = new Arc() { From = nodes[^2], To = tn, Deadhead = dh };
-                adj[^2].Add(new Arc() { From = nodes[^2], To = tn, Deadhead = dh });
+                adjFull[^2][i] = new VSPArc() { From = nodes[^2], To = tn, DeadheadTemplate = dht };
+                adj[^2].Add(new VSPArc() { From = nodes[^2], To = tn, DeadheadTemplate = dht });
             }
             // trip -> depot end arcs
             for (int i = 0; i < nodes.Count - 2; i++)
             {
                 TripNode tn = (TripNode)nodes[i];
                 DeadheadTemplate? dht = locationDHTMapping[tn.Trip.To.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
-                double baseCost = dht.Distance * Config.VH_M_COST;
-                // TODO: Charge directly before depot?
-                Deadhead dh = new() { DeadheadTemplate = dht };
-                adjFull[i][^1] = new Arc() { To = nodes[^1], From = tn, Deadhead = dh };
-                adj[i].Add(new Arc() { To = nodes[^1], From = tn, Deadhead = dh });
+                adjFull[i][^1] = new VSPArc() { To = nodes[^1], From = tn, DeadheadTemplate = dht };
+                adj[i].Add(new VSPArc() { To = nodes[^1], From = tn, DeadheadTemplate = dht });
             }
             // depot -> depot arc
             {
                 DeadheadTemplate? dht = locationDHTMapping[depot.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from depot to depot");
-                double baseCost = dht.Distance * Config.VH_M_COST;
-
-                Deadhead dh = new() { DeadheadTemplate = dht };
-                adjFull[^2][^1] = new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh };
-                adj[^2].Add(new Arc() { To = nodes[^1], From = nodes[^2], Deadhead = dh });
+                adjFull[^2][^1] = new VSPArc() { To = nodes[^1], From = nodes[^2], DeadheadTemplate = dht };
+                adj[^2].Add(new VSPArc() { To = nodes[^1], From = nodes[^2], DeadheadTemplate = dht });
             }
 
             int totalSimplified = 0;
@@ -166,12 +153,8 @@ namespace E_VCSP.Solver
                     if (dht == null) continue; // not a possible drive
                     if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
 
-                    double baseCost = dht.Distance * Config.VH_M_COST;
-
-                    Deadhead dh = new() { DeadheadTemplate = dht };
-
-                    adjFull[i][j] = new Arc() { To = tn2, From = tn1, Deadhead = dh };
-                    adj[i].Add(new Arc() { To = tn2, From = tn1, Deadhead = dh });
+                    adjFull[i][j] = new VSPArc() { To = tn2, From = tn1, DeadheadTemplate = dht };
+                    adj[i].Add(new VSPArc() { To = tn2, From = tn1, DeadheadTemplate = dht });
                 }
             }
 
@@ -185,7 +168,7 @@ namespace E_VCSP.Solver
 
                 for (int dai = 0; dai < adj[i].Count; dai++)
                 {
-                    Arc arc = adj[i][dai];
+                    VSPArc arc = adj[i][dai];
                     if (arc.To.Index < instance.Trips.Count)
                     {
                         Trip t2 = ((TripNode)arc.To).Trip;
@@ -219,8 +202,8 @@ namespace E_VCSP.Solver
             for (int i = 0; i < instance.Trips.Count; i++)
             {
                 Trip t = instance.Trips[i];
-                DeadheadTemplate dhTo = adjFull[instance.DepotStartIndex][i]?.Deadhead?.DeadheadTemplate ?? throw new InvalidDataException("No arc from depot to trip");
-                DeadheadTemplate dhFrom = adjFull[i][instance.DepotEndIndex]?.Deadhead?.DeadheadTemplate ?? throw new InvalidDataException("No arc from trip to depot");
+                DeadheadTemplate dhTo = adjFull[instance.DepotStartIndex][i]?.DeadheadTemplate ?? throw new InvalidDataException("No arc from depot to trip");
+                DeadheadTemplate dhFrom = adjFull[i][instance.DepotEndIndex]?.DeadheadTemplate ?? throw new InvalidDataException("No arc from trip to depot");
 
                 double currSoC = vehicleType.StartSoC;
                 VEDeadhead toTrip = new(dhTo, instance.Trips[i].StartTime - dhTo.Duration, instance.Trips[i].StartTime, vehicleType)
@@ -394,7 +377,7 @@ namespace E_VCSP.Solver
                 lbGenerated = 0,
                 seqWithoutRC = 0,           // Number of sequential columns without reduced cost found
                 totWithoutRC = 0,           // Total columns generated with no RC
-                addedNew = 0,
+                addedNew = 0,               // Total columns added to model (not initial)
                 notFound = 0,               // Number of columns that could not be generated
                 discardedNewColumns = 0,    // Number of columns discarded due to better one in model
                 discardedOldColumns = 0;    // Number of columns in model discarded due to better one found

@@ -13,7 +13,7 @@ namespace E_VCSP.Formatting
         public static Node? ScheduleNode(int startTime, int endTime, string content, Color color)
         {
             // No node displayed
-            if ((endTime - startTime) / Config.MIN_NODE_TIME * Config.MIN_NODE_WIDTH < 2)
+            if ((endTime - startTime) / (double)Config.MIN_NODE_TIME * Config.MIN_NODE_WIDTH < 10)
             {
                 return null;
             }
@@ -22,6 +22,7 @@ namespace E_VCSP.Formatting
             {
                 return new Node($"{startTime}-{endTime}-{content}-{r.Next()}")
                 {
+                    LabelText = "",
                     Attr = {
                         FillColor = color,
                     },

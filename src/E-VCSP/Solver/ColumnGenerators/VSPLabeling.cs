@@ -4,33 +4,40 @@ using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    public record SPLabel(
-        int prevIndex, // Previously visited node index
-        int prevId, // Label preceding this label 
-        int chargeLocationIndex, // Charge location used in this node
-        bool chargeAtSource, // Was charge at start / end of deadhead
-        double currSoC, // SoC at start of node
-        double currCosts,  // Costs incurred at start of node
-        int labelId
-    );
-
-    public class Front
+    public class VSPLabel
     {
-        private SortedList<double, SPLabel> front = [];
+        public static int ID_COUNTER = 0;
+        public int Id;
+        public int PrevNodeIndex; // Previously visited node index
+        public int PrevId; // Label preceding this label 
+        public int ChargeLocationIndex = -1; // Charge location used in this node
+        public bool ChargeAtSource = false; // Was charge at start / end of deadhead
+        public double CurrSoC; // SoC at start of node
+        public double CurrCosts;  // Costs incurred at start of node
+
+        public VSPLabel()
+        {
+            this.Id = ID_COUNTER++;
+        }
+    }
+
+    public class VSPFront
+    {
+        private SortedList<double, VSPLabel> front = [];
 
         /// <summary>
         /// Inserts label into front
         /// </summary>
         /// <param name="label">Label to be inserted</param>
         /// <returns>The difference in amount of items currently in the front; min = -#items in front + 1, max = 1</returns>
-        public int Insert(SPLabel label)
+        public int Insert(VSPLabel label)
         {
             int l = 0, r = front.Count;
-            // find first item that is larger than or equal to label currSoC
+            // find first item that is larger than or equal to label CurrSoC
             while (l < r)
             {
                 int m = (l + r) / 2;
-                if (front.Keys[m] >= label.currSoC - Config.VSP_LB_CHARGE_EPSILON) r = m;
+                if (front.Keys[m] >= label.CurrSoC - Config.VSP_LB_CHARGE_EPSILON) r = m;
                 else l = m + 1;
             }
 
@@ -39,11 +46,11 @@ namespace E_VCSP.Solver.ColumnGenerators
             for (int i = l; i < front.Count; i++)
             {
                 // Skip if domination is found
-                if (front.Values[i].currCosts <= label.currCosts) return 0;
+                if (front.Values[i].CurrCosts <= label.CurrCosts) return 0;
 
                 // If domination is not found however we are within epsilon range of the inserted label, 
                 // add it to a seperate list of items we will be removing
-                if (Math.Abs(front.Values[i].currSoC - label.currSoC) < Config.VSP_LB_CHARGE_EPSILON) sameCharge.Add(i);
+                if (Math.Abs(front.Values[i].CurrSoC - label.CurrSoC) < Config.VSP_LB_CHARGE_EPSILON) sameCharge.Add(i);
             }
 
             // Keep track of front size diff
@@ -60,7 +67,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             for (int i = l - 1; i >= 0 && i < front.Count; i--)
             {
                 var b = front.Values[i];
-                if (label.currCosts <= b.currCosts)
+                if (label.CurrCosts <= b.CurrCosts)
                 {
                     front.RemoveAt(i);
                     diff--;
@@ -68,10 +75,10 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
 
             // Lastly, insert new item. First path should never be taken
-            if (front.ContainsKey(label.currSoC)) front[label.currSoC] = label;
+            if (front.ContainsKey(label.CurrSoC)) front[label.CurrSoC] = label;
             else
             {
-                front[label.currSoC] = label;
+                front[label.CurrSoC] = label;
                 diff++;
             }
             return diff;
@@ -80,7 +87,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         public void Clear() => front.Clear();
 
-        public SPLabel Pop()
+        public VSPLabel Pop()
         {
             int lastIndex = front.Count - 1;
             var label = front.Values[lastIndex];
@@ -91,13 +98,13 @@ namespace E_VCSP.Solver.ColumnGenerators
 
     public class VSPLabeling : VehicleShortestPath
     {
-        private List<List<SPLabel>> allLabels = [];
-        private List<Front> activeLabels = [];
+        private List<List<VSPLabel>> allLabels = [];
+        private List<VSPFront> activeLabels = [];
         private List<double> reducedCosts = [];
 
-        public VSPLabeling(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<Arc?>> adjFull, List<List<Arc>> adj) : base(model, instance, vehicleType, nodes, adjFull, adj) { }
+        public VSPLabeling(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj) : base(model, instance, vehicleType, nodes, adjFull, adj) { }
 
-        private int addLabel(SPLabel spl, int index)
+        private int addLabel(VSPLabel spl, int index)
         {
             allLabels[index].Add(spl);
             return activeLabels[index].Insert(spl);
@@ -130,13 +137,18 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (model == null || model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
                 throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
 
-            int labelId = 0;
-            int activeLabelCount = addLabel(new SPLabel(nodes.Count - 2, -1, -1, false, vehicleType.StartSoC, 0, labelId++), nodes.Count - 2);
+            int activeLabelCount = addLabel(new VSPLabel()
+            {
+                PrevId = -1,
+                PrevNodeIndex = nodes.Count - 2,
+                CurrCosts = 0,
+                CurrSoC = vehicleType.StartSoC,
+            }, nodes.Count - 2);
 
             while (activeLabelCount > 0)
             {
                 // Get label to expand
-                SPLabel? expandingLabel = null;
+                VSPLabel? expandingLabel = null;
                 int expandingLabelIndex = -1;
                 for (int i = 0; i < activeLabels.Count; i++)
                 {
@@ -154,7 +166,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 // Try expand label
                 for (int i = 0; i < adj[expandingLabelIndex].Count; i++)
                 {
-                    Arc arc = adj[expandingLabelIndex][i];
+                    VSPArc arc = adj[expandingLabelIndex][i];
                     int targetIndex = arc.To.Index;
                     Trip? targetTrip = targetIndex < instance.Trips.Count ? instance.Trips[targetIndex] : null;
 
@@ -163,20 +175,20 @@ namespace E_VCSP.Solver.ColumnGenerators
 
                     int idleTime = depotStart || depotEnd
                         ? 0
-                        : instance.Trips[targetIndex].StartTime - instance.Trips[expandingLabelIndex].EndTime - arc.Deadhead.DeadheadTemplate.Duration;
+                        : instance.Trips[targetIndex].StartTime - instance.Trips[expandingLabelIndex].EndTime - arc.DeadheadTemplate.Duration;
 
                     int canCharge = 0;
-                    if (idleTime > 0 && !depotStart && instance.Trips[expandingLabelIndex].To.CanCharge) canCharge += 1;
-                    if (idleTime > 0 && !depotEnd && instance.Trips[targetIndex].From.CanCharge) canCharge += 2;
+                    if (idleTime > Config.MIN_CHARGE_TIME && !depotStart && instance.Trips[expandingLabelIndex].To.CanCharge) canCharge += 1;
+                    if (idleTime > Config.MIN_CHARGE_TIME && !depotEnd && instance.Trips[targetIndex].From.CanCharge) canCharge += 2;
 
                     Location? chargeLocation = null;
-                    if (idleTime > 0 && canCharge > 0)
+                    if (canCharge > 0)
                     {
                         chargeLocation = canCharge > 2 ? instance.Trips[targetIndex].From : instance.Trips[expandingLabelIndex].To;
                     }
 
-                    double SoC = expandingLabel.currSoC;
-                    double costs = arc.Deadhead.DeadheadTemplate.Distance * Config.VH_M_COST;
+                    double SoC = expandingLabel.CurrSoC;
+                    double costs = arc.DeadheadTemplate.Distance * Config.VH_M_COST;
                     if (targetIndex < instance.Trips.Count) costs -= reducedCosts[targetIndex];
 
                     if (canCharge == 1)
@@ -186,7 +198,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                         SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
                     }
 
-                    SoC -= arc.Deadhead.DeadheadTemplate.Distance * vehicleType.DriveUsage;
+                    SoC -= arc.DeadheadTemplate.Distance * vehicleType.DriveUsage;
                     if (SoC < vehicleType.MinSoC) continue;
 
                     if (canCharge >= 2)
@@ -203,22 +215,22 @@ namespace E_VCSP.Solver.ColumnGenerators
                     // TODO add additional charging detours
                     options.Add((
                         SoC,
-                        expandingLabel.currCosts + costs,
+                        expandingLabel.CurrCosts + costs,
                         chargeLocation?.Index ?? -1
                     ));
 
                     // For each label possibility, check if it is not already dominated at the target node. 
                     foreach (var option in options)
                     {
-                        activeLabelCount += addLabel(new SPLabel(
-                            expandingLabelIndex,
-                            expandingLabel.labelId,
-                            option.chargingIndex,
-                            canCharge == 1,
-                            option.newSoC,
-                            option.cost,
-                            labelId++
-                        ), targetIndex);
+                        activeLabelCount += addLabel(new VSPLabel()
+                        {
+                            PrevId = expandingLabel.Id,
+                            PrevNodeIndex = expandingLabelIndex,
+                            ChargeAtSource = canCharge == 1,
+                            ChargeLocationIndex = option.chargingIndex,
+                            CurrCosts = option.cost,
+                            CurrSoC = option.newSoC,
+                        }, targetIndex);
                     }
                 }
             }
@@ -227,23 +239,23 @@ namespace E_VCSP.Solver.ColumnGenerators
             // Backtrack in order to get path
             // indexes to nodes
             var feasibleEnds = allLabels[^1]
-                .Where(x => x.currCosts < 0)
-                .OrderBy(x => x.currCosts).ToList();
+                .Where(x => x.CurrCosts < 0)
+                .OrderBy(x => x.CurrCosts).ToList();
             var validEnds = feasibleEnds.Take(Config.VSP_LB_MAX_COLS);
 
             List<(double cost, VehicleTask vehicleTask)> results = [];
 
             foreach (var validEnd in validEnds)
             {
-                List<(int nodeIndex, SPLabel label)> path = [(
+                List<(int nodeIndex, VSPLabel label)> path = [(
                     allLabels.Count - 1,
                     validEnd
                 )];
-                double minCosts = path[0].label.currCosts;
-                while (path[^1].Item2.prevId != -1)
+                double minCosts = path[0].label.CurrCosts;
+                while (path[^1].label.PrevId != -1)
                 {
-                    var prev = allLabels[path[^1].Item2.prevIndex].Find(x => x.labelId == path[^1].Item2.prevId) ?? throw new Exception("Could not backtrace");
-                    path.Add((path[^1].Item2.prevIndex, prev));
+                    var prev = allLabels[path[^1].label.PrevNodeIndex].Find(x => x.Id == path[^1].label.PrevId) ?? throw new Exception("Could not backtrace");
+                    path.Add((path[^1].label.PrevNodeIndex, prev));
                 }
                 path.Reverse();
 
@@ -253,12 +265,12 @@ namespace E_VCSP.Solver.ColumnGenerators
                     var curr = path[i];
                     var prev = path[i - 1];
                     Trip? trip = instance.Trips[curr.nodeIndex];
-                    DeadheadTemplate dht = adjFull[prev.nodeIndex][curr.nodeIndex]!.Deadhead.DeadheadTemplate;
+                    DeadheadTemplate dht = adjFull[prev.nodeIndex][curr.nodeIndex]!.DeadheadTemplate;
 
                     int currTime = taskElements.Count > 0
                         ? taskElements[^1].EndTime
-                        : trip!.StartTime - adjFull[^2][curr.nodeIndex]!.Deadhead.DeadheadTemplate.Duration;
-                    double currSoC = taskElements.Count > 0
+                        : trip!.StartTime - adjFull[^2][curr.nodeIndex]!.DeadheadTemplate.Duration;
+                    double CurrSoC = taskElements.Count > 0
                         ? taskElements[^1].EndSoCInTask
                         : vehicleType.StartSoC;
 
@@ -267,46 +279,46 @@ namespace E_VCSP.Solver.ColumnGenerators
                     int idleTime = trip!.StartTime - dht.Duration - currTime;
 
                     // Charge before deadhead
-                    if (curr.label.chargeLocationIndex != -1 && curr.label.chargeAtSource)
+                    if (curr.label.ChargeLocationIndex != -1 && curr.label.ChargeAtSource)
                     {
-                        var res = instance.Locations[curr.label.chargeLocationIndex]
+                        var res = instance.Locations[curr.label.ChargeLocationIndex]
                                           .ChargingCurves[vehicleType.Index]
-                                          .MaxChargeGained(currSoC, idleTime);
+                                          .MaxChargeGained(CurrSoC, idleTime);
 
-                        taskElements.Add(new VECharge(instance.Locations[curr.label.chargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
+                        taskElements.Add(new VECharge(instance.Locations[curr.label.ChargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
                         {
-                            StartSoCInTask = currSoC,
-                            EndSoCInTask = Math.Min(currSoC + res.SoCGained, vehicleType.MaxSoC)
+                            StartSoCInTask = CurrSoC,
+                            EndSoCInTask = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC)
                         });
 
-                        currSoC = Math.Min(currSoC + res.SoCGained, vehicleType.MaxSoC);
+                        CurrSoC = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC);
                         currTime += idleTime;
                     }
 
                     // Deadhead
                     taskElements.Add(new VEDeadhead(dht, currTime, currTime + dht.Duration, vehicleType)
                     {
-                        StartSoCInTask = currSoC,
-                        EndSoCInTask = currSoC - dht.Distance * vehicleType.DriveUsage,
+                        StartSoCInTask = CurrSoC,
+                        EndSoCInTask = CurrSoC - dht.Distance * vehicleType.DriveUsage,
                     });
                     currTime += dht.Duration;
-                    currSoC -= dht.Distance * vehicleType.DriveUsage;
+                    CurrSoC -= dht.Distance * vehicleType.DriveUsage;
 
 
                     // Charge after deadhead
-                    if (curr.label.chargeLocationIndex != -1 && !curr.label.chargeAtSource)
+                    if (curr.label.ChargeLocationIndex != -1 && !curr.label.ChargeAtSource)
                     {
-                        var res = instance.Locations[curr.label.chargeLocationIndex]
+                        var res = instance.Locations[curr.label.ChargeLocationIndex]
                                           .ChargingCurves[vehicleType.Index]
-                                          .MaxChargeGained(currSoC, idleTime);
+                                          .MaxChargeGained(CurrSoC, idleTime);
 
-                        taskElements.Add(new VECharge(instance.Locations[curr.label.chargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
+                        taskElements.Add(new VECharge(instance.Locations[curr.label.ChargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
                         {
-                            StartSoCInTask = currSoC,
-                            EndSoCInTask = Math.Min(currSoC + res.SoCGained, vehicleType.MaxSoC)
+                            StartSoCInTask = CurrSoC,
+                            EndSoCInTask = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC)
                         });
 
-                        currSoC = Math.Min(currSoC + res.SoCGained, vehicleType.MaxSoC);
+                        CurrSoC = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC);
                         currTime += idleTime;
                     }
 
@@ -315,8 +327,8 @@ namespace E_VCSP.Solver.ColumnGenerators
                         // TODO: klopt niet helemaal maar goed
                         taskElements.Add(new VEIdle(trip.From, currTime, trip.StartTime)
                         {
-                            StartSoCInTask = currSoC,
-                            EndSoCInTask = currSoC
+                            StartSoCInTask = CurrSoC,
+                            EndSoCInTask = CurrSoC
                         });
                     }
 
@@ -326,17 +338,17 @@ namespace E_VCSP.Solver.ColumnGenerators
                         double tripUsage = vehicleType.DriveUsage * instance.Trips[curr.nodeIndex].Distance;
                         taskElements.Add(new VETrip(instance.Trips[curr.nodeIndex], vehicleType)
                         {
-                            StartSoCInTask = currSoC,
-                            EndSoCInTask = currSoC - tripUsage,
+                            StartSoCInTask = CurrSoC,
+                            EndSoCInTask = CurrSoC - tripUsage,
                         });
 
                         currTime = instance.Trips[curr.nodeIndex].EndTime;
-                        currSoC -= tripUsage;
+                        CurrSoC -= tripUsage;
                     }
                 }
 
                 // Add final deadhead to depot
-                DeadheadTemplate dhtToDepot = adjFull[path[^2].nodeIndex][^1]!.Deadhead.DeadheadTemplate;
+                DeadheadTemplate dhtToDepot = adjFull[path[^2].nodeIndex][^1]!.DeadheadTemplate;
                 int endTime = taskElements[^1].EndTime;
                 taskElements.Add(new VEDeadhead(dhtToDepot, endTime, endTime + dhtToDepot.Duration, vehicleType)
                 {

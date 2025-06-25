@@ -10,6 +10,7 @@ namespace E_VCSP.Parsing
             attributeNameMapping = new()
             {
                 ( "Id", "Locatie" ),
+                ( "IsDepot", "Depot"),
                 ( "ChargeSpots", "Aantal laadpunten" ),
                 ( "ChargeTotalPower", "Vermogen (kW)" ),
             };
@@ -19,6 +20,7 @@ namespace E_VCSP.Parsing
         {
             Location loc = GetOrCreateLocation(line[attributeIndexMapping["Id"]], locations);
             loc.ChargeSpots = int.Parse(line[attributeIndexMapping["ChargeSpots"]]);
+            loc.IsDepot = line[attributeIndexMapping["IsDepot"]] == "1";
             loc.ChargeTotalPower = double.Parse(line[attributeIndexMapping["ChargeTotalPower"]]);
             return loc;
         }

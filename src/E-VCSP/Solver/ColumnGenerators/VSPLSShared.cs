@@ -408,12 +408,12 @@ namespace E_VCSP.Solver.ColumnGenerators
     {
         private Instance instance;
         private List<List<DeadheadTemplate?>> locationDHT = [];
-        private List<List<Arc?>> adjFull = [];
+        private List<List<VSPArc?>> adjFull = [];
         private VehicleType vehicleType;
         private Random random = new();
         public double T;
 
-        public LSOperations(Instance instance, List<List<Arc?>> adjFull, List<List<DeadheadTemplate?>> locationDHT, VehicleType vt, double t)
+        public LSOperations(Instance instance, List<List<VSPArc?>> adjFull, List<List<DeadheadTemplate?>> locationDHT, VehicleType vt, double t)
         {
             this.instance = instance;
             this.locationDHT = locationDHT;
@@ -455,7 +455,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (false && prev.PVE.Type == PVEType.Trip && ve.Type == PVEType.Trip)
             {
                 // Check possible deadheads instead of direct location transfer
-                travel1Template = adjFull[((PVETrip)prev.PVE).Trip.Index][((PVETrip)ve).Trip.Index]?.Deadhead?.DeadheadTemplate;
+                travel1Template = adjFull[((PVETrip)prev.PVE).Trip.Index][((PVETrip)ve).Trip.Index]?.DeadheadTemplate;
             }
             else
             {
@@ -465,7 +465,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (false && ve.Type == PVEType.Trip && next.PVE.Type == PVEType.Trip)
             {
                 // Check possible deadheads instead of direct location transfer
-                travel2Template = adjFull[((PVETrip)ve).Trip.Index][((PVETrip)next.PVE).Trip.Index]?.Deadhead?.DeadheadTemplate;
+                travel2Template = adjFull[((PVETrip)ve).Trip.Index][((PVETrip)next.PVE).Trip.Index]?.DeadheadTemplate;
             }
             else
             {
@@ -537,7 +537,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (false && prev.PVE.Type == PVEType.Trip && next.PVE.Type == PVEType.Trip)
             {
                 // Check possible deadheads instead of direct location transfer
-                travelTemplate = adjFull[((PVETrip)prev.PVE).Trip.Index][((PVETrip)next.PVE).Trip.Index]?.Deadhead?.DeadheadTemplate;
+                travelTemplate = adjFull[((PVETrip)prev.PVE).Trip.Index][((PVETrip)next.PVE).Trip.Index]?.DeadheadTemplate;
             }
             else
             {

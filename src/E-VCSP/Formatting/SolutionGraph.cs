@@ -186,7 +186,7 @@ namespace E_VCSP.Formatting
                 if (minTime < s)
                 {
                     var node = Formatting.GraphElement.ScheduleNode(minTime, s, "padding1" + i, Color.White);
-                    if (node == null)
+                    if (node != null)
                     {
                         graph.AddNode(node);
                         ns.Insert(1, node);
@@ -298,14 +298,20 @@ namespace E_VCSP.Formatting
                 if (minTime < s)
                 {
                     var node = Formatting.GraphElement.ScheduleNode(minTime, s, "padding1" + i, Color.White);
-                    graph.AddNode(node);
-                    ns.Insert(1, node);
+                    if (node != null)
+                    {
+                        graph.AddNode(node);
+                        ns.Insert(1, node);
+                    }
                 }
                 if (maxTime > e)
                 {
                     var node = Formatting.GraphElement.ScheduleNode(e, maxTime, "padding2" + i, Color.White);
-                    graph.AddNode(node);
-                    ns.Add(node);
+                    if (node != null)
+                    {
+                        graph.AddNode(node);
+                        ns.Add(node);
+                    }
                 }
 
                 var align2 = Formatting.GraphElement.ScheduleNode(maxTime, maxTime + Config.MIN_NODE_TIME, "align2" + i, Color.White);

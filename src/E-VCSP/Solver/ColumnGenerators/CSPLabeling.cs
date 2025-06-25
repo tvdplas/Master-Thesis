@@ -4,19 +4,6 @@ using System.Collections;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    internal class BlockArc
-    {
-        internal Block? FromBlock;
-        internal Block? ToBlock;
-        internal int BreakTime;
-        internal int BruttoNettoTime;
-        internal int IdleTime;
-        internal int TravelTime;
-        internal double ReducedCost = 0;
-
-        internal int TotalTime => BreakTime + BruttoNettoTime + IdleTime + TravelTime;
-    }
-
     internal class CSPLabel
     {
         private static int ID_COUNTER = 0;
@@ -125,10 +112,6 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         internal bool isFeasible(int currentEndTime, bool final)
         {
-            if (PrevBlockId == 22 && final)
-            {
-                int x = 0;
-            }
             int duration = currentEndTime - StartTime;
             if (duration > Config.MAX_DRIVE_TIME && Type != DutyType.Broken) return false;
             if (Type == DutyType.Early && currentEndTime > 16.5 * 60 * 60) return false;
@@ -171,116 +154,31 @@ namespace E_VCSP.Solver.ColumnGenerators
         private List<Block> blocks;
         private GRBModel model;
 
-        List<List<BlockArc?>> adjFull = [];
         List<List<BlockArc>> adj = [];
+        List<List<BlockArc?>> adjFull = [];
 
         List<double> rcBlocks = [];
-        double rcExcessiveLength;
-        double rcLlimitedAvgLength;
         double rcMaxBroken;
         double rcMaxBetween;
 
-        internal CSPLabeling(List<Block> blocks, GRBModel model)
+        internal CSPLabeling(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull)
         {
             this.blocks = blocks;
             this.model = model;
+            this.adj = adj;
+            this.adjFull = adjFull;
         }
 
         private void reset()
         {
             var constrs = model.GetConstrs();
             rcBlocks = Enumerable.Range(0, blocks.Count).Select(_ => 0.0).ToList();
+
             if (model.Status != GRB.Status.INFEASIBLE)
             {
                 for (int i = 0; i < blocks.Count; i++) rcBlocks[i] = constrs[i].Pi;
-                rcExcessiveLength = model.GetConstrByName("no_excessive_length").Pi;
-                rcLlimitedAvgLength = model.GetConstrByName("limited_average_length").Pi;
                 rcMaxBroken = model.GetConstrByName("max_broken").Pi;
                 rcMaxBetween = model.GetConstrByName("max_between").Pi;
-            }
-            adjFull = Enumerable.Range(0, blocks.Count + 2).Select(x => new List<BlockArc?>()).ToList();
-            adj = Enumerable.Range(0, blocks.Count + 2).Select(x => new List<BlockArc>()).ToList();
-
-            // TODO: add block arcs for walking
-            for (int blockIndex1 = 0; blockIndex1 < blocks.Count; blockIndex1++)
-            {
-                Block block1 = blocks[blockIndex1];
-                for (int blockIndex2 = 0; blockIndex2 < blocks.Count; blockIndex2++)
-                {
-                    Block block2 = blocks[blockIndex2];
-
-                    // Determine whether or not it is feasible to string to arcs together
-                    // If so: what actually happens during this time. 
-
-                    // For now; only allow transfer if already at same location
-                    // Based on times, determine whether its idle / break / whatever. 
-                    BlockArc? arc = null;
-
-                    if (block1.EndTime <= block2.StartTime && block1.EndLocation == block2.StartLocation)
-                    {
-                        // Arc will be formed; need to fill in details.
-                        int idleTime = block2.StartTime - block1.EndTime;
-                        int breakTime = 0;
-                        int bruttoNettoTime = 0;
-                        int travelTime = 0;
-
-                        int nettoBreakTime = block1.EndLocation.BreakAllowed
-                            ? idleTime - block1.EndLocation.BrutoNetto
-                            : 0;
-
-                        if (nettoBreakTime > Config.CR_MIN_BREAK_TIME && nettoBreakTime < Config.CR_MAX_BREAK_TIME)
-                        {
-                            breakTime = idleTime - block1.EndLocation.BrutoNetto;
-                            bruttoNettoTime = block1.EndLocation.BrutoNetto;
-                            idleTime = 0;
-                        }
-
-                        if (idleTime < Config.CR_MAX_IDLE_TIME) // either "short" idle or break
-                        {
-                            arc = new()
-                            {
-                                FromBlock = block1,
-                                ToBlock = block2,
-                                IdleTime = idleTime,
-                                BreakTime = breakTime,
-                                BruttoNettoTime = bruttoNettoTime,
-                                TravelTime = travelTime,
-                                ReducedCost = rcBlocks[blockIndex2],
-                            };
-                        }
-                    }
-
-                    if (arc != null) adj[blockIndex1].Add(arc);
-                    adjFull[blockIndex1].Add(arc);
-                }
-            }
-
-            // TODO: better depot handling
-            for (int blockIndex = 0; blockIndex < blocks.Count; blockIndex++)
-            {
-                Block block = blocks[blockIndex];
-                BlockArc? start = block.StartLocation.IsDepot ? new BlockArc()
-                {
-                    ToBlock = block,
-                    IdleTime = 0,
-                    BreakTime = 0,
-                    BruttoNettoTime = 0,
-                    TravelTime = 0,
-                } : null;
-                if (start != null) adj[^2].Add(start);
-                adjFull[^2].Add(start);
-                adjFull[blockIndex].Add(null); // cannot go back to depot
-
-                BlockArc? end = block.EndLocation.IsDepot ? new BlockArc()
-                {
-                    ToBlock = block,
-                    IdleTime = 0,
-                    BreakTime = 0,
-                    BruttoNettoTime = 0,
-                    TravelTime = 0,
-                } : null;
-                if (end != null) adj[block.Index].Add(end);
-                adjFull[block.Index].Add(end);
             }
         }
 
@@ -439,7 +337,6 @@ namespace E_VCSP.Solver.ColumnGenerators
                     Type = type,
                 };
                 duties.Add((reducedCost, cd));
-                //Console.WriteLine($"New duty {cd} {Formatting.Time.HHMMSS(cd.Elements[0].StartTime)} - {Formatting.Time.HHMMSS(cd.Elements[^1].EndTime)}");
             }
 
             return duties;

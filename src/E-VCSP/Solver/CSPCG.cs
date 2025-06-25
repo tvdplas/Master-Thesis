@@ -9,10 +9,26 @@ using System.Data;
 
 namespace E_VCSP.Solver
 {
+    internal class BlockArc
+    {
+        internal Block? FromBlock;
+        internal Block? ToBlock;
+        internal int BreakTime;
+        internal int BruttoNettoTime;
+        internal int IdleTime;
+        internal int TravelTime;
+
+        internal int TotalTime => BreakTime + BruttoNettoTime + IdleTime + TravelTime;
+    }
+
+
     public class CSPCG : Solver
     {
         private GRBModel? model;
         private Instance instance;
+        private List<List<BlockArc>> adj = [];
+        private List<List<BlockArc?>> adjFull = [];
+
 
         private List<CrewDuty> duties = [];
         private Dictionary<string, CrewDuty> varnameDutyMapping = [];
@@ -25,6 +41,11 @@ namespace E_VCSP.Solver
 
             // Generate initial set of vehicle duties
             GenerateInitialDuties();
+
+            // Generate possible transfers between blocks
+            GenerateArcs();
+
+            Console.WriteLine($"Ready for CSP: total of {instance.Blocks.Count} blocks to cover");
         }
 
         private void GenerateInitialDuties()
@@ -33,6 +54,102 @@ namespace E_VCSP.Solver
             for (int i = 0; i < instance.Blocks.Count; i++)
             {
                 duties.Add(new CrewDuty([new CDEBlock(instance.Blocks[i])]) { Index = i, Type = DutyType.Single });
+            }
+        }
+
+        private void GenerateArcs()
+        {
+            adjFull = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc?>()).ToList();
+            adj = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc>()).ToList();
+
+            List<(int min, int max)> allowedIdleTimes = [
+                (Config.CR_MIN_SHORT_IDLE_TIME, Config.CR_MAX_SHORT_IDLE_TIME),
+                (Config.CR_MIN_BREAK_TIME, Config.CR_MAX_BREAK_TIME),
+                (Config.CR_MIN_LONG_IDLE_TIME, Config.CR_MAX_LONG_IDLE_TIME),
+            ];
+
+            for (int blockIndex1 = 0; blockIndex1 < instance.Blocks.Count; blockIndex1++)
+            {
+                Block block1 = instance.Blocks[blockIndex1];
+                for (int blockIndex2 = 0; blockIndex2 < instance.Blocks.Count; blockIndex2++)
+                {
+                    Block block2 = instance.Blocks[blockIndex2];
+
+                    // Determine whether or not it is feasible to string to arcs together
+                    // If so: what actually happens during this time. 
+
+                    // For now; only allow transfer if already at same location
+                    // Based on times, determine whether its idle / break / whatever. 
+                    BlockArc? arc = null;
+
+                    if (block1.EndTime <= block2.StartTime && block1.EndLocation == block2.StartLocation)
+                    {
+                        // Arc will be formed; need to fill in details.
+                        int idleTime = block2.StartTime - block1.EndTime;
+
+                        int breakTime = 0;
+                        int bruttoNettoTime = 0;
+                        int travelTime = 0;
+
+                        int nettoBreakTime = block1.EndLocation.BreakAllowed
+                            ? idleTime - block1.EndLocation.BrutoNetto
+                            : 0;
+
+                        if (nettoBreakTime > Config.CR_MIN_BREAK_TIME && nettoBreakTime < Config.CR_MAX_BREAK_TIME)
+                        {
+                            breakTime = idleTime - block1.EndLocation.BrutoNetto;
+                            bruttoNettoTime = block1.EndLocation.BrutoNetto;
+                            idleTime = 0;
+                        }
+
+                        if (
+                            (Config.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_SHORT_IDLE_TIME) ||
+                            (Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
+                        ) // either "short" idle or break
+                        {
+                            arc = new()
+                            {
+                                FromBlock = block1,
+                                ToBlock = block2,
+                                IdleTime = idleTime,
+                                BreakTime = breakTime,
+                                BruttoNettoTime = bruttoNettoTime,
+                                TravelTime = travelTime,
+                            };
+                        }
+                    }
+
+                    if (arc != null) adj[blockIndex1].Add(arc);
+                    adjFull[blockIndex1].Add(arc);
+                }
+            }
+
+            for (int blockIndex = 0; blockIndex < instance.Blocks.Count; blockIndex++)
+            {
+                Block block = instance.Blocks[blockIndex];
+                BlockArc? start = new BlockArc()
+                {
+                    ToBlock = block,
+                    IdleTime = 0,
+                    BreakTime = 0,
+                    BruttoNettoTime = 0,
+                    TravelTime = 0,
+                };
+                if (start != null) adj[^2].Add(start);
+                adjFull[^2].Add(start);
+                adjFull[blockIndex].Add(null); // cannot go back to depot
+
+                BlockArc? end = new BlockArc()
+                {
+                    FromBlock = block,
+                    IdleTime = 0,
+                    BreakTime = 0,
+                    BruttoNettoTime = 0,
+                    TravelTime = 0,
+                };
+                if (end != null)
+                    adj[block.Index].Add(end);
+                adjFull[block.Index].Add(end);
             }
         }
 
@@ -163,10 +280,6 @@ namespace E_VCSP.Solver
             (var model, var dutyVars) = InitModel(cancellationToken);
             model.Optimize();
 
-            CSPLabeling cspl = new(instance.Blocks, model);
-
-            var x = cspl.generateShortestPath();
-
             // Tracking generated columns
             int maxColumns = Config.CSP_INSTANCES_PER_IT * Config.CSP_MAX_COL_GEN_ITS,
                 lastReportedPercent = 0,    // Percentage of total reporting
@@ -179,7 +292,7 @@ namespace E_VCSP.Solver
 
             // Multithreaded shortestpath searching
             List<List<CSPLabeling>> instances = [
-                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(instance.Blocks, model))], // Labeling
+                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(instance.Blocks, model, adj, adjFull))], // Labeling
             ];
             List<double> operationChances = [1];
             List<double> sums = [operationChances[0]];
