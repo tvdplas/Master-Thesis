@@ -173,9 +173,15 @@ namespace E_VCSP.Solver
                     adjFull[i][j] = new Arc() { To = tn2, From = tn1, Deadhead = dh };
                     adj[i].Add(new Arc() { To = tn2, From = tn1, Deadhead = dh });
                 }
+            }
 
-                // Preprocessing: filter by min length, if one is found with low time only use that 
-                int directArcIndex = -1, directArcTransferTime = Config.VSP_PRE_DIRECT_TIME;
+            double avgOutgoingBeforeSimplify = adj.Where((x, i) => i < instance.Trips.Count).Sum(x => x.Count) / ((double)adj.Count - 2);
+
+            // Preprocessing: filter by min length, if one is found with low time only use that 
+            for (int i = 0; i < nodes.Count - 2; i++)
+            {
+                TripNode tn1 = (TripNode)nodes[i];
+                List<int> directArcIndexes = [];
 
                 for (int dai = 0; dai < adj[i].Count; dai++)
                 {
@@ -183,27 +189,29 @@ namespace E_VCSP.Solver
                     if (arc.To.Index < instance.Trips.Count)
                     {
                         Trip t2 = ((TripNode)arc.To).Trip;
-                        if (t2.From.Id != tn1.Trip.To.Id) continue;
 
                         int timeDiff = t2.StartTime - tn1.Trip.EndTime;
-                        if (timeDiff <= directArcTransferTime)
+                        if (timeDiff <= Config.VSP_PRE_DIRECT_TIME)
                         {
-                            directArcIndex = dai;
-                            directArcTransferTime = timeDiff;
+                            directArcIndexes.Add(t2.Index);
                         }
                     }
                 }
 
-                if (directArcIndex != -1)
+                if (directArcIndexes.Count > 0)
                 {
                     totalSimplified++;
-                    int tripIndex = adj[i][directArcIndex].To.Index;
-                    adj[i] = adj[i].Where((x, i) => x.To.Index >= instance.Trips.Count || i == directArcIndex).ToList();
-                    adjFull[i] = adjFull[i].Select((x, i) => x == null || x.To.Index >= instance.Trips.Count || x.To.Index == tripIndex ? x : null).ToList();
+                    adj[i] = adj[i].Where((x, i) => x.To.Index >= instance.Trips.Count || directArcIndexes.Contains(x.To.Index)).ToList();
+                    adjFull[i] = adjFull[i].Select((x, i) => x == null || x.To.Index >= instance.Trips.Count || directArcIndexes.Contains(x.To.Index) ? x : null).ToList();
                 }
             }
 
+            double avgOutgoingAfterSimplify = adj.Where((x, i) => i < instance.Trips.Count).Sum(x => x.Count) / ((double)adj.Count - 2);
+
+
             Console.WriteLine($"Simplified the arcs of {totalSimplified} trips");
+            Console.WriteLine($"Avg outgoing arcs before simplification: {avgOutgoingBeforeSimplify}");
+            Console.WriteLine($"Avg outgoing arcs after simplification: {avgOutgoingAfterSimplify}");
         }
 
         private void GenerateInitialTasks()

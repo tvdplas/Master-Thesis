@@ -7,7 +7,8 @@ namespace E_VCSP.Solver.ColumnGenerators
     public record SPLabel(
         int prevIndex, // Previously visited node index
         int prevId, // Label preceding this label 
-        int prevChargeAction, // Charge action done at this node
+        int chargeLocationIndex, // Charge location used in this node
+        bool chargeAtSource, // Was charge at start / end of deadhead
         double currSoC, // SoC at start of node
         double currCosts,  // Costs incurred at start of node
         int labelId
@@ -130,7 +131,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
 
             int labelId = 0;
-            int activeLabelCount = addLabel(new SPLabel(nodes.Count - 2, -1, -1, vehicleType.StartSoC, 0, labelId++), nodes.Count - 2);
+            int activeLabelCount = addLabel(new SPLabel(nodes.Count - 2, -1, -1, false, vehicleType.StartSoC, 0, labelId++), nodes.Count - 2);
 
             while (activeLabelCount > 0)
             {
@@ -155,7 +156,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 {
                     Arc arc = adj[expandingLabelIndex][i];
                     int targetIndex = arc.To.Index;
-                    Trip? targetTrip = expandingLabelIndex < instance.Trips.Count ? instance.Trips[targetIndex] : null;
+                    Trip? targetTrip = targetIndex < instance.Trips.Count ? instance.Trips[targetIndex] : null;
 
                     bool depotStart = expandingLabelIndex >= instance.Trips.Count,
                          depotEnd = targetIndex >= instance.Trips.Count;
@@ -176,13 +177,13 @@ namespace E_VCSP.Solver.ColumnGenerators
 
                     double SoC = expandingLabel.currSoC;
                     double costs = arc.Deadhead.DeadheadTemplate.Distance * Config.VH_M_COST;
-                    if (targetIndex < instance.Trips.Count) costs -= reducedCosts[expandingLabelIndex];
+                    if (targetIndex < instance.Trips.Count) costs -= reducedCosts[targetIndex];
 
                     if (canCharge == 1)
                     {
                         var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
                         costs += res.Cost;
-                        SoC += res.SoCGained;
+                        SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
                     }
 
                     SoC -= arc.Deadhead.DeadheadTemplate.Distance * vehicleType.DriveUsage;
@@ -192,8 +193,11 @@ namespace E_VCSP.Solver.ColumnGenerators
                     {
                         var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
                         costs += res.Cost;
-                        SoC += res.SoCGained;
+                        SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
                     }
+
+                    SoC -= (targetTrip?.Distance ?? 0) * vehicleType.DriveUsage;
+                    if (SoC < vehicleType.MinSoC) continue;
 
                     List<(double newSoC, double cost, int chargingIndex)> options = [];
                     // TODO add additional charging detours
@@ -203,58 +207,6 @@ namespace E_VCSP.Solver.ColumnGenerators
                         chargeLocation?.Index ?? -1
                     ));
 
-
-                    // Create an arc between the two; if one of the two is a charging location, assume maximum charging time there. 
-
-
-                    // 0: no charge, 1: charge at source, 2: charge at target, 3: charge at either
-
-
-                    double tripCost = expandingLabelIndex < instance.Trips.Count ? reducedCosts[expandingLabelIndex] : 0;
-
-
-
-
-
-
-
-
-                    //if (arc.Deadhead.ChargingActions.Count == 0)
-                    //{
-                    //    // Add label for driving deadhead directly
-                    //    double directTravelSoC = expandingLabel.currSoC -
-                    //        (tripDistance + arc.Deadhead.DeadheadTemplate.Distance) * vehicleType.DriveUsage;
-                    //    if (directTravelSoC >= vehicleType.MinSoC)
-                    //    {
-                    //        options.Add((
-                    //            directTravelSoC,
-                    //            expandingLabel.currCosts - tripCost + arc.Deadhead.DeadheadTemplate.Distance * Config.VH_M_COST,
-                    //            -1
-                    //        ));
-                    //    }
-                    //}
-                    //else
-                    //{
-                    //    // Add labels for each of the possible charging actions between the expanding trip and target trip
-                    //    for (int j = 0; j < arc.Deadhead.ChargingActions.Count; j++)
-                    //    {
-                    //        var chargeAction = arc.Deadhead.ChargingActions[j];
-                    //        double chargeAtStation = expandingLabel.currSoC - (tripDistance * vehicleType.DriveUsage + chargeAction.ChargeUsedTo);
-                    //        if (chargeAtStation < vehicleType.MinSoC) continue; // Not feasible, not enough soc to reach charger
-
-                    //        ChargingCurve cc = chargeAction.ChargeLocation.ChargingCurves[vehicleType.Index];
-                    //        var maxCharge = cc.MaxChargeGained(chargeAtStation, chargeAction.TimeAtLocation);
-                    //        double SoCAtNextTrip = chargeAtStation + maxCharge.SoCGained - chargeAction.ChargeUsedFrom;
-                    //        if (SoCAtNextTrip < vehicleType.MinSoC) continue; // Not feasible, soc at next trip is too low
-
-                    //        options.Add((
-                    //            SoCAtNextTrip,
-                    //            expandingLabel.currCosts - tripCost + chargeAction.DrivingCost + maxCharge.Cost,
-                    //            j
-                    //        ));
-                    //    }
-                    //}
-
                     // For each label possibility, check if it is not already dominated at the target node. 
                     foreach (var option in options)
                     {
@@ -262,6 +214,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                             expandingLabelIndex,
                             expandingLabel.labelId,
                             option.chargingIndex,
+                            canCharge == 1,
                             option.newSoC,
                             option.cost,
                             labelId++
@@ -273,79 +226,128 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             // Backtrack in order to get path
             // indexes to nodes
-            List<(int nodeIndex, SPLabel label)> path = [(allLabels.Count - 1, allLabels[^1].MinBy(x => x.currCosts) ?? throw new InvalidDataException("Could not find path to EOD depot"))];
-            double minCosts = allLabels[^1].Min(x => x.currCosts);
-            while (path[^1].Item2.prevId != -1)
+            var feasibleEnds = allLabels[^1]
+                .Where(x => x.currCosts < 0)
+                .OrderBy(x => x.currCosts).ToList();
+            var validEnds = feasibleEnds.Take(Config.VSP_LB_MAX_COLS);
+
+            List<(double cost, VehicleTask vehicleTask)> results = [];
+
+            foreach (var validEnd in validEnds)
             {
-                var prev = allLabels[path[^1].Item2.prevIndex].Find(x => x.labelId == path[^1].Item2.prevId) ?? throw new Exception("Could not backtrace");
-                path.Add((path[^1].Item2.prevIndex, prev));
+                List<(int nodeIndex, SPLabel label)> path = [(
+                    allLabels.Count - 1,
+                    validEnd
+                )];
+                double minCosts = path[0].label.currCosts;
+                while (path[^1].Item2.prevId != -1)
+                {
+                    var prev = allLabels[path[^1].Item2.prevIndex].Find(x => x.labelId == path[^1].Item2.prevId) ?? throw new Exception("Could not backtrace");
+                    path.Add((path[^1].Item2.prevIndex, prev));
+                }
+                path.Reverse();
+
+                List<VehicleElement> taskElements = [];
+                for (int i = 1; i < path.Count - 1; i++)
+                {
+                    var curr = path[i];
+                    var prev = path[i - 1];
+                    Trip? trip = instance.Trips[curr.nodeIndex];
+                    DeadheadTemplate dht = adjFull[prev.nodeIndex][curr.nodeIndex]!.Deadhead.DeadheadTemplate;
+
+                    int currTime = taskElements.Count > 0
+                        ? taskElements[^1].EndTime
+                        : trip!.StartTime - adjFull[^2][curr.nodeIndex]!.Deadhead.DeadheadTemplate.Duration;
+                    double currSoC = taskElements.Count > 0
+                        ? taskElements[^1].EndSoCInTask
+                        : vehicleType.StartSoC;
+
+                    // (charge) -> dh -> (charge) -> trip; never charge when going to/from depot
+
+                    int idleTime = trip!.StartTime - dht.Duration - currTime;
+
+                    // Charge before deadhead
+                    if (curr.label.chargeLocationIndex != -1 && curr.label.chargeAtSource)
+                    {
+                        var res = instance.Locations[curr.label.chargeLocationIndex]
+                                          .ChargingCurves[vehicleType.Index]
+                                          .MaxChargeGained(currSoC, idleTime);
+
+                        taskElements.Add(new VECharge(instance.Locations[curr.label.chargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
+                        {
+                            StartSoCInTask = currSoC,
+                            EndSoCInTask = Math.Min(currSoC + res.SoCGained, vehicleType.MaxSoC)
+                        });
+
+                        currSoC = Math.Min(currSoC + res.SoCGained, vehicleType.MaxSoC);
+                        currTime += idleTime;
+                    }
+
+                    // Deadhead
+                    taskElements.Add(new VEDeadhead(dht, currTime, currTime + dht.Duration, vehicleType)
+                    {
+                        StartSoCInTask = currSoC,
+                        EndSoCInTask = currSoC - dht.Distance * vehicleType.DriveUsage,
+                    });
+                    currTime += dht.Duration;
+                    currSoC -= dht.Distance * vehicleType.DriveUsage;
+
+
+                    // Charge after deadhead
+                    if (curr.label.chargeLocationIndex != -1 && !curr.label.chargeAtSource)
+                    {
+                        var res = instance.Locations[curr.label.chargeLocationIndex]
+                                          .ChargingCurves[vehicleType.Index]
+                                          .MaxChargeGained(currSoC, idleTime);
+
+                        taskElements.Add(new VECharge(instance.Locations[curr.label.chargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
+                        {
+                            StartSoCInTask = currSoC,
+                            EndSoCInTask = Math.Min(currSoC + res.SoCGained, vehicleType.MaxSoC)
+                        });
+
+                        currSoC = Math.Min(currSoC + res.SoCGained, vehicleType.MaxSoC);
+                        currTime += idleTime;
+                    }
+
+                    if (currTime != trip.StartTime)
+                    {
+                        // TODO: klopt niet helemaal maar goed
+                        taskElements.Add(new VEIdle(trip.From, currTime, trip.StartTime)
+                        {
+                            StartSoCInTask = currSoC,
+                            EndSoCInTask = currSoC
+                        });
+                    }
+
+                    // add trip
+                    if (curr.nodeIndex < instance.Trips.Count)
+                    {
+                        double tripUsage = vehicleType.DriveUsage * instance.Trips[curr.nodeIndex].Distance;
+                        taskElements.Add(new VETrip(instance.Trips[curr.nodeIndex], vehicleType)
+                        {
+                            StartSoCInTask = currSoC,
+                            EndSoCInTask = currSoC - tripUsage,
+                        });
+
+                        currTime = instance.Trips[curr.nodeIndex].EndTime;
+                        currSoC -= tripUsage;
+                    }
+                }
+
+                // Add final deadhead to depot
+                DeadheadTemplate dhtToDepot = adjFull[path[^2].nodeIndex][^1]!.Deadhead.DeadheadTemplate;
+                int endTime = taskElements[^1].EndTime;
+                taskElements.Add(new VEDeadhead(dhtToDepot, endTime, endTime + dhtToDepot.Duration, vehicleType)
+                {
+                    StartSoCInTask = taskElements[^1].EndSoCInTask,
+                    EndSoCInTask = taskElements[^1].EndSoCInTask - dhtToDepot.Distance * vehicleType.DriveUsage,
+                });
+
+                results.Add((minCosts, new VehicleTask(taskElements) { vehicleType = vehicleType }));
             }
 
-            path.Reverse();
-
-
-
-            //List<PartialVehicleElement> taskElements = [new PVEDepot(Depot, StartTime - Config.MIN_NODE_TIME, StartTime)];
-            //for (int i = 0; i < path.Count - 1; i++)
-            //{
-            //    int index = path[i].nodeIndex;
-            //    int nextIndex = path[i + 1].nodeIndex;
-            //    var node = nodes[index];
-
-            //    int currTime = taskElements[^1].EndTime;
-            //    double currSoC = taskElements[^1].EndSoCInTask ?? throw new InvalidDataException("Did not properly set soc in previous element");
-
-
-            //    if (index < instance.Trips.Count)
-            //    {
-            //        double tripUsage = vehicleType.DriveUsage * instance.Trips[index].Distance;
-            //        taskElements.Add(new PVETrip(instance.Trips[index], vehicleType)
-            //        {
-            //            StartSoCInTask = currSoC,
-            //            EndSoCInTask = currSoC - tripUsage,
-            //        });
-
-
-            //        currTime = instance.Trips[index].EndTime;
-            //        currSoC -= tripUsage;
-            //    }
-
-            //    Deadhead dh = adjFull[index][nextIndex]?.Deadhead ?? throw new InvalidDataException("No deadhead corresponding to driven path found");
-            //    int chargeActionIndex = path[i + 1].label.prevChargeAction;
-            //    if (chargeActionIndex != -1)
-            //    {
-            //        VEDeadhead ved = new VEDeadhead(dh, currTime, vehicleType, chargeActionIndex, currSoC);
-            //        ved.StartSoCInTask = currSoC;
-            //        ved.EndSoCInTask = currSoC + ved.SoCDiff;
-            //        taskElements.Add(ved);
-
-            //        currTime = ved.EndTime;
-            //        currSoC = (double)ved!.EndSoCInTask;
-            //    }
-            //    else
-            //    {
-            //        VEDeadhead ved = new VEDeadhead(dh, currTime, vehicleType);
-            //        ved.StartSoCInTask = currSoC;
-            //        ved.EndSoCInTask = currSoC + ved.SoCDiff;
-
-            //        taskElements.Add(ved);
-            //        currTime += dh.DeadheadTemplate.Duration;
-            //        currSoC += ved.SoCDiff;
-            //    }
-
-            //    int endTime = nextIndex == instance.DepotEndIndex ? EndTime : instance.Trips[nextIndex].StartTime;
-            //    Location location = nextIndex == instance.DepotEndIndex ? Depot : instance.Trips[nextIndex].From;
-            //    VEIdle vei = new VEIdle(location, currTime, endTime, vehicleType);
-            //    vei.StartSoCInTask = currSoC;
-            //    vei.EndSoCInTask = currSoC + vei.SoCDiff;
-            //    taskElements.Add(vei);
-            //}
-
-            //taskElements.Add(new PVEDepot(Depot, EndTime, EndTime + Config.MIN_NODE_TIME));
-
-            //if (Config.CONSOLE_LABELING) Console.WriteLine($"Generated column with reduced cost of {minCosts}");
-
-            return [(minCosts, new VehicleTask([]) { vehicleType = vehicleType })];
+            return results;
         }
     }
 }

@@ -77,6 +77,7 @@
         public static string VSP_OPERATION_SEQUENCE = "-"; // Defines an initial operation sequence
 
         public static Header VSP_CG_LABELING = new();
+        public static int VSP_LB_MAX_COLS = 50;
         public static double VSP_LB_WEIGHT = 0;
         public static double VSP_LB_CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same
 
