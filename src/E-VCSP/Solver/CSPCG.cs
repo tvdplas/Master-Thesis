@@ -367,7 +367,7 @@ namespace E_VCSP.Solver
                 if (percent >= lastReportedPercent + 10)
                 {
                     lastReportedPercent = percent - (percent % 10);
-                    //Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{notFound}\t{totWithoutRC}\t{model.ObjVal}");
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{notFound}\t{totWithoutRC}\t{model.ObjVal}");
                 }
 
                 // Select solution strategy, generate new duties
@@ -412,7 +412,7 @@ namespace E_VCSP.Solver
             }
 
             // Info dump
-            //Console.WriteLine($"100%\t{totalGenerated}\t{lbGenerated}\t{notFound}\t{totWithoutRC}\t{model.ObjVal}");
+            Console.WriteLine($"100%\t{totalGenerated}\t{lbGenerated}\t{notFound}\t{totWithoutRC}\t{model.ObjVal}");
             Console.WriteLine($"Value of relaxation: {model.ObjVal}");
             Console.WriteLine($"Total generation attempts: ${totalGenerated}");
             Console.WriteLine($"{totWithoutRC} columns were not added due to positive reduced costs.");

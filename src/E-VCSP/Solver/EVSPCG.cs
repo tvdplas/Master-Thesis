@@ -336,8 +336,10 @@ namespace E_VCSP.Solver
                     int prevInterestingIndex = veIndex - 1;
                     while (prevInterestingIndex >= 0 && prevInteresting == null)
                     {
-                        List<VEType> interestingTypes = [VEType.Deadhead, VEType.Charge, VEType.Charge];
-                        if (interestingTypes.Contains(vt.Elements[prevInterestingIndex].Type))
+                        List<VEType> interestingTypes = [VEType.Deadhead, VEType.Charge, VEType.Trip];
+                        if (interestingTypes.Contains(vt.Elements[prevInterestingIndex].Type)
+                            || (vt.Elements[prevInterestingIndex].Type == VEType.Idle && ((VEIdle)vt.Elements[prevInterestingIndex]).Postprocessed)
+                        )
                         {
                             prevInteresting = vt.Elements[prevInterestingIndex];
                             break;
@@ -349,13 +351,15 @@ namespace E_VCSP.Solver
                     int nextInterestingIndex = veIndex + 1;
                     while (nextInterestingIndex < vt.Elements.Count && nextInteresting == null)
                     {
-                        List<VEType> interestingTypes = [VEType.Deadhead, VEType.Charge, VEType.Charge];
-                        if (interestingTypes.Contains(vt.Elements[nextInterestingIndex].Type))
+                        List<VEType> interestingTypes = [VEType.Deadhead, VEType.Charge, VEType.Trip];
+                        if (interestingTypes.Contains(vt.Elements[nextInterestingIndex].Type)
+                            || (vt.Elements[nextInterestingIndex].Type == VEType.Idle && ((VEIdle)vt.Elements[nextInterestingIndex]).Postprocessed)
+                        )
                         {
                             nextInteresting = vt.Elements[nextInterestingIndex];
                             break;
                         }
-                        else nextInterestingIndex--;
+                        else nextInterestingIndex++;
                     }
 
                     List<VehicleElement> newElements = [];
@@ -379,11 +383,48 @@ namespace E_VCSP.Solver
                     }
 
                     // Connect t
-                    DeadheadTemplate dht = extendedTemplates.Find(x => x.From == from && x.To == to)!;
                     double startSoC = vt.Elements[startIndex].StartSoCInTask;
                     double endSoC = vt.Elements[endIndex].EndSoCInTask;
                     int startTime = vt.Elements[startIndex].StartTime;
                     int endTime = vt.Elements[endIndex].EndTime;
+
+                    // 
+                    var dummyIdle = new VEIdle(to, startTime, endTime)
+                    {
+                        StartLocation = from,
+                        EndLocation = to,
+                        StartSoCInTask = startSoC,
+                        EndSoCInTask = endSoC,
+                        Postprocessed = true,
+                    };
+
+                    for (int x = startIndex; x <= endIndex; x++)
+                    {
+                        if (vt.Elements[x].Type == VEType.Idle || vt.Elements[x].Type == VEType.Deadhead || (vt.Elements[x].Type == VEType.Trip && ((VETrip)vt.Elements[x]).Trip.Index == i)) continue;
+                        throw new InvalidOperationException("verkeerde ding weg aan t gooien");
+                    }
+
+                    vt.Elements.RemoveRange(startIndex, endIndex - startIndex + 1);
+                    vt.Elements.InsertRange(startIndex, [dummyIdle]);
+                }
+            }
+
+
+            // Phase 2: combining idle blocks, adding deadheads
+            for (int i = 0; i < selectedTasks.Count; i++)
+            {
+                VehicleTask vt = selectedTasks[i];
+                List<(int index, VEIdle ve)> idles = [];
+
+                void replace()
+                {
+                    Location from = idles[0].ve.StartLocation!;
+                    Location to = idles[^1].ve.EndLocation!;
+                    DeadheadTemplate dht = extendedTemplates.Find(x => x.From == from && x.To == to)!;
+                    double startSoC = idles[0].ve.StartSoCInTask;
+                    double endSoC = idles[^1].ve.EndSoCInTask;
+                    int startTime = idles[0].ve.StartTime;
+                    int endTime = idles[^1].ve.EndTime;
                     int idleTime = endTime - startTime - dht.Duration;
 
                     var newDeadhead = new VEDeadhead(dht, startTime, startTime + dht.Duration, vehicleType)
@@ -398,17 +439,28 @@ namespace E_VCSP.Solver
                         EndSoCInTask = endSoC,
                         Postprocessed = true,
                     };
+                    vt.Elements.RemoveRange(idles[0].index, idles.Count);
+                    vt.Elements.InsertRange(idles[0].index, [newDeadhead, newIdle]);
 
-                    vt.Elements.RemoveRange(startIndex, endIndex - startIndex);
-                    vt.Elements.InsertRange(startIndex, [newDeadhead, newIdle]);
+                    idles.Clear();
                 }
+
+                for (int j = 0; j < vt.Elements.Count; j++)
+                {
+                    VehicleElement ve = vt.Elements[j];
+                    if (ve.Type == VEType.Idle && ((VEIdle)ve).Postprocessed)
+                    {
+                        idles.Add((j, (VEIdle)ve));
+                    }
+                    else if (idles.Count > 0)
+                    {
+                        replace();
+                        j = j + 2 - idles.Count;
+                    }
+                }
+
+                if (idles.Count > 0) replace();
             }
-
-            /* 
-             
-             
-             */.
-
 
             return selectedTasks;
         }
