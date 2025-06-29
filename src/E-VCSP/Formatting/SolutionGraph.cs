@@ -38,8 +38,16 @@ namespace E_VCSP.Formatting
 
                     if (element is VEIdle vei)
                     {
-                        text = $"idle {vei.StartLocation}@{SoCAtStart}% -> {SoCAtEnd}%";
-                        color = Color.White;
+                        if (element.Postprocessed)
+                        {
+                            text = $"POST idle {vei.StartLocation}@{SoCAtStart}% -> {SoCAtEnd}%";
+                            color = Color.LightGray;
+                        }
+                        else
+                        {
+                            text = $"idle {vei.StartLocation}@{SoCAtStart}% -> {SoCAtEnd}%";
+                            color = Color.White;
+                        }
                     }
                     else if (element is VETrip vet)
                     {
@@ -48,8 +56,16 @@ namespace E_VCSP.Formatting
                     }
                     else if (element is VEDeadhead ved)
                     {
-                        text = $"{ved.DeadheadTemplate.From}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
-                        color = Color.LightGreen;
+                        if (element.Postprocessed)
+                        {
+                            text = $"POST {ved.DeadheadTemplate.From}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
+                            color = Color.Olive;
+                        }
+                        else
+                        {
+                            text = $"{ved.DeadheadTemplate.From}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
+                            color = Color.LightGreen;
+                        }
                     }
                     else if (element is VECharge vec)
                     {
@@ -150,7 +166,7 @@ namespace E_VCSP.Formatting
                         block.StartTime,
                         block.EndTime,
                         $"{block.StartLocation} -> {block.EndLocation}",
-                        block.EndTime - block.StartTime > Config.MAX_DRIVE_TIME ? Color.Red : Color.LightBlue
+                        block.EndTime - block.StartTime > Config.MAX_STEERING_TIME ? Color.Red : Color.LightBlue
                     );
                     add(node);
 

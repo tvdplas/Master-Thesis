@@ -19,21 +19,11 @@
 
         public int MinHandoverTime => Math.Max(SignOffTime, SignOnTime);
 
-        public double ChargePowerPerSpot
-        {
-            get
-            {
-                return ChargeSpots > 0 ? ChargeTotalPower / ChargeSpots : 0;
-            }
-        }
+        public bool FreeIdle => BreakAllowed || CanCharge;
 
-        public bool CanCharge
-        {
-            get
-            {
-                return ChargePowerPerSpot > 0;
-            }
-        }
+        public double ChargePowerPerSpot => ChargeSpots > 0 ? ChargeTotalPower / ChargeSpots : 0;
+
+        public bool CanCharge => ChargePowerPerSpot > 0;
 
         public override string ToString()
         {

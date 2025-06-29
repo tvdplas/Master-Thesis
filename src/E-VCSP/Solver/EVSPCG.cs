@@ -238,35 +238,179 @@ namespace E_VCSP.Solver
         {
             if (model == null) throw new InvalidOperationException("Cannot generate solution graph without model instance");
 
-            List<VehicleTask> tasks = [];
-            int[] covered = new int[instance.Trips.Count];
+            // trip index -> [selected vehicle task index]
+            List<List<int>> coveredBy = Enumerable.Range(0, instance.Trips.Count).Select(x => new List<int>()).ToList();
+            List<VehicleTask> selectedTasks = [];
             foreach (GRBVar v in model.GetVars())
             {
-                if (v.VarName.StartsWith("vt_") && v.X == 1)
+                if (!v.VarName.StartsWith("vt_") || v.X != 1) continue;
+
+                VehicleTask vt = varnameTaskMapping[v.VarName];
+                selectedTasks.Add(vt);
+                foreach (int i in vt.Covers)
                 {
-                    VehicleTask dvt = varnameTaskMapping[v.VarName];
-                    tasks.Add(dvt);
-                    foreach (int i in dvt.Covers)
-                    {
-                        covered[i]++;
-                    }
+                    coveredBy[i].Add(selectedTasks.Count - 1);
                 }
             }
+
+
             int coveredTotal = 0;
-            for (int i = 0; i < covered.Length; i++)
+            bool postprocessingRequired = false;
+            for (int i = 0; i < coveredBy.Count; i++)
             {
-                int val = covered[i];
-                if (val >= 1) coveredTotal++;
-                if (val >= 2 && console) Console.WriteLine($"(!) Trip {instance.Trips[i]} covered {val} times");
+                int coverCount = coveredBy[i].Count;
+                if (coverCount >= 1) coveredTotal++;
+                if (coverCount >= 2 && console)
+                {
+                    Console.WriteLine($"(!) Trip {instance.Trips[i]} covered {coverCount} times");
+                    postprocessingRequired = true;
+                }
             }
 
             if (console)
             {
                 Console.WriteLine($"Covered {coveredTotal}/{instance.Trips.Count} trips");
-                if (coveredTotal < instance.Trips.Count) Console.WriteLine("(!) Not all trips covered");
+                if (postprocessingRequired)
+                    Console.WriteLine("(!) Duplicate trips found; applying postprocessing.");
+                if (coveredTotal < instance.Trips.Count)
+                    Console.WriteLine("(!) Not all trips covered");
             }
 
-            return tasks;
+            if (!postprocessingRequired) return selectedTasks;
+
+            // Two phase approach: 
+            // Phase 1: replace all trips with dummy idle blocks with current from/to and currSoCs
+            // Phase 2: combine adjacent blocks into 1 deadhead / idle combo. 
+            List<DeadheadTemplate> extendedTemplates = [.. instance.DeadheadTemplates];
+            // For each pair that was not yet included, find either a trip which does this route, or a route via the depot; 
+            // take the minimum time / distance. 
+            foreach (Location loc1 in instance.Locations)
+            {
+                foreach (Location loc2 in instance.Locations)
+                {
+                    if (extendedTemplates.Find(x => x.From == loc1 && x.To == loc2) != null) continue;
+
+                    // Trip which has this route
+                    Trip? trip = instance.Trips.Find(x => x.From == loc1 && x.To == loc2);
+                    int tripDistance = trip?.Distance ?? int.MaxValue;
+                    int tripDuration = trip?.Duration ?? int.MaxValue;
+
+                    // Via other point (probably depot)
+                    Location? loc3 = instance.Locations.Find(x =>
+                        extendedTemplates.Find(y => y.From == loc1 && y.To == x) != null
+                        && extendedTemplates.Find(y => y.From == x && y.To == loc2) != null
+                    );
+                    DeadheadTemplate? dht1 = extendedTemplates.Find(y => y.From == loc1 && y.To == loc3);
+                    DeadheadTemplate? dht2 = extendedTemplates.Find(y => y.From == loc3 && y.To == loc2);
+
+                    int detourDistance = (dht1 != null && dht2 != null) ? dht1.Distance + dht2.Distance : int.MaxValue;
+                    int detourDuration = (dht1 != null && dht2 != null) ? dht1.Duration + dht2.Duration : int.MaxValue;
+
+                    extendedTemplates.Add(new DeadheadTemplate()
+                    {
+                        From = loc1,
+                        To = loc2,
+                        Duration = Math.Min(tripDuration, detourDuration),
+                        Distance = Math.Min(tripDistance, detourDistance),
+                        Id = $"dht-generated-{loc1}-{loc2}",
+                    });
+                }
+            }
+
+            // Phase 1: dummy idle blocks
+            for (int i = 0; i < coveredBy.Count; i++)
+            {
+                List<int> coverList = coveredBy[i];
+                if (coverList.Count == 1) continue;
+
+                // No consideration for which one is target; just use first.
+                for (int j = 1; j < coverList.Count; j++)
+                {
+                    VehicleTask vt = selectedTasks[coverList[j]];
+                    int veIndex = vt.Elements.FindIndex(x => x.Type == VEType.Trip && ((VETrip)x).Trip.Index == i);
+                    VehicleElement ve = vt.Elements[veIndex];
+                    Console.WriteLine($"Removing {ve} from vt {coverList[j]}");
+
+                    // Check next / prev to see if we can combine;
+                    VehicleElement? prevInteresting = null;
+                    int prevInterestingIndex = veIndex - 1;
+                    while (prevInterestingIndex >= 0 && prevInteresting == null)
+                    {
+                        List<VEType> interestingTypes = [VEType.Deadhead, VEType.Charge, VEType.Charge];
+                        if (interestingTypes.Contains(vt.Elements[prevInterestingIndex].Type))
+                        {
+                            prevInteresting = vt.Elements[prevInterestingIndex];
+                            break;
+                        }
+                        else prevInterestingIndex--;
+                    }
+
+                    VehicleElement? nextInteresting = null;
+                    int nextInterestingIndex = veIndex + 1;
+                    while (nextInterestingIndex < vt.Elements.Count && nextInteresting == null)
+                    {
+                        List<VEType> interestingTypes = [VEType.Deadhead, VEType.Charge, VEType.Charge];
+                        if (interestingTypes.Contains(vt.Elements[nextInterestingIndex].Type))
+                        {
+                            nextInteresting = vt.Elements[nextInterestingIndex];
+                            break;
+                        }
+                        else nextInterestingIndex--;
+                    }
+
+                    List<VehicleElement> newElements = [];
+
+
+                    Location from = prevInteresting?.EndLocation ?? ((VETrip)ve).Trip.From;
+                    Location to = nextInteresting?.StartLocation ?? ((VETrip)ve).Trip.To;
+                    int startIndex = prevInterestingIndex + 1;
+                    int endIndex = nextInterestingIndex - 1;
+
+                    // We want to glue the two interesting parts together; if either end is a deadhead, more can be compressed.
+                    if (prevInteresting != null && prevInteresting.Type == VEType.Deadhead)
+                    {
+                        from = prevInteresting.StartLocation!;
+                        startIndex = prevInterestingIndex;
+                    }
+                    if (nextInteresting != null && nextInteresting.Type == VEType.Deadhead)
+                    {
+                        to = nextInteresting.EndLocation!;
+                        endIndex = nextInterestingIndex;
+                    }
+
+                    // Connect t
+                    DeadheadTemplate dht = extendedTemplates.Find(x => x.From == from && x.To == to)!;
+                    double startSoC = vt.Elements[startIndex].StartSoCInTask;
+                    double endSoC = vt.Elements[endIndex].EndSoCInTask;
+                    int startTime = vt.Elements[startIndex].StartTime;
+                    int endTime = vt.Elements[endIndex].EndTime;
+                    int idleTime = endTime - startTime - dht.Duration;
+
+                    var newDeadhead = new VEDeadhead(dht, startTime, startTime + dht.Duration, vehicleType)
+                    {
+                        StartSoCInTask = startSoC,
+                        EndSoCInTask = endSoC,
+                        Postprocessed = true,
+                    };
+                    var newIdle = new VEIdle(to, startTime + dht.Duration, endTime)
+                    {
+                        StartSoCInTask = endSoC,
+                        EndSoCInTask = endSoC,
+                        Postprocessed = true,
+                    };
+
+                    vt.Elements.RemoveRange(startIndex, endIndex - startIndex);
+                    vt.Elements.InsertRange(startIndex, [newDeadhead, newIdle]);
+                }
+            }
+
+            /* 
+             
+             
+             */.
+
+
+            return selectedTasks;
         }
 
         private List<Block> getBlocks(bool console)
@@ -311,6 +455,8 @@ namespace E_VCSP.Solver
             // Model
             GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.VSP_SOLVER_TIMEOUT_SEC;
+            model.Parameters.MIPFocus = 3; // upper bound
+
             model.SetCallback(new CustomGRBCallback());
             ct.Register(() =>
             {

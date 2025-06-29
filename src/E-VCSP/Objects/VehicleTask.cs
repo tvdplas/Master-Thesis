@@ -65,6 +65,12 @@ namespace E_VCSP.Objects
         public required double StartSoCInTask = double.MinValue;
         public required double EndSoCInTask = double.MinValue;
 
+
+        /// <summary>
+        /// Identifies a element as coming from postprocessing; SoC might be lower than actual
+        /// </summary>
+        public bool Postprocessed = false;
+
         public VehicleElement()
         {
             DEBUG_INDEX = DEBUG_INDEX_COUNTER++;

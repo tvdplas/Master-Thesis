@@ -43,6 +43,7 @@ namespace E_VCSP.Objects.ParsedData
 
             // Deadheads between locations are given
             DeadheadTemplates = new ParserDeadheadTemplates().Parse(path, Locations);
+
             // Add symetric deadheads to model drives back
             var sym = DeadheadTemplates.Select(dh => new DeadheadTemplate
             {
@@ -53,6 +54,7 @@ namespace E_VCSP.Objects.ParsedData
                 Id = $"dht-sym{dh.Id}"
             }).ToList();
             DeadheadTemplates.AddRange(sym);
+
             // Add self-edges to model waiting time
             foreach (Location loc in Locations)
             {
@@ -61,7 +63,7 @@ namespace E_VCSP.Objects.ParsedData
                     From = loc,
                     To = loc,
                     Distance = 0,
-                    Duration = 0,// TODO: add actual modeled time
+                    Duration = 0,
                     Id = $"dht-self{DeadheadTemplates.Count}"
                 });
             }

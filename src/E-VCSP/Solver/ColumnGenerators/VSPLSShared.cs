@@ -189,7 +189,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 chargeFeasible &= SoCInBounds();
             }
 
-            bool handoverValid(int currTime) => currTime - drivingSince <= Config.MAX_DRIVE_TIME;
+            bool handoverValid(int currTime) => currTime - drivingSince <= Config.MAX_STEERING_TIME;
 
             LLNode? curr = this.Next!; // First travel after depot head
 

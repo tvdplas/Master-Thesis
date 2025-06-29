@@ -47,7 +47,7 @@
         public static double VH_OVER_MAX_COST = 100000; // Cost per vehicle of going over. only used as penalty
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double VH_IDLE_COST = 0; // Cost per unit of time for being idle.
-        public static int MAX_DRIVE_TIME = 60 * 60 * 4; // conitnous driving time
+        public static int MAX_STEERING_TIME = 60 * 60 * 4; // conitnous driving time
         public static double CR_SHIFT_COST = 200; // Minimum price to pay a crew member
         public static double CR_HOURLY_COST = 65; // hourly cost of employee. based on qbuzz data
         public static double CR_BROKEN_SHIFT_COST = 20; // additional surcharge for broken shift. based on qbuzz data
@@ -75,17 +75,17 @@
 
         public static Header VSP_CG = new();
         public static int VSP_INSTANCES_PER_IT = 1;
-        public static int VSP_MAX_COL_GEN_ITS = 250;
+        public static int VSP_MAX_COL_GEN_ITS = 25;
         public static int VSP_OPT_IT_THRESHOLD = 1000; // Amount of columns sequentially generated without rc before cg is stopped
         public static string VSP_OPERATION_SEQUENCE = "-"; // Defines an initial operation sequence
 
         public static Header VSP_CG_LABELING = new();
-        public static double VSP_LB_WEIGHT = 0;
+        public static double VSP_LB_WEIGHT = 1;
         public static int VSP_LB_MAX_COLS = 250;
         public static double VSP_LB_CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same
 
         public static Header VSP_CG_LS_SINGLE = new();
-        public static double VSP_LS_SINGLE_WEIGHT = 1;
+        public static double VSP_LS_SINGLE_WEIGHT = 0;
         public static double VSP_LS_S_STARTING_T = 50;
         public static double VSP_LS_S_ENDING_T = 0.01;
         public static double VSP_LS_S_COOLING_RATE = 0.95;

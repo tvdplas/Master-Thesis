@@ -35,14 +35,14 @@ namespace E_VCSP.Solver.ColumnGenerators
                 if (startTimeBigIdle != -1 && startTimeBigIdle < st)
                 {
                     // First check time traveled before big idle, then update last break time accordingly
-                    if (startTimeBigIdle - lastBreak > Config.MAX_DRIVE_TIME) return false;
+                    if (startTimeBigIdle - lastBreak > Config.MAX_STEERING_TIME) return false;
                     lastBreak = startTimeBigIdle + durationBigIdle;
                 }
                 // Too long between breaks
-                if (st - lastBreak > Config.MAX_DRIVE_TIME) return false;
+                if (st - lastBreak > Config.MAX_STEERING_TIME) return false;
                 lastBreak = st + bt;
             }
-            if (currEndTime - lastBreak > Config.MAX_DRIVE_TIME) return false;
+            if (currEndTime - lastBreak > Config.MAX_STEERING_TIME) return false;
 
             if (final)
             {
@@ -113,7 +113,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         internal bool isFeasible(int currentEndTime, bool final)
         {
             int duration = currentEndTime - StartTime;
-            if (duration > Config.MAX_DRIVE_TIME && Type != DutyType.Broken) return false;
+            if (duration > Config.MAX_STEERING_TIME && Type != DutyType.Broken) return false;
             if (Type == DutyType.Early && currentEndTime > 16.5 * 60 * 60) return false;
             if (Type == DutyType.Day && currentEndTime > 18.25 * 60 * 60) return false;
             if (Type == DutyType.Late && (StartTime < 13 * 60 * 60 || currentEndTime > 26.5 * 60 * 60)) return false;

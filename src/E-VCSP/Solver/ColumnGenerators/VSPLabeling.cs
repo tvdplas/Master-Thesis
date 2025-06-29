@@ -11,6 +11,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         public int PrevNodeIndex; // Previously visited node index
         public int PrevId; // Label preceding this label 
         public int ChargeLocationIndex = -1; // Charge location used in this node
+        public int SteeringTime = 0;
         public bool ChargeAtSource = false; // Was charge at start / end of deadhead
         public double CurrSoC; // SoC at start of node
         public double CurrCosts;  // Costs incurred at start of node
@@ -184,22 +185,31 @@ namespace E_VCSP.Solver.ColumnGenerators
                     Location? chargeLocation = null;
                     if (canCharge > 0)
                     {
-                        chargeLocation = canCharge > 2 ? instance.Trips[targetIndex].From : instance.Trips[expandingLabelIndex].To;
+                        chargeLocation = canCharge >= 2 ? instance.Trips[targetIndex].From : instance.Trips[expandingLabelIndex].To;
                     }
 
+                    int steeringTime = expandingLabel.SteeringTime;
                     double SoC = expandingLabel.CurrSoC;
                     double costs = arc.DeadheadTemplate.Distance * Config.VH_M_COST;
                     if (targetIndex < instance.Trips.Count) costs -= reducedCosts[targetIndex];
+
+                    if (canCharge == 0) steeringTime += idleTime;
 
                     if (canCharge == 1)
                     {
                         var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
                         costs += res.Cost;
                         SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
+
+                        if (chargeLocation.HandoverAllowed && idleTime >= Math.Max(chargeLocation.SignOffTime, chargeLocation.SignOnTime))
+                        {
+                            steeringTime = 0;
+                        }
                     }
 
                     SoC -= arc.DeadheadTemplate.Distance * vehicleType.DriveUsage;
-                    if (SoC < vehicleType.MinSoC) continue;
+                    steeringTime += arc.DeadheadTemplate.Duration;
+                    if (SoC < vehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME) continue;
 
                     if (canCharge >= 2)
                     {
@@ -207,9 +217,21 @@ namespace E_VCSP.Solver.ColumnGenerators
                         costs += res.Cost;
                         SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
                     }
+                    if (targetTrip != null && targetTrip.From.HandoverAllowed && idleTime >= targetTrip.From.MinHandoverTime)
+                    {
+                        steeringTime = 0;
+                    }
+
+                    if (canCharge == 0 && targetTrip != null && !targetTrip.From.FreeIdle)
+                    {
+                        // Idle is after adjust SoC
+                        SoC -= idleTime * vehicleType.IdleUsage;
+                        if (SoC < vehicleType.MinSoC) continue;
+                    }
 
                     SoC -= (targetTrip?.Distance ?? 0) * vehicleType.DriveUsage;
-                    if (SoC < vehicleType.MinSoC) continue;
+                    steeringTime += targetTrip?.Duration ?? 0;
+                    if (SoC < vehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME) continue;
 
                     List<(double newSoC, double cost, int chargingIndex)> options = [];
                     // TODO add additional charging detours
@@ -230,6 +252,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                             ChargeLocationIndex = option.chargingIndex,
                             CurrCosts = option.cost,
                             CurrSoC = option.newSoC,
+                            SteeringTime = steeringTime,
                         }, targetIndex);
                     }
                 }
@@ -324,12 +347,14 @@ namespace E_VCSP.Solver.ColumnGenerators
 
                     if (currTime != trip.StartTime)
                     {
-                        // TODO: klopt niet helemaal maar goed
+                        int timeIndIdle = trip.StartTime - currTime;
                         taskElements.Add(new VEIdle(trip.From, currTime, trip.StartTime)
                         {
                             StartSoCInTask = CurrSoC,
-                            EndSoCInTask = CurrSoC
+                            EndSoCInTask = CurrSoC - timeIndIdle * vehicleType.IdleUsage
                         });
+
+                        CurrSoC -= timeIndIdle * vehicleType.IdleUsage;
                     }
 
                     // add trip
