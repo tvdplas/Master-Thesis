@@ -29,6 +29,10 @@ namespace E_VCSP.Objects.ParsedData
         public bool IsDepot = false;
 
         [JsonIgnore]
+        public bool CrewHub => SignOnTime > 0 || SignOffTime > 0 || CanCharge;
+
+        [JsonIgnore]
+        // TODO: gaat dit wel goed?
         public int MinHandoverTime => Math.Max(SignOffTime, SignOnTime);
         [JsonIgnore]
         public bool FreeIdle => BreakAllowed || CanCharge;

@@ -12,6 +12,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         public int PrevId; // Label preceding this label 
         public int ChargeLocationIndex = -1; // Charge location used in this node
         public int SteeringTime = 0;
+        public int LastHubTime = 0; // Last time a hub was visited
         public bool ChargeAtSource = false; // Was charge at start / end of deadhead
         public double CurrSoC; // SoC at start of node
         public double CurrCosts;  // Costs incurred at start of node

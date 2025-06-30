@@ -83,7 +83,7 @@ namespace E_VCSP.Objects
         Late, // Begin >= 13:00, end at max 26:30
         Night, // Begin < 24:00, end >= 26:30, max 7 hours long
         Between, // Begin before 13, ends after 18:15. Max 10% overall
-        Broken, // Begin after 5:30, end before 19:30, min 1.5 hours of rest inbetween
+        Broken, // Begin after 5:30, end before 19:30, min 1.5 hours of rest inbetween, max 30% of overall
         Count,
         Single, // Only a single block; only used for initialization
     }
@@ -105,10 +105,8 @@ namespace E_VCSP.Objects
                 // Driving / idle / charging costs throughout the day
                 double cost = Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST);
                 cost += Config.CR_SHIFT_COST;
-
+                if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;
                 if (Type == DutyType.Broken) cost += Config.CR_BROKEN_SHIFT_COST;
-                if (Type == DutyType.Single) cost += 1_000_000;
-
                 return cost;
             }
         }

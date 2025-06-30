@@ -3,15 +3,6 @@ using E_VCSP.Objects.ParsedData;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    public enum LSOpResult
-    {
-        Improvement = 0,
-        Accept = 1,
-        Decline = 2,
-        Invalid = 3,
-        Count,
-    }
-
     public class LLNode
     {
         #region debug
@@ -509,7 +500,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             costDiff += newRes.drivingCost;
             costDiff += newRes.chargingCost;
 
-            bool decline = !accept(costDiff);
+            bool decline = !LSShared.Accept(costDiff, T);
 
             if (!changeFeasible || decline)
             {
@@ -578,7 +569,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             costDiff += newRes.drivingCost;
             costDiff += newRes.chargingCost;
 
-            bool decline = !accept(costDiff);
+            bool decline = !LSShared.Accept(costDiff, T);
 
             if (!changeFeasible || decline)
             {
@@ -703,12 +694,6 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (targets.Count == 0) return LSOpResult.Invalid;
 
             return removeStop(head, targets[random.Next(targets.Count)], 0);
-        }
-
-        private bool accept(double deltaScore)
-        {
-            if (deltaScore < 0) return true;
-            return Math.Exp(-deltaScore / T) > random.NextDouble();
         }
     }
 }

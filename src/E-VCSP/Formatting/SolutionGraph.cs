@@ -264,36 +264,62 @@ namespace E_VCSP.Formatting
 
                 foreach (var element in duty.Elements)
                 {
-                    Color color = Color.Red;
-                    string text = "Forgot a case!";
+                    if (element is CDEBreak cdebr)
+                    {
+                        int walkTime = element.StartLocation.BrutoNetto / 2;
 
-                    if (element is CDEIdle cdei)
-                    {
-                        text = $"idle {cdei.StartLocation}";
-                        color = Color.White;
+                        Node? walkfrom = GraphElement.ScheduleNode(
+                            element.StartTime,
+                            element.StartTime + walkTime,
+                            "walk",
+                            Color.LightSalmon
+                        );
+                        Node? brk = GraphElement.ScheduleNode(
+                            element.StartTime + walkTime,
+                            element.EndTime - walkTime,
+                            $"{cdebr.StartLocation}",
+                            Color.DarkSalmon
+                        );
+                        Node? walkto = GraphElement.ScheduleNode(
+                            element.EndTime - walkTime,
+                            element.EndTime,
+                            "walk",
+                            Color.LightSalmon
+                        );
+                        add(walkfrom);
+                        add(brk);
+                        add(walkto);
                     }
-                    else if (element is CDEBlock cdebl)
+                    else
                     {
-                        color = Color.LightBlue;
-                        text = $"{cdebl.StartLocation} -> {cdebl.EndLocation} ({cdebl.Block.Index})";
+                        Color color = Color.Red;
+                        string text = "Forgot a case!";
+
+                        if (element is CDEIdle cdei)
+                        {
+                            text = $"idle {cdei.StartLocation}";
+                            color = Color.White;
+                        }
+                        else if (element is CDEBlock cdebl)
+                        {
+                            color = Color.LightBlue;
+                            text = $"{cdebl.StartLocation} -> {cdebl.EndLocation} ({cdebl.Block.Index})";
+                        }
+                        else if (element is CDETravel cdet)
+                        {
+                            text = $"{cdet.StartLocation} -> {cdet.EndLocation}";
+                            color = Color.LightGreen;
+                        }
+
+                        Node? node = GraphElement.ScheduleNode(
+                            element.StartTime,
+                            element.EndTime,
+                            text,
+                            color
+                        );
+                        add(node);
                     }
-                    else if (element is CDETravel cdet)
-                    {
-                        text = $"{cdet.StartLocation} -> {cdet.EndLocation}";
-                        color = Color.LightGreen;
-                    }
-                    else if (element is CDEBreak cdebr)
-                    {
-                        text = $"{cdebr.StartLocation}";
-                        color = Color.DarkSalmon;
-                    }
-                    Node? node = GraphElement.ScheduleNode(
-                        element.StartTime,
-                        element.EndTime,
-                        text,
-                        color
-                    );
-                    add(node);
+
                 }
                 taskNodes.Add((startTime, endTime, rowNodes));
             }
@@ -303,11 +329,22 @@ namespace E_VCSP.Formatting
             for (int i = 0; i < taskNodes.Count; i++)
             {
                 (int s, int e, var ns) = taskNodes[i];
+
+                Color color = Color.Pink;
+                if (duties[i].Type == DutyType.Early) color = Color.Yellow;
+                else if (duties[i].Type == DutyType.Day) color = Color.LightBlue;
+                else if (duties[i].Type == DutyType.Broken) color = Color.GreenYellow;
+                else if (duties[i].Type == DutyType.Between) color = Color.Green;
+                else if (duties[i].Type == DutyType.Late) color = Color.Blue;
+                else if (duties[i].Type == DutyType.Night) color = Color.BlueViolet;
+                else if (duties[i].Type == DutyType.Single) color = Color.Red;
+
                 var align = Formatting.GraphElement.ScheduleNode(
                     minTime - 1000,
                     minTime,
                     $"{duties[i]} {Formatting.Time.HHMMSS(duties[i].Elements[0].StartTime)}-{Formatting.Time.HHMMSS(duties[i].Elements[^1].EndTime)}\nCosts: {duties[i].Cost}",
-                    Color.White);
+                    color
+                );
                 graph.AddNode(align);
                 ns.Insert(0, align);
 
@@ -330,7 +367,7 @@ namespace E_VCSP.Formatting
                     }
                 }
 
-                var align2 = Formatting.GraphElement.ScheduleNode(maxTime, maxTime + Config.MIN_NODE_TIME, "align2" + i, Color.White);
+                var align2 = Formatting.GraphElement.ScheduleNode(maxTime, maxTime + Config.MIN_NODE_TIME, "align2" + i, color);
                 graph.AddNode(align2);
                 ns.Add(align2);
             }

@@ -50,9 +50,10 @@
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double VH_IDLE_COST = 0; // Cost per unit of time for being idle.
         public static int MAX_STEERING_TIME = 60 * 60 * 4; // conitnous driving time
-        public static double CR_SHIFT_COST = 200; // Minimum price to pay a crew member
+        public static double CR_SHIFT_COST = 2000; // Minimum price to pay a crew member
         public static double CR_HOURLY_COST = 65; // hourly cost of employee. based on qbuzz data
         public static double CR_BROKEN_SHIFT_COST = 20; // additional surcharge for broken shift. based on qbuzz data
+        public static double CR_SINGLE_SHIFT_COST = 100_000_000; // penalty for use of initial shifts
         public static double CR_MAX_BROKEN_SHIFTS = 0.3;
         public static double CR_MAX_BETWEEN_SHIFTS = 0.1;
         public static double CR_MAX_OVER_LONG_SHIFT = 0.15;
@@ -125,5 +126,15 @@
         public static Header CSP_LABELING = new();
         public static int CSP_LB_MAX_COLS = 50;
         public static bool CSP_LB_ATTEMPT_DISJOINT = true; // try to find disjoint paths; if none can be found, return any arbitrary path
+
+        public static Header CSP_LS_GLOBAL = new();
+        public static double CSP_LS_G_STARTING_T = 50;
+        public static double CSP_LS_G_ENDING_T = 0.01;
+        public static double CSP_LS_G_COOLING_RATE = 0.98;
+        public static double CSP_LS_G_ITERATIONS = 10_000_000;
+        public static double CSP_LS_G_SWAP_TAILS = 20;
+        public static double CSP_LS_G_MOVE_SINGLE = 5;
+        public static double CSP_LS_G_CHANGE_TYPE = 1;
+
     }
 }

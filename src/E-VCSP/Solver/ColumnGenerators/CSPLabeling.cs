@@ -38,6 +38,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                     if (startTimeBigIdle - lastBreak > Config.MAX_STEERING_TIME) return false;
                     lastBreak = startTimeBigIdle + durationBigIdle;
                 }
+
                 // Too long between breaks
                 if (st - lastBreak > Config.MAX_STEERING_TIME) return false;
                 lastBreak = st + bt;
@@ -46,8 +47,10 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             if (final)
             {
-                // Broken shift with big idle included
-                if (startTimeBigIdle != -1)
+                // Should be at least one big idle in a broken shift
+                if (Type == DutyType.Broken && startTimeBigIdle == -1) return false;
+                // If a big idle is present, do before / after seperately for breaks
+                else if (Type == DutyType.Broken && startTimeBigIdle != -1)
                 {
                     // Two parts: before break and after idle
                     int beforeDuration = startTimeBigIdle - StartTime;
@@ -113,7 +116,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         internal bool isFeasible(int currentEndTime, bool final)
         {
             int duration = currentEndTime - StartTime;
-            if (duration > Config.MAX_STEERING_TIME && Type != DutyType.Broken) return false;
+            if (duration > Config.CR_MAX_SHIFT_LENGTH && Type != DutyType.Broken) return false;
             if (Type == DutyType.Early && currentEndTime > 16.5 * 60 * 60) return false;
             if (Type == DutyType.Day && currentEndTime > 18.25 * 60 * 60) return false;
             if (Type == DutyType.Late && (StartTime < 13 * 60 * 60 || currentEndTime > 26.5 * 60 * 60)) return false;
@@ -287,12 +290,19 @@ namespace E_VCSP.Solver.ColumnGenerators
             else
             {
                 BitArray currCover = new(blocks.Count);
+                // Priority on disjoint labels
                 for (int i = 0; i < feasibleEnds.Count; i++)
                 {
                     BitArray ba = new(currCover);
                     if (ba.And(feasibleEnds[i].CoveredBlockIds).HasAnySet()) continue;
                     validTargets.Add(feasibleEnds[i]);
                     currCover.Or(feasibleEnds[i].CoveredBlockIds);
+                }
+                // Add extra labels if available
+                for (int i = 0; i < feasibleEnds.Count && validTargets.Count < Config.CSP_LB_MAX_COLS; i++)
+                {
+                    if (validTargets.Contains(feasibleEnds[i])) continue;
+                    validTargets.Add(feasibleEnds[i]);
                 }
             }
 

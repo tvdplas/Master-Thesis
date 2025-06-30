@@ -95,7 +95,7 @@ namespace E_VCSP.Solver
                             ? idleTime - block1.EndLocation.BrutoNetto
                             : 0;
 
-                        if (nettoBreakTime > Config.CR_MIN_BREAK_TIME && nettoBreakTime < Config.CR_MAX_BREAK_TIME)
+                        if (nettoBreakTime >= Config.CR_MIN_BREAK_TIME && nettoBreakTime <= Config.CR_MAX_BREAK_TIME)
                         {
                             breakTime = idleTime - block1.EndLocation.BrutoNetto;
                             bruttoNettoTime = block1.EndLocation.BrutoNetto;
@@ -124,29 +124,30 @@ namespace E_VCSP.Solver
                 }
             }
 
+            // Add depot arcs if signon / signoff is allowed
             for (int blockIndex = 0; blockIndex < instance.Blocks.Count; blockIndex++)
             {
                 Block block = instance.Blocks[blockIndex];
-                BlockArc? start = new BlockArc()
+                BlockArc? start = block.StartLocation.CrewHub ? new BlockArc()
                 {
                     ToBlock = block,
                     IdleTime = 0,
                     BreakTime = 0,
                     BruttoNettoTime = 0,
-                    TravelTime = 0,
-                };
+                    TravelTime = block.StartLocation.SignOnTime,
+                } : null;
                 if (start != null) adj[^2].Add(start);
                 adjFull[^2].Add(start);
-                adjFull[blockIndex].Add(null); // cannot go back to depot
+                adjFull[blockIndex].Add(null);
 
-                BlockArc? end = new BlockArc()
+                BlockArc? end = block.EndLocation.CrewHub ? new BlockArc()
                 {
                     FromBlock = block,
                     IdleTime = 0,
                     BreakTime = 0,
                     BruttoNettoTime = 0,
-                    TravelTime = 0,
-                };
+                    TravelTime = block.StartLocation.SignOffTime,
+                } : null;
                 if (end != null)
                     adj[block.Index].Add(end);
                 adjFull[block.Index].Add(end);
