@@ -1,4 +1,6 @@
-﻿namespace E_VCSP.Objects
+﻿using System.Text.Json.Serialization;
+
+namespace E_VCSP.Objects.ParsedData
 {
     /// <summary>
     /// Vehicle descriptor; Only 1 in use per instance
@@ -9,11 +11,12 @@
         /// <summary>
         /// Data ID
         /// </summary>
+        [JsonInclude]
         public required string Id;
         /// <summary>
         /// Index into vehicle type array
         /// </summary>
-        public required int Index;
+        public int Index;
         /// <summary>
         /// Total capacity in KWh
         /// </summary>

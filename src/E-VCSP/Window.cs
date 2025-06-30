@@ -4,6 +4,7 @@ using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 
 namespace E_VCSP
 {
@@ -14,7 +15,7 @@ namespace E_VCSP
 
         Instance? instance;
 
-        Solver.Solver? vspSolver;
+        EVSPCG? vspSolver;
         Solver.Solver? cspSolver;
 
         bool working = false;
@@ -207,19 +208,11 @@ namespace E_VCSP
             viewToggleButton.Enabled = false;
             solveCSPButton.Enabled = false;
 
-
             instance = new(activeFolder);
-            vspSolver = Config.VSP_USE_CG ? new EVSPCG(instance) : new EVSPDiscrete(instance);
-            if (instance.Trips.Count * Config.DISCRETE_FACTOR < Config.MAX_NODES_FOR_SHOWN && vspSolver is EVSPDiscrete sd)
-            {
-                graphViewer.Graph = sd.DGraph.GenerateDiscreteGraph();
-            }
-            else
-            {
-                Microsoft.Msagl.Drawing.Graph g = new();
-                g.AddNode("Graph not shown");
-                graphViewer.Graph = g;
-            }
+            vspSolver = new EVSPCG(instance);
+            Microsoft.Msagl.Drawing.Graph g = new();
+            g.AddNode("No graph to show");
+            graphViewer.Graph = g;
 
             string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
             Config.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
@@ -239,15 +232,6 @@ namespace E_VCSP
             if (vspSolver == null || working) return;
             blockView = !blockView;
             graphViewer.Graph = vspSolver.GenerateSolutionGraph(blockView);
-        }
-
-        private void toggleDisplay(object sender, EventArgs e)
-        {
-            display = (display + 1) % 3;
-            if (display == 0)
-            {
-
-            }
         }
 
         private async void solveCSPClick(object sender, EventArgs e)
@@ -288,6 +272,26 @@ namespace E_VCSP
                 stopButton.Enabled = false;
                 cancellationTokenSource?.Dispose(); // Dispose the source
                 cancellationTokenSource = null;
+            }
+        }
+
+        private void loadEVSPResultClick(object sender, EventArgs e)
+        {
+            var res = openFileDialog1.ShowDialog();
+            if (res == DialogResult.OK)
+            {
+                Console.WriteLine("Starting load of " + openFileDialog1.FileName);
+                var dump = JsonSerializer.Deserialize<EVSPCGDump>(File.ReadAllText(openFileDialog1.FileName), new JsonSerializerOptions());
+                if (dump == null) throw new InvalidDataException("Dump not valid");
+
+                activeFolder = dump.path;
+                reload();
+
+                vspSolver!.LoadFromDump(dump);
+                graphViewer.Graph = vspSolver.GenerateSolutionGraph(blockView);
+                viewToggleButton.Enabled = true;
+                solveCSPButton.Enabled = true;
+                Console.WriteLine("Loaded " + openFileDialog1.FileName);
             }
         }
     }

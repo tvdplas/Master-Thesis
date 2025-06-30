@@ -1,18 +1,21 @@
-﻿namespace E_VCSP.Objects.ParsedData
+﻿using System.Text.Json.Serialization;
+
+namespace E_VCSP.Objects.ParsedData
 {
     public class Trip
     {
-        public required string Route;
-        public required Location From;
-        public required Location To;
+        public string Route = "unknown";
+        public Location From;
+        public Location To;
         public int StartTime; // unit: seconds
         public int EndTime; // unit: seconds
         public int Duration; // unit: seconds
         public int Distance; // unit: meters
         public int MinimumLayover; // unit: seconds
-        public required List<string> AllowedVehicleTypes;
+        public List<string> AllowedVehicleTypes = [];
+        [JsonInclude]
         public required string Id;
-        public required int Index = -1;
+        public int Index = -1;
 
         public override string ToString()
         {

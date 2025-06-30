@@ -4,6 +4,7 @@ namespace E_VCSP.Objects.ParsedData
 {
     public class Instance
     {
+        public string Path { get; private set; }
         public List<Location> ChargingLocations;
         public List<Location> Locations;
         public List<Trip> Trips;
@@ -13,14 +14,15 @@ namespace E_VCSP.Objects.ParsedData
         public int DepotEndIndex = -1;
 
         public List<DeadheadTemplate> DeadheadTemplates;
+        public List<DeadheadTemplate> ExtendedTemplates;
 
-        /// <summary>
-        /// TODO: should be moved. Blocks that are selected by VSP. Empty is no solve done
-        /// </summary>
+        public List<VehicleTask> SelectedTasks = [];
         public List<Block> Blocks = [];
 
         public Instance(string path)
         {
+            Path = path;
+
             // Load initial set of locations with chargers; may not be complete.
             Locations = new ParserLocations().Parse(path, []) ?? [];
             ChargingLocations = [.. Locations];
@@ -43,7 +45,6 @@ namespace E_VCSP.Objects.ParsedData
 
             // Deadheads between locations are given
             DeadheadTemplates = new ParserDeadheadTemplates().Parse(path, Locations);
-
             // Add symetric deadheads to model drives back
             var sym = DeadheadTemplates.Select(dh => new DeadheadTemplate
             {
@@ -66,6 +67,42 @@ namespace E_VCSP.Objects.ParsedData
                     Duration = 0,
                     Id = $"dht-self{DeadheadTemplates.Count}"
                 });
+            }
+
+            ExtendedTemplates = [.. DeadheadTemplates];
+            // For each pair that was not yet included, find either a trip which does this route, or a route via the depot; 
+            // take the minimum time / distance. 
+            foreach (Location loc1 in Locations)
+            {
+                foreach (Location loc2 in Locations)
+                {
+                    if (ExtendedTemplates.Find(x => x.From == loc1 && x.To == loc2) != null) continue;
+
+                    // Trip which has this route
+                    Trip? trip = Trips.Find(x => x.From == loc1 && x.To == loc2);
+                    int tripDistance = trip?.Distance ?? int.MaxValue;
+                    int tripDuration = trip?.Duration ?? int.MaxValue;
+
+                    // Via other point (probably depot)
+                    Location? loc3 = Locations.Find(x =>
+                        ExtendedTemplates.Find(y => y.From == loc1 && y.To == x) != null
+                        && ExtendedTemplates.Find(y => y.From == x && y.To == loc2) != null
+                    );
+                    DeadheadTemplate? dht1 = ExtendedTemplates.Find(y => y.From == loc1 && y.To == loc3);
+                    DeadheadTemplate? dht2 = ExtendedTemplates.Find(y => y.From == loc3 && y.To == loc2);
+
+                    int detourDistance = (dht1 != null && dht2 != null) ? dht1.Distance + dht2.Distance : int.MaxValue;
+                    int detourDuration = (dht1 != null && dht2 != null) ? dht1.Duration + dht2.Duration : int.MaxValue;
+
+                    ExtendedTemplates.Add(new DeadheadTemplate()
+                    {
+                        From = loc1,
+                        To = loc2,
+                        Duration = Math.Min(tripDuration, detourDuration),
+                        Distance = Math.Min(tripDistance, detourDistance),
+                        Id = $"dht-generated-{loc1}-{loc2}",
+                    });
+                }
             }
 
             DepotStartIndex = Trips.Count;

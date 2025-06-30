@@ -6,6 +6,7 @@ using Gurobi;
 using Microsoft.Msagl.Drawing;
 using System.Collections;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace E_VCSP.Solver
 {
@@ -44,6 +45,17 @@ namespace E_VCSP.Solver
         public int DrivingTimeTo;
         public int DrivingTimeFrom;
         public int TimeAtLocation;
+    }
+
+    public class EVSPCGDump
+    {
+        [JsonInclude]
+        public required string path;
+        // Only include selected tasks
+        [JsonInclude]
+        public List<VehicleTask> selectedTasks = [];
+        [JsonInclude]
+        public required VehicleType vehicleType;
     }
 
     public class EVSPCG : Solver
@@ -85,6 +97,43 @@ namespace E_VCSP.Solver
 
             // Generate initial set of vehicle tasks
             GenerateInitialTasks();
+        }
+
+        public void LoadFromDump(EVSPCGDump dump)
+        {
+            vehicleType = instance.VehicleTypes.Find(x => dump.vehicleType.Id == x.Id)!;
+
+            dump.selectedTasks = dump.selectedTasks.Select(t =>
+            {
+                t.vehicleType = vehicleType;
+                t.Elements = t.Elements.Select(e =>
+                {
+                    e.EndLocation = instance.Locations.Find(l => l.Id == e.EndLocation.Id);
+                    e.StartLocation = instance.Locations.Find(l => l.Id == e.StartLocation.Id);
+                    if (e is VETrip et)
+                    {
+                        var tripMatch = instance.Trips.Find(t => t.Id == et.Trip.Id);
+                        if (tripMatch == null)
+                            throw new InvalidDataException();
+                        et.Trip = tripMatch;
+                    }
+                    if (e is VEDeadhead ed)
+                    {
+                        var dhtMatch = instance.ExtendedTemplates.Find(dht => dht.Id == ed.DeadheadTemplate.Id);
+                        if (dhtMatch == null)
+                            throw new InvalidDataException();
+                        ed.DeadheadTemplate = dhtMatch;
+                    }
+                    return e;
+                }).ToList();
+                return t;
+            }).ToList();
+            instance.SelectedTasks = dump.selectedTasks;
+            instance.Blocks = dump.selectedTasks
+                .SelectMany(t => Block.FromVehicleTask(t))
+                .Select((b, i) => { b.Index = i; return b; })
+                .ToList();
+            tasks = dump.selectedTasks;
         }
 
         private void GenerateGraph()
@@ -238,9 +287,11 @@ namespace E_VCSP.Solver
         {
             if (model == null) throw new InvalidOperationException("Cannot generate solution graph without model instance");
 
+            List<VehicleTask> selectedTasks = [];
+
             // trip index -> [selected vehicle task index]
             List<List<int>> coveredBy = Enumerable.Range(0, instance.Trips.Count).Select(x => new List<int>()).ToList();
-            List<VehicleTask> selectedTasks = [];
+            List<VehicleTask> tasks = [];
             foreach (GRBVar v in model.GetVars())
             {
                 if (!v.VarName.StartsWith("vt_") || v.X != 1) continue;
@@ -281,41 +332,6 @@ namespace E_VCSP.Solver
             // Two phase approach: 
             // Phase 1: replace all trips with dummy idle blocks with current from/to and currSoCs
             // Phase 2: combine adjacent blocks into 1 deadhead / idle combo. 
-            List<DeadheadTemplate> extendedTemplates = [.. instance.DeadheadTemplates];
-            // For each pair that was not yet included, find either a trip which does this route, or a route via the depot; 
-            // take the minimum time / distance. 
-            foreach (Location loc1 in instance.Locations)
-            {
-                foreach (Location loc2 in instance.Locations)
-                {
-                    if (extendedTemplates.Find(x => x.From == loc1 && x.To == loc2) != null) continue;
-
-                    // Trip which has this route
-                    Trip? trip = instance.Trips.Find(x => x.From == loc1 && x.To == loc2);
-                    int tripDistance = trip?.Distance ?? int.MaxValue;
-                    int tripDuration = trip?.Duration ?? int.MaxValue;
-
-                    // Via other point (probably depot)
-                    Location? loc3 = instance.Locations.Find(x =>
-                        extendedTemplates.Find(y => y.From == loc1 && y.To == x) != null
-                        && extendedTemplates.Find(y => y.From == x && y.To == loc2) != null
-                    );
-                    DeadheadTemplate? dht1 = extendedTemplates.Find(y => y.From == loc1 && y.To == loc3);
-                    DeadheadTemplate? dht2 = extendedTemplates.Find(y => y.From == loc3 && y.To == loc2);
-
-                    int detourDistance = (dht1 != null && dht2 != null) ? dht1.Distance + dht2.Distance : int.MaxValue;
-                    int detourDuration = (dht1 != null && dht2 != null) ? dht1.Duration + dht2.Duration : int.MaxValue;
-
-                    extendedTemplates.Add(new DeadheadTemplate()
-                    {
-                        From = loc1,
-                        To = loc2,
-                        Duration = Math.Min(tripDuration, detourDuration),
-                        Distance = Math.Min(tripDistance, detourDistance),
-                        Id = $"dht-generated-{loc1}-{loc2}",
-                    });
-                }
-            }
 
             // Phase 1: dummy idle blocks
             for (int i = 0; i < coveredBy.Count; i++)
@@ -420,7 +436,7 @@ namespace E_VCSP.Solver
                 {
                     Location from = idles[0].ve.StartLocation!;
                     Location to = idles[^1].ve.EndLocation!;
-                    DeadheadTemplate dht = extendedTemplates.Find(x => x.From == from && x.To == to)!;
+                    DeadheadTemplate dht = instance.ExtendedTemplates.Find(x => x.From == from && x.To == to)!;
                     double startSoC = idles[0].ve.StartSoCInTask;
                     double endSoC = idles[^1].ve.EndSoCInTask;
                     int startTime = idles[0].ve.StartTime;
@@ -465,28 +481,26 @@ namespace E_VCSP.Solver
             return selectedTasks;
         }
 
-        private List<Block> getBlocks(bool console)
+        private (List<VehicleTask>, List<Block>) finalizeResults(bool console)
         {
-            return getSelectedTasks(console)
+            var selectedTasks = getSelectedTasks(console);
+
+            return (selectedTasks, selectedTasks
                 .SelectMany(t => Block.FromVehicleTask(t))
                 .Select((b, i) => { b.Index = i; return b; })
-                .ToList();
+                .ToList());
         }
 
         public override Graph GenerateSolutionGraph(bool blockView)
         {
-            List<VehicleTask> tasks = getSelectedTasks(false);
-
-            File.WriteAllText(Config.RUN_LOG_FOLDER + "vehicleTasks.json", JsonSerializer.Serialize(tasks));
-
             if (blockView)
             {
-                List<List<Block>> blocktasks = tasks.Select(t => Block.FromVehicleTask(t)).ToList();
+                List<List<Block>> blocktasks = instance.SelectedTasks.Select(t => Block.FromVehicleTask(t)).ToList();
                 return SolutionGraph.GenerateBlockGraph(blocktasks);
             }
             else
             {
-                return SolutionGraph.GenerateVehicleTaskGraph(tasks);
+                return SolutionGraph.GenerateVehicleTaskGraph(instance.SelectedTasks);
             }
         }
 
@@ -783,8 +797,19 @@ namespace E_VCSP.Solver
                 return false;
             }
 
+            (var selectedTasks, var blocks) = finalizeResults(true);
+            instance.SelectedTasks = selectedTasks;
+            instance.Blocks = blocks;
+            if (Config.DUMP_VSP)
+            {
+                File.WriteAllText(Config.RUN_LOG_FOLDER + "evspcg-res.json", JsonSerializer.Serialize(new EVSPCGDump()
+                {
+                    selectedTasks = selectedTasks,
+                    vehicleType = vehicleType,
+                    path = instance.Path,
+                }));
+            }
 
-            instance.Blocks = getBlocks(true);
             Config.CONSOLE_GUROBI = configState;
             return true;
         }

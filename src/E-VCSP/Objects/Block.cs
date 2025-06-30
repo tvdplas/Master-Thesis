@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects.ParsedData;
+using System.Text.Json.Serialization;
 
 namespace E_VCSP.Objects
 {
@@ -11,10 +12,15 @@ namespace E_VCSP.Objects
     }
     public class BlockElement
     {
+        [JsonInclude]
         public int StartTime;
+        [JsonInclude]
         public int EndTime;
+        [JsonInclude]
         public Location StartLocation;
+        [JsonInclude]
         public Location EndLocation;
+        [JsonInclude]
         public BlockElementType Type;
 
         public static List<BlockElement> FromVE(VehicleElement ve)

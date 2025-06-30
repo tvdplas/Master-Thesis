@@ -1,11 +1,15 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace E_VCSP.Objects.ParsedData
 {
     public class ChargeResult
     {
+        [JsonInclude]
         public double SoCGained;
+        [JsonInclude]
         public double TimeUsed;
+        [JsonInclude]
         public double Cost;
     }
 
@@ -14,21 +18,27 @@ namespace E_VCSP.Objects.ParsedData
     /// </summary>
     public class ChargingCurve
     {
-        private class CurvePiece
+        public class CurvePiece
         {
+            [JsonInclude]
             public int MinSoC;
+            [JsonInclude]
             public int MaxSoC;
+            [JsonInclude]
             public double Rate;
         }
 
         // Sorted list of curve pieces
+        [JsonInclude]
         private List<CurvePiece> Pieces;
+        [JsonInclude]
         public double CostPerPercentage;
 
-        /// <summary>
-        /// Fake max of upper segment when extending is enabled
-        /// </summary>
-        private const int DUMMY_MAX_SOC = 50_000;
+        public ChargingCurve(List<CurvePiece> pieces, double costPerPercentage)
+        {
+            Pieces = pieces;
+            CostPerPercentage = costPerPercentage;
+        }
 
         public ChargingCurve(List<(int SoC, double rate)> rates, double totalCapacity)
         {

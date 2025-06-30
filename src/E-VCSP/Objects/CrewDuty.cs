@@ -1,5 +1,6 @@
 ﻿using E_VCSP.Objects.ParsedData;
 using System.Collections;
+using System.Text.Json.Serialization;
 
 namespace E_VCSP.Objects
 {
@@ -12,15 +13,21 @@ namespace E_VCSP.Objects
     }
     public class CrewDutyElement
     {
+        [JsonInclude]
         public CrewDutyElementType Type;
+        [JsonInclude]
         public int StartTime;
+        [JsonInclude]
         public int EndTime;
+        [JsonInclude]
         public Location StartLocation;
+        [JsonInclude]
         public Location EndLocation;
     }
 
     public class CDEBlock : CrewDutyElement
     {
+        [JsonInclude]
         public Block Block;
         public CDEBlock(Block b)
         {
@@ -83,9 +90,12 @@ namespace E_VCSP.Objects
 
     public class CrewDuty
     {
+        [JsonInclude]
         public DutyType Type;
+        [JsonInclude]
         public List<CrewDutyElement> Elements;
         public List<int> Covers;
+        [JsonInclude]
         public int Index = -1;
 
         public double Cost

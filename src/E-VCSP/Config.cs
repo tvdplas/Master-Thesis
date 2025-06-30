@@ -20,6 +20,7 @@
     public static class Config
     {
         public static Header PROGRAM = new();
+        public static string DATA_FOLDER = "";
         public static string RUN_LOG_FOLDER = "";
 
         // Graph display
@@ -28,6 +29,7 @@
         public static bool CONSOLE_LABELING = false;
         public static bool CONSOLE_LS = false;
         public static bool CONSOLE_COVER = false;
+        public static bool DUMP_VSP = false;
 
         // General layout
         public static Header GRAPH_LAYOUT = new();

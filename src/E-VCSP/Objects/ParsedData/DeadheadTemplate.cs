@@ -1,14 +1,17 @@
-﻿namespace E_VCSP.Objects.ParsedData
+﻿using System.Text.Json.Serialization;
+
+namespace E_VCSP.Objects.ParsedData
 {
     /// <summary>
     /// Non-time bound deadhead.
     /// </summary>
     public class DeadheadTemplate
     {
-        public required Location From;
-        public required Location To;
+        public Location From;
+        public Location To;
         public int Duration;
         public int Distance;
+        [JsonInclude]
         public required string Id;
 
         public override string ToString()

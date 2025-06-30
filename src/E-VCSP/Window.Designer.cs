@@ -26,6 +26,8 @@ namespace E_VCSP
             graphViewer = new Microsoft.Msagl.GraphViewerGdi.GViewer();
             textBox1 = new TextBox();
             panel1 = new Panel();
+            loadCSPResultButton = new Button();
+            loadEVSPResultButton = new Button();
             solveCSPButton = new Button();
             viewToggleButton = new Button();
             solveVSPButton = new Button();
@@ -36,6 +38,7 @@ namespace E_VCSP
             button5 = new Button();
             label1 = new Label();
             splitContainer1 = new SplitContainer();
+            openFileDialog1 = new OpenFileDialog();
             panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
             splitContainer1.Panel1.SuspendLayout();
@@ -120,6 +123,8 @@ namespace E_VCSP
             // 
             // panel1
             // 
+            panel1.Controls.Add(loadCSPResultButton);
+            panel1.Controls.Add(loadEVSPResultButton);
             panel1.Controls.Add(solveCSPButton);
             panel1.Controls.Add(viewToggleButton);
             panel1.Controls.Add(solveVSPButton);
@@ -132,9 +137,28 @@ namespace E_VCSP
             panel1.Size = new Size(304, 558);
             panel1.TabIndex = 1;
             // 
+            // loadCSPResultButton
+            // 
+            loadCSPResultButton.Location = new Point(146, 29);
+            loadCSPResultButton.Name = "loadCSPResultButton";
+            loadCSPResultButton.Size = new Size(152, 23);
+            loadCSPResultButton.TabIndex = 7;
+            loadCSPResultButton.Text = "Load CSP result";
+            loadCSPResultButton.UseVisualStyleBackColor = true;
+            // 
+            // loadEVSPResultButton
+            // 
+            loadEVSPResultButton.Location = new Point(4, 29);
+            loadEVSPResultButton.Name = "loadEVSPResultButton";
+            loadEVSPResultButton.Size = new Size(136, 23);
+            loadEVSPResultButton.TabIndex = 6;
+            loadEVSPResultButton.Text = "Load EVSP result";
+            loadEVSPResultButton.UseVisualStyleBackColor = true;
+            loadEVSPResultButton.Click += loadEVSPResultClick;
+            // 
             // solveCSPButton
             // 
-            solveCSPButton.Location = new Point(146, 33);
+            solveCSPButton.Location = new Point(146, 54);
             solveCSPButton.Name = "solveCSPButton";
             solveCSPButton.Size = new Size(152, 23);
             solveCSPButton.TabIndex = 5;
@@ -145,7 +169,7 @@ namespace E_VCSP
             // viewToggleButton
             // 
             viewToggleButton.Enabled = false;
-            viewToggleButton.Location = new Point(146, 62);
+            viewToggleButton.Location = new Point(146, 80);
             viewToggleButton.Name = "viewToggleButton";
             viewToggleButton.Size = new Size(155, 23);
             viewToggleButton.TabIndex = 4;
@@ -155,7 +179,7 @@ namespace E_VCSP
             // 
             // solveVSPButton
             // 
-            solveVSPButton.Location = new Point(4, 33);
+            solveVSPButton.Location = new Point(4, 54);
             solveVSPButton.Name = "solveVSPButton";
             solveVSPButton.Size = new Size(136, 23);
             solveVSPButton.TabIndex = 2;
@@ -166,7 +190,7 @@ namespace E_VCSP
             // stopButton
             // 
             stopButton.Enabled = false;
-            stopButton.Location = new Point(4, 62);
+            stopButton.Location = new Point(4, 80);
             stopButton.Name = "stopButton";
             stopButton.Size = new Size(136, 23);
             stopButton.TabIndex = 3;
@@ -236,6 +260,10 @@ namespace E_VCSP
             splitContainer1.SplitterDistance = 445;
             splitContainer1.TabIndex = 0;
             // 
+            // openFileDialog1
+            // 
+            openFileDialog1.FileName = "openFileDialog1";
+            // 
             // MainView
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -274,6 +302,11 @@ namespace E_VCSP
         private Button button4;
         private Button button5;
         private Label label1;
+        private Button loadEVSPResultButton;
+        private Button loadCSPResultButton;
+        private Button loadCSPButton;
+        private Button loadESVPButton;
         private Button solveCSPButton;
+        private OpenFileDialog openFileDialog1;
     }
 }
