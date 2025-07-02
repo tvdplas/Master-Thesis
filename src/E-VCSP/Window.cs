@@ -1,5 +1,6 @@
 
 using E_VCSP.Formatting;
+using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver;
 using System.Reflection;
@@ -17,15 +18,21 @@ namespace E_VCSP
 
         EVSPCG? vspSolver;
         Solver.Solver? cspSolver;
+        RosterDisplay rd = new();
 
         bool working = false;
-        bool blockView = false;
+        int view = 0; // 0 = vt, 1 = blocks, 2 = cd
 
 
         public MainView()
         {
             InitializeComponent();
-            Console.SetOut(new ConsoleIntercept(textBox1));
+            splitContainer.Panel1.Controls.Add(rd);
+            splitContainer.Panel1.Resize += (sender, e) =>
+            {
+                rd.ResetView();
+            };
+            Console.SetOut(new ConsoleIntercept(consoleView));
             Console.WriteLine("Program started");
 
             activeFolderLabel.Text = activeFolder;
@@ -46,7 +53,7 @@ namespace E_VCSP
                 Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom,
                 Padding = new Padding(0, 0, 0, 100),
             };
-            panel1.Controls.Add(scrollablePanel);
+            configPanel.Controls.Add(scrollablePanel);
 
             int yOffset = 10;
             foreach (FieldInfo field in fields)
@@ -173,7 +180,8 @@ namespace E_VCSP
 
                 if (success)
                 {
-                    graphViewer.Graph = vspSolver.GenerateSolutionGraph(blockView);
+                    view = 0;
+                    rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(instance.SelectedTasks));
                     viewToggleButton.Enabled = true;
                     solveCSPButton.Enabled = true;
                     Console.WriteLine("Solver finished successfully.");
@@ -208,9 +216,6 @@ namespace E_VCSP
 
             instance = new(activeFolder);
             vspSolver = new EVSPCG(instance);
-            Microsoft.Msagl.Drawing.Graph g = new();
-            g.AddNode("No graph to show");
-            graphViewer.Graph = g;
 
             string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
             Config.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
@@ -227,9 +232,18 @@ namespace E_VCSP
 
         private void toggleGraphView(object sender, EventArgs e)
         {
-            if (vspSolver == null || working) return;
-            blockView = !blockView;
-            graphViewer.Graph = vspSolver.GenerateSolutionGraph(blockView);
+            if (instance == null || working) return;
+            view = (view + 1) % 3;
+
+            List<List<RosterNode>> newNodes = [];
+            if (view == 0 && instance.SelectedTasks.Count > 0)
+                newNodes = SolutionGraph.GenerateVehicleTaskGraph(instance.SelectedTasks);
+            else if (view == 1 && instance.Blocks.Count > 0)
+                newNodes = SolutionGraph.GenerateBlockGraph(instance.SelectedTasks.Select(x => Block.FromVehicleTask(x)).ToList());
+            else if (view == 2 && instance.SelectedTasks.Count > 0)
+                newNodes = SolutionGraph.GenerateCrewDutyGraph(instance.SelectedDuties);
+
+            rd.UpdateRosterNodes(newNodes);
         }
 
         private async void solveCSPClick(object sender, EventArgs e)
@@ -249,15 +263,8 @@ namespace E_VCSP
             {
                 success = await Task.Run(() => cspSolver.Solve(token), token);
 
-                if (success)
-                {
-                    graphViewer.Graph = cspSolver.GenerateSolutionGraph(blockView);
-                    Console.WriteLine("CSP Solver finished successfully.");
-                }
-                else
-                {
-                    Console.WriteLine("Solver did not find a solution or was cancelled.");
-                }
+                if (success) Console.WriteLine("CSP Solver finished successfully.");
+                else Console.WriteLine("No solution/cancelled.");
             }
             catch (OperationCanceledException)
             {
@@ -265,6 +272,7 @@ namespace E_VCSP
             }
             finally
             {
+                view = 2;
                 working = false;
                 solveCSPButton.Enabled = true;
                 stopButton.Enabled = false;
@@ -286,7 +294,8 @@ namespace E_VCSP
                 reload();
 
                 vspSolver!.LoadFromDump(dump);
-                graphViewer.Graph = vspSolver.GenerateSolutionGraph(blockView);
+                view = 0;
+                rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(instance!.SelectedTasks));
                 viewToggleButton.Enabled = true;
                 solveCSPButton.Enabled = true;
                 Console.WriteLine("Loaded " + openFileDialog1.FileName);

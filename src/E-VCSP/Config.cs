@@ -26,14 +26,7 @@
         // Graph display
         public static Header DEBUG = new();
         public static bool CONSOLE_GUROBI = false;
-        public static bool CONSOLE_LABELING = false;
-        public static bool CONSOLE_LS = false;
-        public static bool CONSOLE_COVER = false;
         public static bool DUMP_VSP = false;
-
-        // General layout
-        public static Header GRAPH_LAYOUT = new();
-        public static int MAX_NODES_FOR_SHOWN = 150;
 
         // Nodes
         public static Header NODES = new();
@@ -50,6 +43,7 @@
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double VH_IDLE_COST = 0; // Cost per unit of time for being idle.
         public static int MAX_STEERING_TIME = 60 * 60 * 4; // conitnous driving time
+        public static int MAX_NO_HUB_TIME = 60 * 60 * 8; // conitnous time without visiting crew hub
         public static double CR_SHIFT_COST = 2000; // Minimum price to pay a crew member
         public static double CR_HOURLY_COST = 65; // hourly cost of employee. based on qbuzz data
         public static double CR_BROKEN_SHIFT_COST = 20; // additional surcharge for broken shift. based on qbuzz data
@@ -69,7 +63,6 @@
         public static int DISCRETE_FACTOR = 5;
 
         public static Header VSP = new();
-        public static bool VSP_USE_CG = true;
         public static bool VSP_DETERMINE_IIS = false;
         public static int VSP_SOLVER_TIMEOUT_SEC = 60;
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint

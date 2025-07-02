@@ -18,6 +18,7 @@ namespace E_VCSP.Objects.ParsedData
 
         public List<VehicleTask> SelectedTasks = [];
         public List<Block> Blocks = [];
+        public List<CrewDuty> SelectedDuties = [];
 
         public Instance(string path)
         {

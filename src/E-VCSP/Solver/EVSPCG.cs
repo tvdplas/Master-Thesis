@@ -3,7 +3,6 @@ using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using Gurobi;
-using Microsoft.Msagl.Drawing;
 using System.Collections;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,7 +11,7 @@ namespace E_VCSP.Solver
 {
     public abstract class EVSPNode
     {
-        public int Index;
+        public required int Index;
     }
 
     public class TripNode : EVSPNode
@@ -27,6 +26,8 @@ namespace E_VCSP.Solver
 
     public class VSPArc
     {
+        public required int StartTime;
+        public required int EndTime;
         public required EVSPNode From;
         public required EVSPNode To;
         public required DeadheadTemplate DeadheadTemplate;
@@ -166,24 +167,46 @@ namespace E_VCSP.Solver
             {
                 TripNode tn = (TripNode)nodes[i];
                 DeadheadTemplate? dht = locationDHTMapping[depot.Index][tn.Trip.From.Index] ?? throw new InvalidDataException("No travel possible from depot to trip");
-                double baseCost = Config.VH_PULLOUT_COST + (dht.Distance * Config.VH_M_COST);
-
-                adjFull[^2][i] = new VSPArc() { From = nodes[^2], To = tn, DeadheadTemplate = dht };
-                adj[^2].Add(new VSPArc() { From = nodes[^2], To = tn, DeadheadTemplate = dht });
+                VSPArc arc = new VSPArc()
+                {
+                    StartTime = tn.Trip.StartTime - dht.Duration,
+                    EndTime = tn.Trip.StartTime,
+                    From = nodes[^2],
+                    To = tn,
+                    DeadheadTemplate = dht
+                };
+                adjFull[^2][i] = arc;
+                adj[^2].Add(arc);
             }
             // trip -> depot end arcs
             for (int i = 0; i < nodes.Count - 2; i++)
             {
                 TripNode tn = (TripNode)nodes[i];
                 DeadheadTemplate? dht = locationDHTMapping[tn.Trip.To.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
-                adjFull[i][^1] = new VSPArc() { To = nodes[^1], From = tn, DeadheadTemplate = dht };
-                adj[i].Add(new VSPArc() { To = nodes[^1], From = tn, DeadheadTemplate = dht });
+                VSPArc arc = new VSPArc()
+                {
+                    StartTime = tn.Trip.EndTime,
+                    EndTime = tn.Trip.EndTime + dht.Duration,
+                    From = tn,
+                    To = nodes[^1],
+                    DeadheadTemplate = dht
+                };
+                adjFull[i][^1] = arc;
+                adj[i].Add(arc);
             }
             // depot -> depot arc
             {
                 DeadheadTemplate? dht = locationDHTMapping[depot.Index][depot.Index] ?? throw new InvalidDataException("No travel possible from depot to depot");
-                adjFull[^2][^1] = new VSPArc() { To = nodes[^1], From = nodes[^2], DeadheadTemplate = dht };
-                adj[^2].Add(new VSPArc() { To = nodes[^1], From = nodes[^2], DeadheadTemplate = dht });
+                VSPArc arc = new VSPArc()
+                {
+                    StartTime = 0,
+                    EndTime = 0,
+                    From = nodes[^2],
+                    To = nodes[^1],
+                    DeadheadTemplate = dht
+                };
+                adjFull[^2][^1] = arc;
+                adj[^2].Add(arc);
             }
 
             int totalSimplified = 0;
@@ -202,8 +225,17 @@ namespace E_VCSP.Solver
                     if (dht == null) continue; // not a possible drive
                     if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
 
-                    adjFull[i][j] = new VSPArc() { To = tn2, From = tn1, DeadheadTemplate = dht };
-                    adj[i].Add(new VSPArc() { To = tn2, From = tn1, DeadheadTemplate = dht });
+                    VSPArc arc = new VSPArc()
+                    {
+                        StartTime = tn1.Trip.EndTime,
+                        EndTime = tn2.Trip.StartTime,
+                        To = tn2,
+                        From = tn1,
+                        DeadheadTemplate = dht
+                    };
+
+                    adjFull[i][j] = arc;
+                    adj[i].Add(arc);
                 }
             }
 
@@ -491,19 +523,6 @@ namespace E_VCSP.Solver
                 .ToList());
         }
 
-        public override Graph GenerateSolutionGraph(bool blockView)
-        {
-            if (blockView)
-            {
-                List<List<Block>> blocktasks = instance.SelectedTasks.Select(t => Block.FromVehicleTask(t)).ToList();
-                return SolutionGraph.GenerateBlockGraph(blocktasks);
-            }
-            else
-            {
-                return SolutionGraph.GenerateVehicleTaskGraph(instance.SelectedTasks);
-            }
-        }
-
         /// <summary>
         /// Initialize model for column generaton
         /// </summary>
@@ -596,7 +615,7 @@ namespace E_VCSP.Solver
 
             // Multithreaded shortestpath searching
             List<List<VehicleColumnGen>> instances = [
-                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // SP
+                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // SP
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_SINGLE
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_GLOBAL
             ];

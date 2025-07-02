@@ -19,13 +19,11 @@ namespace E_VCSP
 
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainView));
             loadButton = new Button();
             loadFolderBrowser = new FolderBrowserDialog();
             activeFolderLabel = new Label();
-            graphViewer = new Microsoft.Msagl.GraphViewerGdi.GViewer();
-            textBox1 = new TextBox();
-            panel1 = new Panel();
+            consoleView = new TextBox();
+            configPanel = new Panel();
             loadCSPResultButton = new Button();
             loadEVSPResultButton = new Button();
             solveCSPButton = new Button();
@@ -37,13 +35,12 @@ namespace E_VCSP
             button4 = new Button();
             button5 = new Button();
             label1 = new Label();
-            splitContainer1 = new SplitContainer();
+            splitContainer = new SplitContainer();
             openFileDialog1 = new OpenFileDialog();
-            panel1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
-            splitContainer1.Panel1.SuspendLayout();
-            splitContainer1.Panel2.SuspendLayout();
-            splitContainer1.SuspendLayout();
+            configPanel.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
+            splitContainer.Panel2.SuspendLayout();
+            splitContainer.SuspendLayout();
             SuspendLayout();
             // 
             // loadButton
@@ -64,78 +61,36 @@ namespace E_VCSP
             activeFolderLabel.Size = new Size(0, 15);
             activeFolderLabel.TabIndex = 1;
             // 
-            // graphViewer
+            // consoleView
             // 
-            graphViewer.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            graphViewer.ArrowheadLength = 10D;
-            graphViewer.AsyncLayout = false;
-            graphViewer.AutoScroll = true;
-            graphViewer.AutoSize = true;
-            graphViewer.BackwardEnabled = false;
-            graphViewer.BuildHitTree = true;
-            graphViewer.CurrentLayoutMethod = Microsoft.Msagl.GraphViewerGdi.LayoutMethod.UseSettingsOfTheGraph;
-            graphViewer.EdgeInsertButtonVisible = false;
-            graphViewer.FileName = "";
-            graphViewer.ForwardEnabled = false;
-            graphViewer.Graph = null;
-            graphViewer.IncrementalDraggingModeAlways = false;
-            graphViewer.InsertingEdge = false;
-            graphViewer.LayoutAlgorithmSettingsButtonVisible = false;
-            graphViewer.LayoutEditingEnabled = true;
-            graphViewer.Location = new Point(0, 0);
-            graphViewer.LooseOffsetForRouting = 0.25D;
-            graphViewer.MouseHitDistance = 0.05D;
-            graphViewer.Name = "graphViewer";
-            graphViewer.NavigationVisible = true;
-            graphViewer.NeedToCalculateLayout = true;
-            graphViewer.OffsetForRelaxingInRouting = 0.6D;
-            graphViewer.PaddingForEdgeRouting = 8D;
-            graphViewer.PanButtonPressed = false;
-            graphViewer.SaveAsImageEnabled = true;
-            graphViewer.SaveAsMsaglEnabled = true;
-            graphViewer.SaveButtonVisible = true;
-            graphViewer.SaveGraphButtonVisible = true;
-            graphViewer.SaveInVectorFormatEnabled = true;
-            graphViewer.Size = new Size(443, 534);
-            graphViewer.TabIndex = 3;
-            graphViewer.TightOffsetForRouting = 0.125D;
-            graphViewer.ToolBarIsVisible = true;
-            graphViewer.Transform = (Microsoft.Msagl.Core.Geometry.Curves.PlaneTransformation)resources.GetObject("graphViewer.Transform");
-            graphViewer.UndoRedoButtonsVisible = true;
-            graphViewer.WindowZoomButtonPressed = false;
-            graphViewer.ZoomF = 1D;
-            graphViewer.ZoomWindowThreshold = 0.05D;
-            // 
-            // textBox1
-            // 
-            textBox1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            textBox1.BackColor = Color.Black;
-            textBox1.Font = new Font("Consolas", 10F);
-            textBox1.ForeColor = Color.White;
-            textBox1.Location = new Point(0, 0);
-            textBox1.MaxLength = 1000000000;
-            textBox1.Multiline = true;
-            textBox1.Name = "textBox1";
-            textBox1.ReadOnly = true;
-            textBox1.ScrollBars = ScrollBars.Both;
-            textBox1.Size = new Size(408, 558);
-            textBox1.TabIndex = 4;
+            consoleView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            consoleView.BackColor = Color.Black;
+            consoleView.Font = new Font("Consolas", 10F);
+            consoleView.ForeColor = Color.White;
+            consoleView.Location = new Point(0, 0);
+            consoleView.MaxLength = 1000000000;
+            consoleView.Multiline = true;
+            consoleView.Name = "consoleView";
+            consoleView.ReadOnly = true;
+            consoleView.ScrollBars = ScrollBars.Both;
+            consoleView.Size = new Size(408, 558);
+            consoleView.TabIndex = 4;
             // 
             // panel1
             // 
-            panel1.Controls.Add(loadCSPResultButton);
-            panel1.Controls.Add(loadEVSPResultButton);
-            panel1.Controls.Add(solveCSPButton);
-            panel1.Controls.Add(viewToggleButton);
-            panel1.Controls.Add(solveVSPButton);
-            panel1.Controls.Add(stopButton);
-            panel1.Controls.Add(loadButton);
-            panel1.Controls.Add(activeFolderLabel);
-            panel1.Dock = DockStyle.Left;
-            panel1.Location = new Point(0, 0);
-            panel1.Name = "panel1";
-            panel1.Size = new Size(304, 558);
-            panel1.TabIndex = 1;
+            configPanel.Controls.Add(loadCSPResultButton);
+            configPanel.Controls.Add(loadEVSPResultButton);
+            configPanel.Controls.Add(solveCSPButton);
+            configPanel.Controls.Add(viewToggleButton);
+            configPanel.Controls.Add(solveVSPButton);
+            configPanel.Controls.Add(stopButton);
+            configPanel.Controls.Add(loadButton);
+            configPanel.Controls.Add(activeFolderLabel);
+            configPanel.Dock = DockStyle.Left;
+            configPanel.Location = new Point(0, 0);
+            configPanel.Name = "panel1";
+            configPanel.Size = new Size(304, 558);
+            configPanel.TabIndex = 1;
             // 
             // loadCSPResultButton
             // 
@@ -245,20 +200,16 @@ namespace E_VCSP
             // 
             // splitContainer1
             // 
-            splitContainer1.Dock = DockStyle.Fill;
-            splitContainer1.Location = new Point(304, 0);
-            splitContainer1.Name = "splitContainer1";
-            // 
-            // splitContainer1.Panel1
-            // 
-            splitContainer1.Panel1.Controls.Add(graphViewer);
+            splitContainer.Dock = DockStyle.Fill;
+            splitContainer.Location = new Point(304, 0);
+            splitContainer.Name = "splitContainer1";
             // 
             // splitContainer1.Panel2
             // 
-            splitContainer1.Panel2.Controls.Add(textBox1);
-            splitContainer1.Size = new Size(860, 558);
-            splitContainer1.SplitterDistance = 445;
-            splitContainer1.TabIndex = 0;
+            splitContainer.Panel2.Controls.Add(consoleView);
+            splitContainer.Size = new Size(860, 558);
+            splitContainer.SplitterDistance = 445;
+            splitContainer.TabIndex = 0;
             // 
             // openFileDialog1
             // 
@@ -269,18 +220,16 @@ namespace E_VCSP
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1164, 558);
-            Controls.Add(splitContainer1);
-            Controls.Add(panel1);
+            Controls.Add(splitContainer);
+            Controls.Add(configPanel);
             Name = "MainView";
             Text = "E-VCSP Visualisation";
-            panel1.ResumeLayout(false);
-            panel1.PerformLayout();
-            splitContainer1.Panel1.ResumeLayout(false);
-            splitContainer1.Panel1.PerformLayout();
-            splitContainer1.Panel2.ResumeLayout(false);
-            splitContainer1.Panel2.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
-            splitContainer1.ResumeLayout(false);
+            configPanel.ResumeLayout(false);
+            configPanel.PerformLayout();
+            splitContainer.Panel2.ResumeLayout(false);
+            splitContainer.Panel2.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
+            splitContainer.ResumeLayout(false);
             ResumeLayout(false);
         }
 
@@ -289,10 +238,9 @@ namespace E_VCSP
         private Button loadButton;
         private FolderBrowserDialog loadFolderBrowser;
         private Label activeFolderLabel;
-        private Microsoft.Msagl.GraphViewerGdi.GViewer graphViewer;
-        private TextBox textBox1;
-        private Panel panel1; // Panel for the Button and FolderBrowserDialog
-        private SplitContainer splitContainer1; // SplitContainer for the TextBox and GraphViewer
+        private TextBox consoleView;
+        private Panel configPanel; // Panel for the Button and FolderBrowserDialog
+        private SplitContainer splitContainer; // SplitContainer for the TextBox and GraphViewer
         private Button solveVSPButton;
         private Button stopButton;
         private CancellationTokenSource cancellationTokenSource;

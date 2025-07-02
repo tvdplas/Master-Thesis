@@ -4,6 +4,14 @@ using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
+    public enum ChargeTime
+    {
+        None,
+        Source,
+        Target,
+        Detour,
+    }
+
     public class VSPLabel
     {
         public static int ID_COUNTER = 0;
@@ -11,9 +19,9 @@ namespace E_VCSP.Solver.ColumnGenerators
         public int PrevNodeIndex; // Previously visited node index
         public int PrevId; // Label preceding this label 
         public int ChargeLocationIndex = -1; // Charge location used in this node
-        public int SteeringTime = 0;
-        public int LastHubTime = 0; // Last time a hub was visited
-        public bool ChargeAtSource = false; // Was charge at start / end of deadhead
+        public int SteeringTime = 0; // Time since a handover was visited
+        public int LastHubTime = 0; // Time since a stop with hub capibility was visited
+        public required ChargeTime ChargeTime; // Was charge at start / end of deadhead
         public double CurrSoC; // SoC at start of node
         public double CurrCosts;  // Costs incurred at start of node
 
@@ -104,7 +112,27 @@ namespace E_VCSP.Solver.ColumnGenerators
         private List<VSPFront> activeLabels = [];
         private List<double> reducedCosts = [];
 
-        public VSPLabeling(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj) : base(model, instance, vehicleType, nodes, adjFull, adj) { }
+        List<List<DeadheadTemplate?>> locationDHT = [];
+
+        public VSPLabeling(
+            GRBModel model,
+            Instance instance,
+            VehicleType vehicleType,
+            List<EVSPNode> nodes,
+            List<List<VSPArc?>> adjFull,
+            List<List<VSPArc>> adj,
+            List<List<DeadheadTemplate?>> locationDHT
+        ) : base(
+            model,
+            instance,
+            vehicleType,
+            nodes,
+            adjFull,
+            adj
+        )
+        {
+            this.locationDHT = locationDHT;
+        }
 
         private int addLabel(VSPLabel spl, int index)
         {
@@ -135,7 +163,6 @@ namespace E_VCSP.Solver.ColumnGenerators
         {
             reset();
 
-            if (Config.CONSOLE_LABELING) Console.WriteLine("Starting label correction");
             if (model == null || model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
                 throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
 
@@ -145,6 +172,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 PrevNodeIndex = nodes.Count - 2,
                 CurrCosts = 0,
                 CurrSoC = vehicleType.StartSoC,
+                ChargeTime = ChargeTime.None,
             }, nodes.Count - 2);
 
             while (activeLabelCount > 0)
@@ -162,7 +190,6 @@ namespace E_VCSP.Solver.ColumnGenerators
                         break;
                     }
                 }
-
                 if (expandingLabel == null) throw new InvalidDataException("Could not find active label to expand");
 
                 // Try expand label
@@ -172,89 +199,174 @@ namespace E_VCSP.Solver.ColumnGenerators
                     int targetIndex = arc.To.Index;
                     Trip? targetTrip = targetIndex < instance.Trips.Count ? instance.Trips[targetIndex] : null;
 
-                    bool depotStart = expandingLabelIndex >= instance.Trips.Count,
-                         depotEnd = targetIndex >= instance.Trips.Count;
+                    // List of vehicle statstics achievable at start of trip.
+                    List<(double SoC, double cost, int steeringTime, int hubTime, int chargeIndex, ChargeTime chargeTime)> statsAtTrip = [];
 
-                    int idleTime = depotStart || depotEnd
-                        ? 0
-                        : instance.Trips[targetIndex].StartTime - instance.Trips[expandingLabelIndex].EndTime - arc.DeadheadTemplate.Duration;
-
-                    int canCharge = 0;
-                    if (idleTime > Config.MIN_CHARGE_TIME && !depotStart && instance.Trips[expandingLabelIndex].To.CanCharge) canCharge += 1;
-                    if (idleTime > Config.MIN_CHARGE_TIME && !depotEnd && instance.Trips[targetIndex].From.CanCharge) canCharge += 2;
-
-                    Location? chargeLocation = null;
-                    if (canCharge > 0)
+                    // Direct trip
                     {
-                        chargeLocation = canCharge >= 2 ? instance.Trips[targetIndex].From : instance.Trips[expandingLabelIndex].To;
-                    }
+                        bool depotStart = expandingLabelIndex >= instance.Trips.Count,
+                             depotEnd = targetIndex >= instance.Trips.Count;
 
-                    int steeringTime = expandingLabel.SteeringTime;
-                    double SoC = expandingLabel.CurrSoC;
-                    double costs = arc.DeadheadTemplate.Distance * Config.VH_M_COST;
-                    if (targetIndex < instance.Trips.Count) costs -= reducedCosts[targetIndex];
+                        int idleTime = depotStart || depotEnd
+                            ? 0
+                            : instance.Trips[targetIndex].StartTime - instance.Trips[expandingLabelIndex].EndTime - arc.DeadheadTemplate.Duration;
 
-                    if (canCharge == 0) steeringTime += idleTime;
+                        int canCharge = 0;
+                        if (idleTime > Config.MIN_CHARGE_TIME && !depotStart && instance.Trips[expandingLabelIndex].To.CanCharge) canCharge += 1;
+                        if (idleTime > Config.MIN_CHARGE_TIME && !depotEnd && instance.Trips[targetIndex].From.CanCharge) canCharge += 2;
 
-                    if (canCharge == 1)
-                    {
-                        var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
-                        costs += res.Cost;
-                        SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
+                        Location? chargeLocation = null;
+                        if (canCharge > 0)
+                        {
+                            chargeLocation = canCharge >= 2 ? instance.Trips[targetIndex].From : instance.Trips[expandingLabelIndex].To;
+                        }
 
-                        if (chargeLocation.HandoverAllowed && idleTime >= Math.Max(chargeLocation.SignOffTime, chargeLocation.SignOnTime))
+                        int steeringTime = expandingLabel.SteeringTime;
+                        int hubTime = expandingLabel.LastHubTime;
+                        double SoC = expandingLabel.CurrSoC;
+                        double costs = arc.DeadheadTemplate.Distance * Config.VH_M_COST;
+                        if (targetIndex < instance.Trips.Count) costs -= reducedCosts[targetIndex];
+
+                        if (canCharge == 0) steeringTime += idleTime;
+
+                        if (canCharge == 1)
+                        {
+                            var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
+                            costs += res.Cost;
+                            SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
+
+                            if (chargeLocation.HandoverAllowed && idleTime >= Math.Max(chargeLocation.SignOffTime, chargeLocation.SignOnTime))
+                            {
+                                steeringTime = 0;
+                            }
+                        }
+
+                        SoC -= arc.DeadheadTemplate.Distance * vehicleType.DriveUsage;
+                        steeringTime += arc.DeadheadTemplate.Duration;
+                        hubTime += arc.DeadheadTemplate.Duration;
+                        if (SoC < vehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME || hubTime >= Config.MAX_NO_HUB_TIME) continue;
+
+                        if (canCharge >= 2)
+                        {
+                            var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
+                            costs += res.Cost;
+                            SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
+                        }
+                        if (targetTrip != null && targetTrip.From.HandoverAllowed && idleTime >= targetTrip.From.MinHandoverTime)
                         {
                             steeringTime = 0;
                         }
+                        if (targetTrip != null && targetTrip.From.CrewHub && idleTime >= targetTrip.From.MinHandoverTime)
+                        {
+                            hubTime = 0;
+                        }
+
+                        if (canCharge == 0 && targetTrip != null && !targetTrip.From.FreeIdle)
+                        {
+                            // Idle is after adjust SoC
+                            SoC -= idleTime * vehicleType.IdleUsage;
+                            if (SoC < vehicleType.MinSoC) continue;
+                        }
+
+                        ChargeTime cl = canCharge switch
+                        {
+                            0 => ChargeTime.None,
+                            1 => ChargeTime.Source,
+                            2 => ChargeTime.Target,
+                            3 => ChargeTime.Target,
+                            _ => throw new InvalidDataException("not possible")
+                        };
+
+                        statsAtTrip.Add((
+                            SoC,
+                            costs,
+                            steeringTime,
+                            hubTime,
+                            chargeLocation?.Index ?? -1,
+                            cl
+                        ));
                     }
-
-                    SoC -= arc.DeadheadTemplate.Distance * vehicleType.DriveUsage;
-                    steeringTime += arc.DeadheadTemplate.Duration;
-                    if (SoC < vehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME) continue;
-
-                    if (canCharge >= 2)
+                    // Check possible detours to charging locations for which the location is not already visited
+                    for (int j = 0; j < instance.ChargingLocations.Count; j++)
                     {
-                        var res = chargeLocation!.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
+                        Location candidateLocation = instance.ChargingLocations[j];
+                        // Dont allow detour to already visited location
+                        if (candidateLocation.Index == arc.DeadheadTemplate.From.Index ||
+                            candidateLocation.Index == arc.DeadheadTemplate.To.Index) continue;
+
+                        // Check if detour is possible
+                        DeadheadTemplate? dht1 = locationDHT[arc.DeadheadTemplate.From.Index][candidateLocation.Index];
+                        DeadheadTemplate? dht2 = locationDHT[candidateLocation.Index][arc.DeadheadTemplate.To.Index];
+
+                        // Not possible to do deadhead 
+                        if (dht1 == null || dht2 == null) continue;
+
+                        // No time to perform charge
+                        int idleTime = (arc.EndTime - arc.StartTime) - (dht1.Duration + dht2.Duration);
+                        if (idleTime < Config.MIN_CHARGE_TIME) continue;
+
+
+                        // There's time to perform the detour; calculate feasibility. 
+                        // Always assume that detour is performed directly after previous label
+                        int steeringTime = expandingLabel.SteeringTime;
+                        int hubTime = expandingLabel.LastHubTime;
+                        double SoC = expandingLabel.CurrSoC;
+                        double costs = (dht1.Distance + dht2.Distance) * Config.VH_M_COST;
+
+                        // Perform first deadhead;
+                        steeringTime += dht1.Duration;
+                        hubTime += dht1.Duration;
+                        SoC -= dht1.Distance * vehicleType.DriveUsage;
+                        if (SoC < vehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME || hubTime >= Config.MAX_NO_HUB_TIME) continue;
+
+                        // Check if we can reset steering/hub time now that we are at charging location
+                        if (candidateLocation.HandoverAllowed && idleTime >= candidateLocation.MinHandoverTime)
+                            steeringTime = 0;
+                        if (candidateLocation.CrewHub && idleTime >= candidateLocation.MinHandoverTime)
+                            hubTime = 0;
+
+                        // Perform charge at charging location  
+                        var res = candidateLocation.ChargingCurves[vehicleType.Index].MaxChargeGained(SoC, idleTime);
                         costs += res.Cost;
                         SoC = Math.Min(SoC + res.SoCGained, vehicleType.MaxSoC);
+
+                        // Perform second deadhead
+                        steeringTime += dht2.Duration;
+                        hubTime += dht2.Duration;
+                        SoC -= dht2.Distance * vehicleType.DriveUsage;
+                        if (SoC < vehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME || hubTime >= Config.MAX_NO_HUB_TIME) continue;
+
+                        statsAtTrip.Add((
+                            SoC,
+                            costs,
+                            steeringTime,
+                            hubTime,
+                            candidateLocation.Index,
+                            ChargeTime.Detour
+                        ));
                     }
-                    if (targetTrip != null && targetTrip.From.HandoverAllowed && idleTime >= targetTrip.From.MinHandoverTime)
+
+                    for (int j = 0; j < statsAtTrip.Count; j++)
                     {
-                        steeringTime = 0;
-                    }
+                        var stats = statsAtTrip[j];
 
-                    if (canCharge == 0 && targetTrip != null && !targetTrip.From.FreeIdle)
-                    {
-                        // Idle is after adjust SoC
-                        SoC -= idleTime * vehicleType.IdleUsage;
-                        if (SoC < vehicleType.MinSoC) continue;
-                    }
+                        stats.SoC -= (targetTrip?.Distance ?? 0) * vehicleType.DriveUsage;
+                        stats.steeringTime += targetTrip?.Duration ?? 0;
+                        stats.hubTime += targetTrip?.Duration ?? 0;
+                        stats.cost += (targetTrip?.Distance ?? 0) * Config.VH_M_COST;
+                        if (stats.SoC < vehicleType.MinSoC || stats.steeringTime >= Config.MAX_STEERING_TIME || stats.hubTime >= Config.MAX_NO_HUB_TIME) continue;
 
-                    SoC -= (targetTrip?.Distance ?? 0) * vehicleType.DriveUsage;
-                    steeringTime += targetTrip?.Duration ?? 0;
-                    if (SoC < vehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME) continue;
-
-                    List<(double newSoC, double cost, int chargingIndex)> options = [];
-                    // TODO add additional charging detours
-                    options.Add((
-                        SoC,
-                        expandingLabel.CurrCosts + costs,
-                        chargeLocation?.Index ?? -1
-                    ));
-
-                    // For each label possibility, check if it is not already dominated at the target node. 
-                    foreach (var option in options)
-                    {
                         activeLabelCount += addLabel(new VSPLabel()
                         {
                             PrevId = expandingLabel.Id,
                             PrevNodeIndex = expandingLabelIndex,
-                            ChargeAtSource = canCharge == 1,
-                            ChargeLocationIndex = option.chargingIndex,
-                            CurrCosts = option.cost,
-                            CurrSoC = option.newSoC,
-                            SteeringTime = steeringTime,
-                        }, targetIndex);
+                            ChargeTime = stats.chargeTime,
+                            ChargeLocationIndex = stats.chargeIndex,
+                            CurrCosts = expandingLabel.CurrCosts + stats.cost,
+                            CurrSoC = stats.SoC,
+                            SteeringTime = stats.steeringTime,
+                            LastHubTime = stats.hubTime,
+                        }, arc.To.Index);
                     }
                 }
             }
@@ -289,7 +401,6 @@ namespace E_VCSP.Solver.ColumnGenerators
                     var curr = path[i];
                     var prev = path[i - 1];
                     Trip? trip = instance.Trips[curr.nodeIndex];
-                    DeadheadTemplate dht = adjFull[prev.nodeIndex][curr.nodeIndex]!.DeadheadTemplate;
 
                     int currTime = taskElements.Count > 0
                         ? taskElements[^1].EndTime
@@ -298,64 +409,113 @@ namespace E_VCSP.Solver.ColumnGenerators
                         ? taskElements[^1].EndSoCInTask
                         : vehicleType.StartSoC;
 
+                    // Depending on detour not: 
                     // (charge) -> dh -> (charge) -> trip; never charge when going to/from depot
+                    // dh -> charge -> dh -> trip; 
 
-                    int idleTime = trip!.StartTime - dht.Duration - currTime;
-
-                    // Charge before deadhead
-                    if (curr.label.ChargeLocationIndex != -1 && curr.label.ChargeAtSource)
+                    if (curr.label.ChargeTime == ChargeTime.Detour)
                     {
-                        var res = instance.Locations[curr.label.ChargeLocationIndex]
-                                          .ChargingCurves[vehicleType.Index]
-                                          .MaxChargeGained(CurrSoC, idleTime);
+                        int fromIndex = prev.nodeIndex < instance.Trips.Count
+                            ? instance.Trips[prev.nodeIndex].To.Index
+                            : instance.Locations.FindIndex(x => x.IsDepot);
+                        int toIndex = trip.From.Index;
+                        DeadheadTemplate dht1 = locationDHT[fromIndex][curr.label.ChargeLocationIndex]!;
+                        DeadheadTemplate dht2 = locationDHT[curr.label.ChargeLocationIndex][toIndex]!;
 
-                        taskElements.Add(new VECharge(instance.Locations[curr.label.ChargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
+                        int idleTime = trip!.StartTime - dht1.Duration - dht2.Duration - currTime;
+
+
+                        taskElements.Add(new VEDeadhead(dht1, currTime, currTime + dht1.Duration, vehicleType)
                         {
                             StartSoCInTask = CurrSoC,
-                            EndSoCInTask = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC)
+                            EndSoCInTask = CurrSoC - dht1.Distance * vehicleType.DriveUsage,
                         });
 
-                        CurrSoC = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC);
+                        currTime += dht1.Duration;
+                        CurrSoC -= dht1.Distance * vehicleType.DriveUsage;
+
+                        var chargeRes = instance.Locations[curr.label.ChargeLocationIndex]
+                                            .ChargingCurves[vehicleType.Index]
+                                            .MaxChargeGained(CurrSoC, idleTime);
+
+                        taskElements.Add(new VECharge(instance.Locations[curr.label.ChargeLocationIndex], currTime, currTime + idleTime, chargeRes.SoCGained, chargeRes.Cost)
+                        {
+                            StartSoCInTask = CurrSoC,
+                            EndSoCInTask = Math.Min(CurrSoC + chargeRes.SoCGained, vehicleType.MaxSoC)
+                        });
+
+                        CurrSoC = Math.Min(CurrSoC + chargeRes.SoCGained, vehicleType.MaxSoC);
                         currTime += idleTime;
-                    }
 
-                    // Deadhead
-                    taskElements.Add(new VEDeadhead(dht, currTime, currTime + dht.Duration, vehicleType)
-                    {
-                        StartSoCInTask = CurrSoC,
-                        EndSoCInTask = CurrSoC - dht.Distance * vehicleType.DriveUsage,
-                    });
-                    currTime += dht.Duration;
-                    CurrSoC -= dht.Distance * vehicleType.DriveUsage;
-
-
-                    // Charge after deadhead
-                    if (curr.label.ChargeLocationIndex != -1 && !curr.label.ChargeAtSource)
-                    {
-                        var res = instance.Locations[curr.label.ChargeLocationIndex]
-                                          .ChargingCurves[vehicleType.Index]
-                                          .MaxChargeGained(CurrSoC, idleTime);
-
-                        taskElements.Add(new VECharge(instance.Locations[curr.label.ChargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
+                        taskElements.Add(new VEDeadhead(dht2, currTime, currTime + dht2.Duration, vehicleType)
                         {
                             StartSoCInTask = CurrSoC,
-                            EndSoCInTask = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC)
+                            EndSoCInTask = CurrSoC - dht2.Distance * vehicleType.DriveUsage,
                         });
 
-                        CurrSoC = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC);
-                        currTime += idleTime;
+                        currTime += dht2.Duration;
+                        CurrSoC -= dht2.Distance * vehicleType.DriveUsage;
                     }
-
-                    if (currTime != trip.StartTime)
+                    else
                     {
-                        int timeIndIdle = trip.StartTime - currTime;
-                        taskElements.Add(new VEIdle(trip.From, currTime, trip.StartTime)
+                        DeadheadTemplate dht = adjFull[prev.nodeIndex][curr.nodeIndex]!.DeadheadTemplate;
+                        int idleTime = trip!.StartTime - dht.Duration - currTime;
+
+                        // Charge before deadhead
+                        if (curr.label.ChargeTime == ChargeTime.Source)
+                        {
+                            var res = instance.Locations[curr.label.ChargeLocationIndex]
+                                              .ChargingCurves[vehicleType.Index]
+                                              .MaxChargeGained(CurrSoC, idleTime);
+
+                            taskElements.Add(new VECharge(instance.Locations[curr.label.ChargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
+                            {
+                                StartSoCInTask = CurrSoC,
+                                EndSoCInTask = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC)
+                            });
+
+                            CurrSoC = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC);
+                            currTime += idleTime;
+                        }
+
+                        // Deadhead
+                        taskElements.Add(new VEDeadhead(dht, currTime, currTime + dht.Duration, vehicleType)
                         {
                             StartSoCInTask = CurrSoC,
-                            EndSoCInTask = CurrSoC - timeIndIdle * vehicleType.IdleUsage
+                            EndSoCInTask = CurrSoC - dht.Distance * vehicleType.DriveUsage,
                         });
+                        currTime += dht.Duration;
+                        CurrSoC -= dht.Distance * vehicleType.DriveUsage;
 
-                        CurrSoC -= timeIndIdle * vehicleType.IdleUsage;
+
+                        // Charge after deadhead
+                        if (curr.label.ChargeTime == ChargeTime.Target)
+                        {
+                            var res = instance.Locations[curr.label.ChargeLocationIndex]
+                                              .ChargingCurves[vehicleType.Index]
+                                              .MaxChargeGained(CurrSoC, idleTime);
+
+                            taskElements.Add(new VECharge(instance.Locations[curr.label.ChargeLocationIndex], currTime, currTime + idleTime, res.SoCGained, res.Cost)
+                            {
+                                StartSoCInTask = CurrSoC,
+                                EndSoCInTask = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC)
+                            });
+
+                            CurrSoC = Math.Min(CurrSoC + res.SoCGained, vehicleType.MaxSoC);
+                            currTime += idleTime;
+                        }
+
+                        if (currTime != trip.StartTime)
+                        {
+                            int timeIndIdle = trip.StartTime - currTime;
+                            taskElements.Add(new VEIdle(trip.From, currTime, trip.StartTime)
+                            {
+                                StartSoCInTask = CurrSoC,
+                                EndSoCInTask = CurrSoC - timeIndIdle * vehicleType.IdleUsage
+                            });
+
+                            CurrSoC -= timeIndIdle * vehicleType.IdleUsage;
+                        }
                     }
 
                     // add trip

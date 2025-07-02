@@ -3,7 +3,6 @@ using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using Gurobi;
-using Microsoft.Msagl.Drawing;
 using System.Collections;
 using System.Data;
 
@@ -270,12 +269,6 @@ namespace E_VCSP.Solver
             return duties;
         }
 
-        public override Graph GenerateSolutionGraph(bool blockView)
-        {
-            List<CrewDuty> selectedDuties = getSelectedDuties();
-            return SolutionGraph.GenerateCrewDutyGraph(selectedDuties);
-        }
-
         public override bool Solve(CancellationToken cancellationToken)
         {
             (var model, var dutyVars) = InitModel(cancellationToken);
@@ -443,6 +436,7 @@ namespace E_VCSP.Solver
             else Console.WriteLine($"Costs: {model.ObjVal}");
 
             Config.CONSOLE_GUROBI = configState;
+            instance.SelectedDuties = getSelectedDuties();
             return succes;
         }
     }
