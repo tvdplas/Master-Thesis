@@ -4,7 +4,7 @@ using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    public class VSPLSSingle : VehicleShortestPath
+    public class VSPLSSingle : VehicleColumnGen
     {
         private List<double> reducedCostsTrips = [];
         List<List<DeadheadTemplate?>> locationDHT = [];

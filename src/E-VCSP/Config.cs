@@ -124,10 +124,12 @@
         public static int CSP_MAX_COL_GEN_ITS = 100;
 
         public static Header CSP_LABELING = new();
+        public static double CSP_LABELING_WEIGHT = 0;
         public static int CSP_LB_MAX_COLS = 50;
         public static bool CSP_LB_ATTEMPT_DISJOINT = true; // try to find disjoint paths; if none can be found, return any arbitrary path
 
         public static Header CSP_LS_GLOBAL = new();
+        public static double CSP_LS_GLOBAL_WEIGHT = 0;
         public static double CSP_LS_G_STARTING_T = 50;
         public static double CSP_LS_G_ENDING_T = 0.01;
         public static double CSP_LS_G_COOLING_RATE = 0.98;

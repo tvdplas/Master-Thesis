@@ -152,25 +152,14 @@ namespace E_VCSP.Solver.ColumnGenerators
         }
     }
 
-    internal class CSPLabeling
+    internal class CSPLabeling : CrewColumnGen
     {
-        private List<Block> blocks;
-        private GRBModel model;
-
-        List<List<BlockArc>> adj = [];
-        List<List<BlockArc?>> adjFull = [];
-
         List<double> rcBlocks = [];
         double rcMaxBroken;
         double rcMaxBetween;
 
-        internal CSPLabeling(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull)
-        {
-            this.blocks = blocks;
-            this.model = model;
-            this.adj = adj;
-            this.adjFull = adjFull;
-        }
+        internal CSPLabeling(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull) : base(blocks, model, adj, adjFull)
+        { }
 
         private void reset()
         {
@@ -186,7 +175,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         }
 
 
-        internal List<(double reducedCosts, CrewDuty crewDuty)> generateShortestPath()
+        public override List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties()
         {
             reset();
 
@@ -260,19 +249,33 @@ namespace E_VCSP.Solver.ColumnGenerators
                     BitArray newCoverage = new(currentLabel.CoveredBlockIds);
                     if (targetBlockIndex < blocks.Count) newCoverage.Set(targetBlockIndex, true);
 
+                    int prevEndTime = targetBlockIndex >= blocks.Count ? currentLabel.StartTime : blocks[currentNodeIndex].EndTime;
+                    int currentEndTime = blocks[targetBlockIndex >= blocks.Count ? currentNodeIndex : targetBlockIndex].EndTime;
+
+                    int timeDiff = currentEndTime - prevEndTime;
+                    int maxPrevIdle = currentLabel.Idles.Count > 0 ? currentLabel.Idles.MaxBy(x => x.idleTime).idleTime : 0;
+
+                    int addedTime = currentLabel.Type != DutyType.Broken ? timeDiff :
+                        arc.IdleTime > 1.5 * 60 * 60 && arc.IdleTime > maxPrevIdle
+                            ? timeDiff - arc.IdleTime + maxPrevIdle
+                            : timeDiff;
+
+                    double costFromTime = addedTime / (60.0 * 60.0) * Config.CR_HOURLY_COST;
+                    double costFromRc = targetBlockIndex < blocks.Count ? -rcBlocks[targetBlockIndex] : 0;
+
                     CSPLabel newLabel = new()
                     {
                         CoveredBlockIds = newCoverage,
                         Breaks = arc.BreakTime == 0 ? currentLabel.Breaks : [.. currentLabel.Breaks, (arc.FromBlock!.EndTime, arc.BreakTime)],
                         Idles = arc.IdleTime == 0 ? currentLabel.Idles : [.. currentLabel.Idles, (arc.FromBlock!.EndTime, arc.IdleTime)],
                         PrevBlockId = currentNodeIndex,
-                        Cost = currentLabel.Cost + (targetBlockIndex < blocks.Count ? -rcBlocks[targetBlockIndex] : 0),
+                        Cost = currentLabel.Cost + costFromTime + costFromRc,
                         PrevLabelId = currentLabel.Id,
                         Type = currentLabel.Type,
                         StartTime = currentLabel.StartTime,
                     };
 
-                    if (!newLabel.isFeasible(blocks[targetBlockIndex >= blocks.Count ? currentNodeIndex : targetBlockIndex].EndTime, false)) continue;
+                    if (!newLabel.isFeasible(currentEndTime, false)) continue;
 
                     // Dominated if feasible and less coverage (i think)
                     else addLabel(newLabel, targetBlockIndex);

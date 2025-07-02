@@ -292,10 +292,11 @@ namespace E_VCSP.Solver
                 notFound = 0;               // Number of columns that could not be generated
 
             // Multithreaded shortestpath searching
-            List<List<CSPLabeling>> instances = [
+            List<List<CrewColumnGen>> instances = [
                 [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(instance.Blocks, model, adj, adjFull))], // Labeling
+                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLSGlobal(instance.Blocks, model, adj, adjFull))], // Labeling
             ];
-            List<double> operationChances = [1];
+            List<double> operationChances = [Config.CSP_LABELING_WEIGHT, Config.CSP_LS_GLOBAL_WEIGHT];
             List<double> sums = [operationChances[0]];
             for (int i = 1; i < operationChances.Count; i++) sums.Add(sums[i - 1] + operationChances[i]);
 
@@ -375,8 +376,8 @@ namespace E_VCSP.Solver
                 List<(double, CrewDuty)>[] generatedDuties = new List<(double, CrewDuty)>[Config.CSP_INSTANCES_PER_IT];
                 double r = rnd.NextDouble() * sums[^1];
                 int selectedMethodÍndex = sums.FindIndex(x => r <= x);
-                List<CSPLabeling> selectedMethod = instances[selectedMethodÍndex];
-                Parallel.For(0, Config.CSP_INSTANCES_PER_IT, (i) => generatedDuties[i] = selectedMethod[i].generateShortestPath());
+                List<CrewColumnGen> selectedMethod = instances[selectedMethodÍndex];
+                Parallel.For(0, Config.CSP_INSTANCES_PER_IT, (i) => generatedDuties[i] = selectedMethod[i].GenerateDuties());
 
                 // Update generated totals
                 totalGenerated += generatedDuties.Length;

@@ -98,7 +98,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         }
     }
 
-    public class VSPLabeling : VehicleShortestPath
+    public class VSPLabeling : VehicleColumnGen
     {
         private List<List<VSPLabel>> allLabels = [];
         private List<VSPFront> activeLabels = [];

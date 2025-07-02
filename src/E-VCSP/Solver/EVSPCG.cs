@@ -595,7 +595,7 @@ namespace E_VCSP.Solver
                 discardedOldColumns = 0;    // Number of columns in model discarded due to better one found
 
             // Multithreaded shortestpath searching
-            List<List<VehicleShortestPath>> instances = [
+            List<List<VehicleColumnGen>> instances = [
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj))], // SP
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_SINGLE
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_GLOBAL
@@ -636,7 +636,7 @@ namespace E_VCSP.Solver
                     selectedMethodIndex = sums.FindIndex(x => r <= x);
                 }
 
-                List<VehicleShortestPath> selectedMethod = instances[selectedMethodIndex];
+                List<VehicleColumnGen> selectedMethod = instances[selectedMethodIndex];
 
                 if (Config.VSP_INSTANCES_PER_IT > 1)
                 {

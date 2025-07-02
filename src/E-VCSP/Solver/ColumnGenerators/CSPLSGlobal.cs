@@ -6,7 +6,7 @@ namespace E_VCSP.Solver.ColumnGenerators
     internal class CSPLSDuty
     {
         public DutyType Type = DutyType.Single;
-        public required CSPLSNode Head;
+        public List<CrewDutyElement> Elements = [];
         public required double Cost;
 
         public double BaseCost
@@ -19,28 +19,31 @@ namespace E_VCSP.Solver.ColumnGenerators
                 return cost;
             }
         }
-    }
 
-    internal class CSPLSNode
-    {
-        public Block Block;
-        public CSPLSNode? Prev;
-        public CSPLSNode? Next;
-
-        public CSPLSNode(Block block)
+        public double CalcCost()
         {
-            Block = block;
+            if (Elements.Count == 0) return 0;
+
+            double cost = BaseCost;
+
+            // TODO: step on / step off
+            cost += Elements[^1].EndTime - Elements[0].StartTime / (60.0 * 60.0) * Config.CR_HOURLY_COST;
+
+            // Broken shift largest idle is free
+            if (Type == DutyType.Broken)
+            {
+                var largestIdle = Elements.Where(x => x.Type == CrewDutyElementType.Idle).OrderByDescending(x => x.EndTime - x.StartTime).FirstOrDefault();
+                if (largestIdle != null)
+                    cost -= (largestIdle.EndTime - largestIdle.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST;
+            }
+
+            Cost = cost;
+            return cost;
         }
     }
 
-    internal class CSPLSGlobal
+    internal class CSPLSGlobal : CrewColumnGen
     {
-        private List<Block> blocks;
-        private GRBModel model;
-
-        private List<List<BlockArc>> adj = [];
-        private List<List<BlockArc?>> adjFull = [];
-
         private List<CSPLSDuty> duties = [];
 
         private Random random;
@@ -48,12 +51,8 @@ namespace E_VCSP.Solver.ColumnGenerators
         private double alpha;
         private int Q;
 
-        internal CSPLSGlobal(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull)
+        internal CSPLSGlobal(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull) : base(blocks, model, adj, adjFull)
         {
-            this.blocks = blocks;
-            this.model = model;
-            this.adj = adj;
-            this.adjFull = adjFull;
             this.random = LSShared.random;
         }
 
@@ -68,31 +67,43 @@ namespace E_VCSP.Solver.ColumnGenerators
             for (int i = 0; i < blocks.Count; i++)
             {
                 Block b = blocks[i];
-                CSPLSNode node = new(b);
-                duties.Add(new() { Cost = 0, Head = node, Type = DutyType.Single });
+                duties.Add(new() { Cost = -1, Elements = [new CDEBlock(b)], Type = DutyType.Single });
+                duties[^1].CalcCost();
             }
-        }
-
-
-        private double CalcCost(CSPLSDuty duty)
-        {
-            double cost = duty.BaseCost;
-
-            return cost;
         }
 
         private LSOpResult moveSingle()
         {
-            // Select two random duties
-            int dutyIndex1 = random.Next(duties.Count);
-            int dutyIndex2 = random.Next(duties.Count);
-            while (dutyIndex2 == dutyIndex1) dutyIndex2 = random.Next(duties.Count);
+            //// Select two random duties
+            //int dutyIndex1 = random.Next(duties.Count);
+            //int dutyIndex2 = random.Next(duties.Count);
+            //while (dutyIndex2 == dutyIndex1) dutyIndex2 = random.Next(duties.Count);
 
-            CSPLSDuty duty1 = duties[dutyIndex1];
-            CSPLSDuty duty2 = duties[dutyIndex2];
+            //CSPLSDuty duty1 = duties[dutyIndex1];
+            //CSPLSDuty duty2 = duties[dutyIndex2];
 
-            // Select a random part of duty 2 to transfer to duty 1.
+            //// Select a random block from duty 2 to transfer to duty 1.
+            //int d2Index = random.Next(duty2.Elements.Count);
+            //while (duty2.Elements[d2Index].Type != CrewDutyElementType.Block) random.Next(duty2.Elements.Count);
+            //CDEBlock cdeb2 = (CDEBlock)duty2.Elements[d2Index];
 
+            //// Overlap with existing block
+            //if (
+            //    duty1.Elements.Find(
+            //        x => x.Type == CrewDutyElementType.Block
+            //        && (cdeb2.StartTime <= x.EndTime && cdeb2.EndTime >= x.StartTime)
+            //    ) != null
+            //) return LSOpResult.Invalid;
+
+            //// Check if connection can be made
+            //// Find last before
+            //int d1PrevTrip = duty1.Elements.FindLastIndex(x => x.Type == CrewDutyElementType.Block && x.EndTime <= cdeb2.StartTime);
+            //// Either arc must exist from d1prev or d1prev is -1 and cdeb2.startlocation can be used to get on
+            //if ((d1PrevTrip >= 0 && adjFull[((CDEBLock)duty1.Elements[d1PrevTrip]).Block.Index][cdeb2.Block.Index] == null)
+            //    || (d1PrevTrip == -1 && !cdeb2.StartLocation.CrewBase)
+            //) return LSOpResult.Invalid;
+
+            //int d1NextTrip = duty1.Elements.FindIndex(x => x.Type == CrewDutyElementType.Block && x.StartTime >= cdeb2.EndTime);
 
             return LSOpResult.Invalid;
         }
@@ -113,7 +124,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return Math.Exp(-deltaScore / T) > random.NextDouble();
         }
 
-        internal List<(double reducedCosts, CrewDuty crewDuty)> generateColumns()
+        public override List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties()
         {
             reset();
 

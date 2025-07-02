@@ -19,9 +19,7 @@ namespace E_VCSP
         Solver.Solver? cspSolver;
 
         bool working = false;
-
         bool blockView = false;
-        int display = 0; // 0 = both, 1 = graph, 2 = console
 
 
         public MainView()
@@ -147,17 +145,17 @@ namespace E_VCSP
             reload();
         }
 
-        private void stopButtonClick(object sender, EventArgs e) // <<< Add this method
+        private void stopButtonClick(object sender, EventArgs e)
         {
             if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
             {
-                Console.WriteLine("Stop button clicked. Requesting cancellation...");
+                Console.WriteLine("Stopping");
                 cancellationTokenSource.Cancel();
                 stopButton.Enabled = false; // Disable stop button immediately
             }
         }
 
-        private async void solveVSPClick(object sender, EventArgs e) // <<< Change to async void
+        private async void solveVSPClick(object sender, EventArgs e)
         {
             reload(); // Ensure instance and solver are ready
             if (vspSolver == null) return;

@@ -102,11 +102,25 @@ namespace E_VCSP.Objects
         {
             get
             {
-                // Driving / idle / charging costs throughout the day
-                double cost = Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST);
-                cost += Config.CR_SHIFT_COST;
+                double cost = Config.CR_SHIFT_COST; // base
+                // Driven time
+                cost += Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST);
+                // Special type
                 if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;
-                if (Type == DutyType.Broken) cost += Config.CR_BROKEN_SHIFT_COST;
+                // Special type + remove largest idle
+                if (Type == DutyType.Broken)
+                {
+                    var largestIdle = Elements
+                        .Where(e => e.Type == CrewDutyElementType.Idle)
+                        .OrderByDescending(e => e.EndTime - e.StartTime)
+                        .FirstOrDefault();
+
+                    if (largestIdle == null) throw new InvalidDataException("Broken shift with no idle");
+
+                    cost -= (largestIdle.EndTime - largestIdle.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST; // remove largest idle
+                    cost += Config.CR_BROKEN_SHIFT_COST;
+                }
+
                 return cost;
             }
         }

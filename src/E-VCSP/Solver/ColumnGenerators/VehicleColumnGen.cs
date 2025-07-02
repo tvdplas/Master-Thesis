@@ -4,7 +4,7 @@ using Gurobi;
 
 namespace E_VCSP.Solver
 {
-    public abstract class VehicleShortestPath
+    public abstract class VehicleColumnGen
     {
         // Information about current instance / model state
         public GRBModel model;
@@ -19,7 +19,7 @@ namespace E_VCSP.Solver
 
         public Location Depot;
 
-        protected VehicleShortestPath(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj)
+        protected VehicleColumnGen(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj)
         {
             this.model = model;
             this.instance = instance;

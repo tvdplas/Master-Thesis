@@ -4,7 +4,7 @@ using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    public class VSPLSGlobal : VehicleShortestPath
+    public class VSPLSGlobal : VehicleColumnGen
     {
         public VSPLSGlobal(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj, List<List<DeadheadTemplate?>> locationDHT) : base(model, instance, vehicleType, nodes, adjFull, adj)
         {
