@@ -286,7 +286,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return (handoversFeasible, chargeFeasible, drivingCost, chargingCost);
         }
 
-        public VehicleTask ToVehicleTask(VehicleType vt)
+        public VehicleTask ToVehicleTask(VehicleType vt, string source)
         {
             if (Prev != null) throw new InvalidOperationException("Not calling on head");
 
@@ -391,7 +391,11 @@ namespace E_VCSP.Solver.ColumnGenerators
                 curr = curr.Next;
             }
 
-            return new VehicleTask(elements) { vehicleType = vt };
+            return new VehicleTask(elements)
+            {
+                vehicleType = vt,
+                Source = source,
+            };
         }
     }
 
@@ -402,6 +406,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         private List<List<VSPArc?>> adjFull = [];
         private VehicleType vehicleType;
         private Random random = new();
+        public required string type;
         public double T;
 
         public LSOperations(Instance instance, List<List<VSPArc?>> adjFull, List<List<DeadheadTemplate?>> locationDHT, VehicleType vt, double t)

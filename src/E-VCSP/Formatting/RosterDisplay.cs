@@ -49,19 +49,20 @@ public class RosterDisplay : Control
 
     private float rx(float x) => x * _horizontalZoom;
 
-    public void ResetView()
+    public void ResetView(bool resetPan = true)
     {
-        if (rosterNodes.Any())
+        if (rosterNodes.Any() && resetPan)
             _panOffset = new Point(-rosterNodes.Min(x => x.Min(y => y.StartTime)), 0);
-        this._zoom = 1.0f;
-        this._horizontalZoom = 1.0f;
+
         this.Invalidate();
     }
 
     public void UpdateRosterNodes(List<List<RosterNode>> rosterNodes)
     {
+        bool resetPan = !this.rosterNodes.Any() && rosterNodes.Any();
         this.rosterNodes = rosterNodes;
-        ResetView();
+
+        ResetView(resetPan);
     }
 
 

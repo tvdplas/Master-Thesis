@@ -27,7 +27,10 @@ namespace E_VCSP.Solver.ColumnGenerators
             alpha = Config.VSP_LS_G_COOLING_RATE;
             Q = (int)Math.Round(-Config.VSP_LS_G_ITERATIONS / (Math.Log(Config.VSP_LS_G_STARTING_T / Config.VSP_LS_G_ENDING_T) / Math.Log(alpha)));
 
-            ops = new(instance, adjFull, locationDHT, vehicleType, T);
+            ops = new(instance, adjFull, locationDHT, vehicleType, T)
+            {
+                type = "LS Global",
+            };
 
 
             tasks.Clear();
@@ -452,7 +455,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             {
                 generatedColumns.AddRange(tasks.Select(taskHead =>
                 {
-                    VehicleTask vehicleTask = taskHead.ToVehicleTask(vehicleType);
+                    VehicleTask vehicleTask = taskHead.ToVehicleTask(vehicleType, "LS Global");
                     double reducedCost = vehicleTask.Cost;
                     foreach (int coveredTripIndex in vehicleTask.Covers)
                     {

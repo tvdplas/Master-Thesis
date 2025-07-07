@@ -28,10 +28,6 @@ namespace E_VCSP
         {
             InitializeComponent();
             splitContainer.Panel1.Controls.Add(rd);
-            splitContainer.Panel1.Resize += (sender, e) =>
-            {
-                rd.ResetView();
-            };
             Console.SetOut(new ConsoleIntercept(consoleView));
             Console.WriteLine("Program started");
 

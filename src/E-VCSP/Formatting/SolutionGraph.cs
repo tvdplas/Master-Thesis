@@ -73,7 +73,7 @@ namespace E_VCSP.Formatting
                 {
                     StartTime = tasks.Min(x => x.Elements[0].StartTime) - 1000,
                     EndTime = tasks.Min(x => x.Elements[0].StartTime),
-                    Content = "VT " + task.Index,
+                    Content = $"VT {task.Index}\n Source: {task.Source}",
                     Color = System.Drawing.Color.Gray
                 });
 
@@ -187,6 +187,11 @@ namespace E_VCSP.Formatting
                         {
                             content = $"{cdet.StartLocation} -> {cdet.EndLocation}";
                             color = Color.LightGreen;
+                        }
+                        else if (element is CDESignOnOff cdes)
+                        {
+                            content = $"{cdes.StartLocation}";
+                            color = Color.Lavender;
                         }
 
                         rowNodes.Add(new RosterNode()

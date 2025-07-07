@@ -10,6 +10,7 @@ namespace E_VCSP.Objects
         Idle,
         Break,
         Travel,
+        SignOnOff,
     }
     public class CrewDutyElement
     {
@@ -68,11 +69,25 @@ namespace E_VCSP.Objects
     {
         public CDETravel(int startTime, int endTime, Location startLocation, Location endLocation)
         {
-            Type = CrewDutyElementType.Break;
+            Type = CrewDutyElementType.Travel;
             StartTime = startTime;
             EndTime = endTime;
             StartLocation = startLocation;
             EndLocation = endLocation;
+        }
+    }
+
+    public class CDESignOnOff : CrewDutyElement
+    {
+        public CDESignOnOff(int startTime, int endTime, Location location)
+        {
+            if (!location.CrewHub) throw new InvalidOperationException("Heh");
+
+            Type = CrewDutyElementType.SignOnOff;
+            StartTime = startTime;
+            EndTime = endTime;
+            StartLocation = location;
+            EndLocation = location;
         }
     }
 

@@ -24,6 +24,8 @@ namespace E_VCSP.Objects
         Charge
     }
 
+
+
     /// <summary>
     /// Vehicle element which has not yet been finalized
     /// </summary>
@@ -298,10 +300,10 @@ namespace E_VCSP.Objects
         }
     }
 
-
-
     public class VehicleTask
     {
+        [JsonInclude]
+        public required string Source;
         [JsonInclude]
         public required VehicleType vehicleType;
         [JsonInclude]

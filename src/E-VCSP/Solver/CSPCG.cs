@@ -8,6 +8,17 @@ using System.Data;
 
 namespace E_VCSP.Solver
 {
+    enum BlockArcType
+    {
+        Break,
+        LongIdle,
+        ShortIdle,
+        Travel,
+        SignOnOff,
+        Invalid,
+    }
+
+
     internal class BlockArc
     {
         internal Block? FromBlock;
@@ -16,6 +27,7 @@ namespace E_VCSP.Solver
         internal int BruttoNettoTime;
         internal int IdleTime;
         internal int TravelTime;
+        internal BlockArcType Type = BlockArcType.Invalid;
 
         internal int TotalTime => BreakTime + BruttoNettoTime + IdleTime + TravelTime;
     }
@@ -61,12 +73,6 @@ namespace E_VCSP.Solver
             adjFull = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc?>()).ToList();
             adj = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc>()).ToList();
 
-            List<(int min, int max)> allowedIdleTimes = [
-                (Config.CR_MIN_SHORT_IDLE_TIME, Config.CR_MAX_SHORT_IDLE_TIME),
-                (Config.CR_MIN_BREAK_TIME, Config.CR_MAX_BREAK_TIME),
-                (Config.CR_MIN_LONG_IDLE_TIME, Config.CR_MAX_LONG_IDLE_TIME),
-            ];
-
             for (int blockIndex1 = 0; blockIndex1 < instance.Blocks.Count; blockIndex1++)
             {
                 Block block1 = instance.Blocks[blockIndex1];
@@ -83,13 +89,12 @@ namespace E_VCSP.Solver
 
                     if (block1.EndTime <= block2.StartTime && block1.EndLocation == block2.StartLocation)
                     {
-                        // Arc will be formed; need to fill in details.
+                        // Arc might be formed; start with base time layout, check for validity
+                        BlockArcType blockArcType = BlockArcType.Invalid;
                         int idleTime = block2.StartTime - block1.EndTime;
-
                         int breakTime = 0;
                         int bruttoNettoTime = 0;
                         int travelTime = 0;
-
                         int nettoBreakTime = block1.EndLocation.BreakAllowed
                             ? idleTime - block1.EndLocation.BrutoNetto
                             : 0;
@@ -99,12 +104,18 @@ namespace E_VCSP.Solver
                             breakTime = idleTime - block1.EndLocation.BrutoNetto;
                             bruttoNettoTime = block1.EndLocation.BrutoNetto;
                             idleTime = 0;
+                            blockArcType = BlockArcType.Break;
                         }
 
-                        if (
-                            (Config.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_SHORT_IDLE_TIME) ||
-                            (Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
-                        ) // either "short" idle or break
+                        // Short idle; can happen anywhere (driver remains in bus)
+                        else if (Config.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_SHORT_IDLE_TIME)
+                            blockArcType = BlockArcType.ShortIdle;
+
+                        // Long idle used for split shifts
+                        else if (block1.EndLocation.CrewHub && Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
+                            blockArcType = BlockArcType.LongIdle;
+
+                        if (blockArcType != BlockArcType.Invalid)
                         {
                             arc = new()
                             {
@@ -114,6 +125,7 @@ namespace E_VCSP.Solver
                                 BreakTime = breakTime,
                                 BruttoNettoTime = bruttoNettoTime,
                                 TravelTime = travelTime,
+                                Type = blockArcType
                             };
                         }
                     }
@@ -134,6 +146,7 @@ namespace E_VCSP.Solver
                     BreakTime = 0,
                     BruttoNettoTime = 0,
                     TravelTime = block.StartLocation.SignOnTime,
+                    Type = BlockArcType.SignOnOff
                 } : null;
                 if (start != null) adj[^2].Add(start);
                 adjFull[^2].Add(start);
@@ -146,6 +159,7 @@ namespace E_VCSP.Solver
                     BreakTime = 0,
                     BruttoNettoTime = 0,
                     TravelTime = block.StartLocation.SignOffTime,
+                    Type = BlockArcType.SignOnOff
                 } : null;
                 if (end != null)
                     adj[block.Index].Add(end);

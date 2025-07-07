@@ -1,6 +1,7 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using Gurobi;
+using System.Collections;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
@@ -22,6 +23,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         public int SteeringTime = 0; // Time since a handover was visited
         public int LastHubTime = 0; // Time since a stop with hub capibility was visited
         public required ChargeTime ChargeTime; // Was charge at start / end of deadhead
+        public BitArray CoveredTrips;
         public double CurrSoC; // SoC at start of node
         public double CurrCosts;  // Costs incurred at start of node
 
@@ -112,6 +114,8 @@ namespace E_VCSP.Solver.ColumnGenerators
         private List<VSPFront> activeLabels = [];
         private List<double> reducedCosts = [];
 
+        private List<bool> blockedNodes = [];
+
         List<List<DeadheadTemplate?>> locationDHT = [];
 
         public VSPLabeling(
@@ -145,11 +149,13 @@ namespace E_VCSP.Solver.ColumnGenerators
             allLabels.Clear();
             activeLabels.Clear();
             reducedCosts.Clear();
+            blockedNodes.Clear();
 
             for (int i = 0; i < nodes.Count; i++)
             {
                 allLabels.Add([]);
                 activeLabels.Add(new());
+                blockedNodes.Add(false);
             }
 
             GRBConstr[] constrs = model.GetConstrs();
@@ -159,13 +165,8 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
         }
 
-        public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
+        private void runLabeling()
         {
-            reset();
-
-            if (model == null || model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
-                throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
-
             int activeLabelCount = addLabel(new VSPLabel()
             {
                 PrevId = -1,
@@ -173,6 +174,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 CurrCosts = 0,
                 CurrSoC = vehicleType.StartSoC,
                 ChargeTime = ChargeTime.None,
+                CoveredTrips = new BitArray(instance.Trips.Count)
             }, nodes.Count - 2);
 
             while (activeLabelCount > 0)
@@ -196,8 +198,15 @@ namespace E_VCSP.Solver.ColumnGenerators
                 for (int i = 0; i < adj[expandingLabelIndex].Count; i++)
                 {
                     VSPArc arc = adj[expandingLabelIndex][i];
+
+                    // Skip this node as it is already part of the primary solution
+                    if (blockedNodes[arc.To.Index]) continue;
+
                     int targetIndex = arc.To.Index;
                     Trip? targetTrip = targetIndex < instance.Trips.Count ? instance.Trips[targetIndex] : null;
+
+                    BitArray newCover = new BitArray(expandingLabel.CoveredTrips);
+                    if (targetTrip != null) newCover[targetTrip.Index] = true;
 
                     // List of vehicle statstics achievable at start of trip.
                     List<(double SoC, double cost, int steeringTime, int hubTime, int chargeIndex, ChargeTime chargeTime)> statsAtTrip = [];
@@ -366,23 +375,48 @@ namespace E_VCSP.Solver.ColumnGenerators
                             CurrSoC = stats.SoC,
                             SteeringTime = stats.steeringTime,
                             LastHubTime = stats.hubTime,
+                            CoveredTrips = newCover,
                         }, arc.To.Index);
                     }
                 }
             }
+        }
 
-
+        private List<(double reducedCost, VehicleTask vehicleTask)> extractTasks(string source)
+        {
             // Backtrack in order to get path
             // indexes to nodes
+
             var feasibleEnds = allLabels[^1]
                 .Where(x => x.CurrCosts < 0)
                 .OrderBy(x => x.CurrCosts).ToList();
-            var validEnds = feasibleEnds.Take(Config.VSP_LB_MAX_COLS);
+
+            List<VSPLabel> validEnds = [];
+            if (!Config.VSP_LB_ATTEMPT_DISJOINT) validEnds = feasibleEnds.Take(Config.VSP_LB_MAX_COLS).ToList();
+            else
+            {
+                BitArray currCover = new(instance.Trips.Count);
+                // Priority on disjoint labels
+                for (int i = 0; i < feasibleEnds.Count; i++)
+                {
+                    BitArray ba = new(currCover);
+                    if (ba.And(feasibleEnds[i].CoveredTrips).HasAnySet()) continue;
+                    validEnds.Add(feasibleEnds[i]);
+                    currCover.Or(feasibleEnds[i].CoveredTrips);
+                }
+                // Add extra labels if available
+                for (int i = 0; i < feasibleEnds.Count && validEnds.Count < Config.VSP_LB_MAX_COLS; i++)
+                {
+                    if (validEnds.Contains(feasibleEnds[i])) continue;
+                    validEnds.Add(feasibleEnds[i]);
+                }
+            }
 
             List<(double cost, VehicleTask vehicleTask)> results = [];
 
-            foreach (var validEnd in validEnds)
+            for (int validEndIndex = 0; validEndIndex < validEnds.Count; validEndIndex++)
             {
+                var validEnd = validEnds[validEndIndex];
                 List<(int nodeIndex, VSPLabel label)> path = [(
                     allLabels.Count - 1,
                     validEnd
@@ -542,10 +576,45 @@ namespace E_VCSP.Solver.ColumnGenerators
                     EndSoCInTask = taskElements[^1].EndSoCInTask - dhtToDepot.Distance * vehicleType.DriveUsage,
                 });
 
-                results.Add((minCosts, new VehicleTask(taskElements) { vehicleType = vehicleType }));
+                results.Add((minCosts, new VehicleTask(taskElements)
+                {
+                    vehicleType = vehicleType,
+                    Source = $"Labeling {source} -  {validEndIndex}",
+                }));
             }
 
             return results;
+        }
+
+        public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
+        {
+            reset();
+
+            if (model == null || model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
+                throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
+
+            runLabeling();
+            List<(double reducedCost, VehicleTask vehicleTask)> primaryTasks = extractTasks("primary");
+            List<(double reducedCost, VehicleTask vehicleTask)> secondaryTasks = [];
+
+            for (int i = 0; i < Math.Min(primaryTasks.Count, Config.VSP_LB_SEC_COL_COUNT); i++)
+            {
+                var baseTask = primaryTasks[i];
+
+                for (int j = 1; j < (Config.VSP_LB_SEC_COL_ATTEMPTS + 1); j++)
+                {
+                    reset();
+                    for (int k = 0; k < (int)((double)j * baseTask.vehicleTask.Covers.Count / (Config.VSP_LB_SEC_COL_ATTEMPTS + 1)); k++)
+                    {
+                        blockedNodes[baseTask.vehicleTask.Covers[k]] = true;
+                    }
+                    runLabeling();
+                    secondaryTasks.AddRange(extractTasks("secondary"));
+                }
+            }
+
+            primaryTasks.AddRange(secondaryTasks);
+            return primaryTasks;
         }
     }
 }

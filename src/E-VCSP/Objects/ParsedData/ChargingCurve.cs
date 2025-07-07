@@ -86,7 +86,7 @@ namespace E_VCSP.Objects.ParsedData
             CurvePiece? p = null;
             for (int i = 0; i < Pieces.Count; i++)
             {
-                if (currSoC <= Pieces[i].MaxSoC)
+                if (currSoC < Pieces[i].MaxSoC)
                 {
                     p = Pieces[i];
                     break;

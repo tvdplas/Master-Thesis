@@ -78,7 +78,10 @@
         public static Header VSP_CG_LABELING = new();
         public static double VSP_LB_WEIGHT = 1;
         public static int VSP_LB_MAX_COLS = 250;
+        public static bool VSP_LB_ATTEMPT_DISJOINT = true;
         public static double VSP_LB_CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same
+        public static double VSP_LB_SEC_COL_COUNT = 2; // Number of primary columns to generate secondary columns for 
+        public static double VSP_LB_SEC_COL_ATTEMPTS = 4; // Number of attempts per secondary column
 
         public static Header VSP_CG_LS_SINGLE = new();
         public static double VSP_LS_SINGLE_WEIGHT = 0;

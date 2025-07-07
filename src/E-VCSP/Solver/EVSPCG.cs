@@ -309,6 +309,7 @@ namespace E_VCSP.Solver
                 {
                     vehicleType = vehicleType,
                     Index = i,
+                    Source = "Base cover",
                 };
 
                 tasks.Add(vehicleTask);
@@ -419,12 +420,12 @@ namespace E_VCSP.Solver
                     int endIndex = nextInterestingIndex - 1;
 
                     // We want to glue the two interesting parts together; if either end is a deadhead, more can be compressed.
-                    if (prevInteresting != null && prevInteresting.Type == VEType.Deadhead)
+                    if (prevInteresting != null && (prevInteresting.Type == VEType.Deadhead || ((prevInteresting.Type == VEType.Idle && ((VEIdle)prevInteresting).Postprocessed))))
                     {
                         from = prevInteresting.StartLocation!;
                         startIndex = prevInterestingIndex;
                     }
-                    if (nextInteresting != null && nextInteresting.Type == VEType.Deadhead)
+                    if (nextInteresting != null && (nextInteresting.Type == VEType.Deadhead || ((nextInteresting.Type == VEType.Idle && ((VEIdle)nextInteresting).Postprocessed))))
                     {
                         to = nextInteresting.EndLocation!;
                         endIndex = nextInterestingIndex;
@@ -615,7 +616,7 @@ namespace E_VCSP.Solver
 
             // Multithreaded shortestpath searching
             List<List<VehicleColumnGen>> instances = [
-                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // SP
+                [new VSPLabeling(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping)], // Labeliing
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSSingle(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_SINGLE
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSGlobal(model, instance, instance.VehicleTypes[0], nodes, adjFull, adj, locationDHTMapping))], // LS_GLOBAL
             ];
@@ -641,7 +642,7 @@ namespace E_VCSP.Solver
                 var reducedCosts = model.GetConstrs().Select(x => x.Pi);
 
                 // Generate batch of new tasks using pricing information from previous solve
-                List<(double, VehicleTask)>[] generatedTasks = new List<(double, VehicleTask)>[Config.VSP_INSTANCES_PER_IT];
+                List<List<(double, VehicleTask)>> generatedTasks = [];
 
                 int selectedMethodIndex = -1;
                 if (predefinedOperations.Count > 0)
@@ -657,19 +658,19 @@ namespace E_VCSP.Solver
 
                 List<VehicleColumnGen> selectedMethod = instances[selectedMethodIndex];
 
-                if (Config.VSP_INSTANCES_PER_IT > 1)
+                if (selectedMethod.Count > 1)
                 {
-                    Parallel.For(0, Config.VSP_INSTANCES_PER_IT, (i) =>
+                    Parallel.For(0, selectedMethod.Count, (i) =>
                     {
-                        generatedTasks[i] = selectedMethod[i].GenerateVehicleTasks();
+                        generatedTasks.Add(selectedMethod[i].GenerateVehicleTasks());
                     });
                 }
                 else
                 {
-                    generatedTasks[0] = selectedMethod[0].GenerateVehicleTasks();
+                    generatedTasks.Add(selectedMethod[0].GenerateVehicleTasks());
                 }
 
-                totalGenerated += generatedTasks.Length;
+                totalGenerated += generatedTasks.Count;
                 int colsGenerated = generatedTasks.Sum(t => t.Count);
                 switch (selectedMethodIndex)
                 {
@@ -703,7 +704,7 @@ namespace E_VCSP.Solver
                         bool coverExists = coverTaskMapping.ContainsKey(ba);
 
                         // Cover already exists and is cheaper -> skip
-                        if (coverExists && coverTaskMapping[ba].Cost < newTask.Cost)
+                        if (coverExists && coverTaskMapping[ba].Cost <= newTask.Cost)
                         {
                             discardedNewColumns++;
                             continue;
