@@ -1,5 +1,6 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
+using E_VCSP.Utils;
 using Gurobi;
 using System.Collections;
 
@@ -382,34 +383,35 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
         }
 
-        private List<(double reducedCost, VehicleTask vehicleTask)> extractTasks(string source)
+        private List<(double reducedCost, VehicleTask vehicleTask)> extractTasks(string source, HashSet<BitArray> alreadyFound)
         {
             // Backtrack in order to get path
             // indexes to nodes
-
-            var feasibleEnds = allLabels[^1]
-                .Where(x => x.CurrCosts < 0)
+            List<VSPLabel> feasibleEnds = allLabels[^1]
+                .Where(x => x.CurrCosts < 0 && !alreadyFound.Contains(x.CoveredTrips))
                 .OrderBy(x => x.CurrCosts).ToList();
 
             List<VSPLabel> validEnds = [];
-            if (!Config.VSP_LB_ATTEMPT_DISJOINT) validEnds = feasibleEnds.Take(Config.VSP_LB_MAX_COLS).ToList();
-            else
+            // Make trying to add disjoint labels
+            if (Config.VSP_LB_ATTEMPT_DISJOINT)
             {
                 BitArray currCover = new(instance.Trips.Count);
-                // Priority on disjoint labels
                 for (int i = 0; i < feasibleEnds.Count; i++)
                 {
+                    if (alreadyFound.Contains(feasibleEnds[i].CoveredTrips)) continue;
                     BitArray ba = new(currCover);
                     if (ba.And(feasibleEnds[i].CoveredTrips).HasAnySet()) continue;
                     validEnds.Add(feasibleEnds[i]);
+                    alreadyFound.Add(feasibleEnds[i].CoveredTrips);
                     currCover.Or(feasibleEnds[i].CoveredTrips);
                 }
-                // Add extra labels if available
-                for (int i = 0; i < feasibleEnds.Count && validEnds.Count < Config.VSP_LB_MAX_COLS; i++)
-                {
-                    if (validEnds.Contains(feasibleEnds[i])) continue;
-                    validEnds.Add(feasibleEnds[i]);
-                }
+            }
+            // Keep on filling with unique until max is reached / no more labels
+            for (int i = 0; i < feasibleEnds.Count && validEnds.Count < Config.VSP_LB_MAX_COLS; i++)
+            {
+                if (alreadyFound.Contains(feasibleEnds[i].CoveredTrips)) continue;
+                validEnds.Add(feasibleEnds[i]);
+                alreadyFound.Add(feasibleEnds[i].CoveredTrips);
             }
 
             List<(double cost, VehicleTask vehicleTask)> results = [];
@@ -594,8 +596,11 @@ namespace E_VCSP.Solver.ColumnGenerators
                 throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
 
             runLabeling();
-            List<(double reducedCost, VehicleTask vehicleTask)> primaryTasks = extractTasks("primary");
+            List<(double reducedCost, VehicleTask vehicleTask)> primaryTasks = extractTasks("primary", new());
             List<(double reducedCost, VehicleTask vehicleTask)> secondaryTasks = [];
+
+            HashSet<BitArray> alreadyFound = new(new BitArrayComparer());
+            foreach (var x in primaryTasks) alreadyFound.Add(x.vehicleTask.ToBitArray(instance.Trips.Count));
 
             for (int i = 0; i < Math.Min(primaryTasks.Count, Config.VSP_LB_SEC_COL_COUNT); i++)
             {
@@ -609,7 +614,9 @@ namespace E_VCSP.Solver.ColumnGenerators
                         blockedNodes[baseTask.vehicleTask.Covers[k]] = true;
                     }
                     runLabeling();
-                    secondaryTasks.AddRange(extractTasks("secondary"));
+                    var newExtracted = extractTasks("secondary", alreadyFound);
+                    secondaryTasks.AddRange(newExtracted);
+                    foreach (var x in newExtracted) alreadyFound.Add(x.vehicleTask.ToBitArray(instance.Trips.Count));
                 }
             }
 

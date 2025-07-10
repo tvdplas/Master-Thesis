@@ -162,7 +162,7 @@ Given timetables for each of the considered lines, let $\mathcal{T}$ be the set 
 
 Next, let us define our battery behavior. For each trip $t$ and deadhead $dh$, let $d_t$ and $d_{dh}$ respectively indicate the amount of charge that is used during its travel. Additionally, let $u_{dh,\sigma}$ indicate the maximum amount of charge that can be gained during a deadhead if a vehicle starts the deadhead at a State of Charge (SoC) of $\sigma$; in this, let charging at any possible given charging location be considered. Depending on available charging infrastructure, this may imply that a deadhead is not driven directly, instead making a time-feasible detour via a charging location which provides the fastest charging capabilities. SoC gained at a location depends on given (possibly non-linear) charging curves for the vehicle, allowing for different amounts of charge to be achieved in the same time span depending on the initial SoC. Note that when discrete SoC values are used, all values of $u_{dh,\sigma}$ can be precomputed.
 
-Lastly, let us define relief points. A subset of the terminal locations of trips may serve as relief points; these locations are the only ones at which a handover or break for a crew member can take place.
+Lastly, let us define relief points and crew bases. A subset of the terminal locations of trips may serve as relief points; these locations are the only ones at which a handover or break for a crew member can take place. A subset of the relief points is a crew base; these locations are the only ones at which a crew member may start or end their duty.
 
 Let a \textit{block} be a sequence of trips and/or deadheads that must be driven by a single driver; that is, no relief points are visited during the sequence except at its start and end. Let an individual trip or deadhead in this sequence be called an \textit{element}. In order for a block to be feasible, it must match the following requirements: 
 \begin{itemize}
@@ -336,19 +336,212 @@ Research has also been done into integrating the E-VSP with the step before it i
 As can be seen in Table \ref{tab:eVCSP-lit}, research into the E-VSP has successfully incorporated many battery characteristics which can be of importance when determining overall operational costs and feasibility. The E-VCSP on the other hand has seen less progress: both non-linear charging and battery degradation have not yet been considered in any work at the time of writing. Additionally, no documented attempt at using a discretized SoC model for the E-VCSP has been made. In this work, we therefore aim to address two of these points: the use of a discretized model, as well as incorporating non-linear charging curves. 
 
 \section{Methodology}
-The main idea is that the E-VSP and CSP are both seen as subproblems of the larger E-VCSP. Both are solved, and information is passed back and forth using the main problem. 
+In this section, we will discuss our methodology for solving the E-VCSP. In order to do so, we will first discuss our ways of solving the E-VSP and CSP sequentially; afterwards, we discuss how parts of these techniques can be reused in order to solve the integrated problem.
 
-In order to solve quickly, a heuristic approach is applied to both subproblems. Specifically, a simulated annealing algorithm (SAA) is used in order to solve the pricing problem of the two subproblems. 
+For both the E-VSP and CSP a (truncated) column generation approach is implemented based on a set cover ILP. In order to make this approach computationally feasible, a combination of pre- and postprocessing is applied on the underlying networks and solutions. As large parts of the solution methods for these two problems are shared, a detailed overview of the any shared technique will only be provided in the E-VSP section. Where applicable, the CSP solution method will refer back to this. 
 
-Preivous work has shown that solving the pricing problem for the E-VSP using exact approaches works well, however the resulting methods are slow; therefore, less information about the solution is known early. Additionally, the inclusion of crew schedules implies that always charging fully or moving all charging to an early point in the schedule might not be ideal; therefore, a SAA approach was implemented instead, allowing for more flexibility and a hard constraint on the amount of time spent by limiting the overall number of iterations. 
+\subsection{E-VSP}
+Our approach for solving the E-VSP can roughly be broken up into 3 steps: 
+\begin{itemize}
+  \item \textit{Preprocessing}, in which our initial data set is transformed into a graph which is simplified using heuristics.
+  \item \textit{Solving}, in which truncated column generation using various sources is applied in order to solve the problem of finding a set of vehicle tasks which cover all trips. 
+  \item \textit{Postprocessing}, in which duplicate trips are transformed into deadheads in order to reduce the total amount of driving manhours required. 
+\end{itemize} 
+\subsubsection{Preprocessing}
+Given are a set of trips $\mathcal{T}$, a set of locations $\mathcal{L}$, and a set of deadheads $\mathcal{DH}$ connecting pairs of locations. Of these locations, exactly one is the depot $\mathcal{D} \in \mathcal{L}$. Additionally, a subset of the locations $\mathcal{L}_c \subseteq \mathcal{L}$ has charging equipment installed.
 
-For the E-VSP, a pricing problem was implemented using the following operations: 
-- add trip
-- remove trip
-- change charging action between two trips 
-- increase charging time during action
-- decrease charging time during action
+Inspired by \citet{vanKootenNiekerk2017}, let us transform this data into a graph $G_{vt} = (V_{vt}, A_{vt})$ in which paths represent individual vehicle tasks. Let $V_{vt} = \{ d_{s}, d_{e} \} \cup \mathcal{T}$, where $d_{s}$ and $d_{e}$ represent the depot at the beginning and end of the day respectively. For each node $t \in \mathcal{T}$, add an arc to $A_{vt}$ from $d_{s}$ to $t$ and from $t$ to $d_{e}$ if there is a deadhead in $\mathcal{DH}$ connecting the depot to the starting and ending location of trip $t$ respectively. Next, add an arc to $A_{vt}$ between each pair of trips $t, t'$ if there is a deadhead in $dh \in \mathcal{DH}$ that connects the ending location of $t$ to the starting location of $t'$ and the duration of $dh$ does not exceed the time between the end of $t$ and the start of $t'$. This graph corresponds to the one found in a standard VSP formulation; we will now modify it in order to be more computationally efficient and include additional charging capabilities.
 
-laadtijd in/uit
+Let us begin by reducing the overall size of the graph. Oftentimes a timetable will include sequences of trips which are meant to be driven sequentially. This most commonly occurs when a line is driven in two directions; a trip in one direction may be followed by a trip in the other direction, implying that a vehicle turns around and drives both directions sequentially. This can be used to substantially reduce the amount of arcs in the graph by forcing the use of short turnaround arcs between trips if they are available. 
+
+More formally: for each trip node $t$, let $A_t \subset A_{vt}$ be the set of outgoing arcs from $t$ to other trip nodes. Let $A_{t,st} \subseteq A_t$ be the collection of arcs for which the time between $t$ and the target trip $t'$ is less than some threshold $\delta$ and for which the end location of $t$ is equal to the starting location of $t'$. If $|A_{t,st}| \geq 1$, replace $A_t$ with $A_{t,st}$. Otherwise, leave the original set of outgoing arcs the same. A $\delta$ in the order of $\sim 0.5$ hours was found to be reasonable during initial testing.
+
+Once this initial reduction of arcs between trips has been performed, we will extend the remaining arcs in order to properly accommodate charging. Let us first assume that charging never occurs when driving to or from the depot; all charging operations will therefore take place in the time between pairs of trips. Given the current state of our graph $G$, this implies that charging may only take place if a trip starts or ends at a charging location, and a connecting trip allows for idle time which can be used for charging.
+
+In order to increase the amount of charging options, let us consider the existing arcs in $A_{vt}$ between pairs of trips $t$ and $t'$; let us refer to these arcs as \textit{base arcs}. For each charging location $l_c \in \mathcal{L}_c$ for which $l_c$ is not the ending location of $t$ or the starting location of $t'$, we will attempt to add an additional charging arc. This arc will model the possibility of performing a detour between $t$ and $t'$ to $l_c$ in order to charge there; let us refer to this as a \textit{detour arc}. Let us add this detour arc if there exists a deadhead $dh \in \mathcal{DH}$ from the ending location of $t$ to $l_c$, a deadhead $dh' \in \mathcal{DH}$ from $l_c$ to the start of $t'$, and the combined duration of $dh$ and $dh'$ allows for enough time at $l_c$ to meet the minimum charging time.
+
+For all detour arcs, we assume that the time at the charging location is maximized. This means that we we always perform the deadhead towards the charging location at the earliest possible time, and the deadhead to the next trip at the latest possible time. For base arcs, let us also maximize time at a charging location; if the start and end location of a base arc are both non-charging or both charging locations, time at the start location is maximized as a tiebreaker. Knowing this, an arc can be uniquely defined as including: 
+\begin{itemize}
+  \item Overall driving costs for the movements (deadhead(s) / target trip).
+  \item SoC usage for each individual movement.
+  \item Time spent at a predetermined charging location, if one is visited. If the vehicle is not fully charged, this time will always be used. \todo{beter plaatsen}
+\end{itemize}
+
+Any feasible vehicle task can now be described as a path in $G$ from $d_s$ to $d_e$. The costs for a certain task can be defined as the sum of all used arcs driving costs + a KWh cost for the sum of all SoC usage. In this, we assume that the cost of energy remains constant throughout the day and at different charging locations, and that vehicles will be fully recharged overnight for the same KWh cost as during the day. Additionally note that not every path from  $d_s$ to $d_e$ describes a feasible vehicle task; depending on the arcs used, the amount of time that a vehicle has to charge may not be sufficient in order to keep it within SoC bounds during the task. 
+
+\todo{Misschien gewoon een voorbeeld? Wat trips, deadheads en charging locaties in tabel vorm, resulterende graaf met evt dubbele arcs voor detour arcs}
+
+\subsubsection{Solving}
+In order to now solve the E-VSP, a collection of feasible vehicle tasks that cover the trips $\mathcal{T}$ must be found. In order to do this, we will use a (truncated) column generation approach; this has previously been shown to be an effective solution method for the E-VSP by works such as \citet{vanKootenNiekerk2017}, \citet{Zhang2021} and \citet{deVos2024}. The ILP used to model this is a set covering ILP; in this let $VT$ represent the available set of vehicle tasks, let $x_{i}$ be a binary decision variable indicating the use of vehicle task $v_i \in VT$, and let $k_{i,t}$ be a parameter defining whether vehicle task $v_i$ includes the trip $t \in \mathcal{T}$. 
+\begin{align}
+\min \quad
+& \sum_{1 \leq i \leq |VT|} x_{i} \cdot cost(v_i)
+\end{align}
+Subject to:
+\begin{align}
+\sum_{1 \leq i \leq |VT|} x_{i}k_{i,t} &\geq 1 && \forall t = 1,\:\dots,\:|\mathcal{T}| \label{form:vehicle-cover}\\
+x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|VT| \label{form:x-integer}
+\end{align}
+This problem can be relaxed to an LP by replacing constraint (\ref{form:x-integer}) with the following:
+\begin{align}
+x_{i} &\geq 0 && \forall i = 1,\:\dots,\:|VT|
+\end{align}
+In this relaxed problem, let the dual cost of constraint (\ref{form:vehicle-cover}) be $\pi_t$ with $t \in \mathcal{T}$. 
+
+The LP relaxation can initially be solved using dummy columns each containing exactly 1 trip. Afterwards, new columns can be are generated, guided by the dual cost $\pi_t$ of the trip coverage constraints. We generate columns in one of three ways: a labeling algorithm which is used to solve the pricing problem, a local search algorithm which approximates the solution to the pricing problem, and a local search algorithm which covers all trips at the same time. We will now discuss these in detail. \\
+
+\paragraph{Labeling} \label{sec:labeling-evsp}
+Let us consider our previously defined graph $G_{vt} = (V_{vt}, A_{vt})$. A new vehicle task can be represented as a path from $d_s$ to $d_e$, where the reduced costs of the vehicle task can be used as the length of the path. These costs can be defined as the costs incurred by driving and charging minus the sum of dual costs of the covered trips. In order to model the limited SoC range during the finding of the shortest path,  labeling algorithm algorithm can be used. 
+
+For each node in $V$, we keep track of a set of active labels. Each of these labels contains the current costs, current SoC and the previous label. Starting in $d_e$ with an empty label, we can start propagating labels through the graph. A sketch of the labeling algorithm is outlined in Algorithm \ref{alg:evsp-labeling}.
+
+\begin{algorithm}
+\caption{E-VSP Labeling}\label{alg:evsp-labeling}
+\begin{algorithmic}
+\While{$|\textit{activeLabels}| > 0$} 
+    \State $(label, node) \gets \textit{activeLabels.Pop()}$
+    \For{$arc \in node.OutgoingArcs$}
+        \State $(label', node') \gets ApplyArc(label, arc)$
+        \If{$Feasible(label')$}
+            \State $activeLabels.Push(label', node')$
+        \EndIf
+    \EndFor
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\noindent Once all active labels have been processed, $d_e$ will now contain a list of finalized labels. We can then find a label with lowest costs and backtrack through previous label to $d_s$ in order to reconstruct the entire vehicle task. If the reduced cost of this task is negative, it will improve our solution to the relaxed E-VSP when included. 
+
+As the amount of outgoing arcs may be large, propagating all labels can become computationally expensive. We therefore introduce a domination rule, allowing us to discard a label if a better one is known: for two labels $l$ and $l'$ on the same node $v$, we consider $l$ to be dominated by $l'$ if the costs of $l'$ are not higher and the SoC of $l'$ is not lower. If a label $l$ is dominated after the introduction of a new label $l'$, the label $l$ may be removed from the list of active nodes, reducing the total amount of considered nodes.
+
+In order to make this domination rule stronger, SoC values may be binned into discrete buckets. This allows for small SoC differences to be discarded during the domination check, allowing more labels to become dominated and further reducing computational load. During our testing, actual SoC values were rounded down to the nearest whole percentage point for domination purposes, resulting in a total of 101 buckets. Major gains can also be achieved through proper processing order of active labels. If active labels are evaluated ordered in non-descending order of trip endtime, it is guaranteed that all domination rulings for a certain trip will have been applied before any labels from that trip are expanded. This greatly reduces the total amount of labels expanded.
+
+The list of finalized labels in $d_e$ often contains more than one label with negative costs; in this case, multiple vehicle tasks with negative reduced costs can be extracted from the labeling result. In order to do this, we first sort the labels by cost in non-descending order. A maximum number of labels, which we shall call $N$ here, is then selected from this sorted list of labels. An attempt is first made to select labels whose trip covers are disjoint in order to encourage early coverage of all trips. After no more labels are available whose cover is disjoint, we simply add labels with new trip covers until we have added $N$ in total or until all labels with unique trip covers have been added. 
+
+While this allows us to converge on a good solution for the relaxed problem quite quickly, solving the unrelaxed problem with the resulting vehicle tasks might still prove challenging without significant trip overlap. In an attempt to prevent this, a secondary set of vehicle tasks is generated. In this, the top $M \leq N$ generated tasks from the initial labeling round are selected as a base. For each of these bases, we iteratively block off some of the trips from the task, starting from the front. For each set of blocked of tasks, we then rerun the labeling algorithm; this causes a new set of labels to be generated which might still use part of the base, but are forced to use alternate trips for the parts which are blocked off. This results in vehicle tasks with new covers which might not be optimal in de relaxation, however they might help during the final solve. \\
+
+\paragraph{Local search - Shortest Path} 
+Without binning of SoC values, the labeling algorithm provides an exact solution to the pricing problem. For larger instances however, it might not be computationally feasible to generate enough columns in order to find a good solution. As an alternative, we can approximate a solution to the pricing problem using local search. In order to do this a simulated annealing algorithm is used to construct a vehicle task, where the objective is to once more to minimize the reduced costs of the task.  
+
+Starting with an empty task, a collection of operations is repeatedly applied in order to modify it. After an operation is applied, the reduced cost of the new vehicle task is compared to that before the application. If the solution quality improves, the change is accepted; otherwise, it is accepted with a chance depending on both the difference in cost and how far along in the search we are. For more details, we refer to \citet{Kirk83}.
+
+During this process, we ensure feasibility of 
+
+\begin{algorithm}
+\caption{E-VSP Simulated annealing}\label{alg:evsp-simulated-annealing}
+\begin{algorithmic}
+\State $vt \gets empty$
+\While{$currIt < totalIts$} 
+    \State $op \gets operations.GetRandom()$
+    \State $vt' \gets op(vt)$
+    \If{$\exp((vt.Cost - vt'.Cost) / T) > \textit{uniform}(0, 1)$}
+      $vt \gets vt'$
+    \EndIf
+    \State $T \gets T * \alpha;\:currIts \gets currIts + 1$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+The following set of operations is applied in order to modify the vehicle task $vt$: \\
+
+\noindent\textit{Add trip:} from the set of currently unvisited trips, select a trip $t$ at random. In $vt$, validate that there is space to place $t$; if not, abort the operation. Otherwise, validate that there are arcs available in $A_{vt}$ to connect $t$ to its predecessor and successor in $vt$, and add $t$ to $vt$. \\
+
+\noindent\textit{Remove trip:} from the set of currently visited trips, select a trip $t$ at random. Validate that there is an arc available from the predecessor of $t$ to the successor of $t$ in $A_{vt}$; if so, connect them and remove $t$. \\ 
+
+\noindent\textit{Change arc:} In $vt$, select an sequential pair of trips $t$ and $t'$. Select a currently unused arc between $t$ and $t'$ from $A_{vt}$. \\ 
+
+
+During these operations, we consider the placement of trips within the vehicle task to be a hard constraint; overlapping driving times are not allowed. We do allow the SoC to go out of bounds.
+\paragraph{Local search - Global solution}
+\todo{Invullen}
+
+Batches of columns are generated until no columns with negative reduced costs can be found, or until a time limit is reached. Afterwards, constraint (\ref{form:x-integer}) is reinstated, making the model binary again. Branch-and-bound is then applied in order to find an integer solution. \\
+
+\subsubsection{Postprocessing}
+Once an integer solution is found to the E-VSP, there may still be overlap between the selected vehicle tasks. Depending on both the columns generated and the time limit given to solver, this number of duplicate trips may result in significant duplication of work. In order to reduce the costs incurred in driving the selected tasks, simple postprocessing is applied in order to completely eliminate any duplicate trips. 
+
+In order to achieve this, we first make the assumption that for any pair of locations $l$ and $l'$ in $\mathcal{L}$, a corresponding deadhead $\mathcal{DH}$ exists. If this is not the case, temporarily extend $\mathcal{DH}$:  a minimum duration and distance driven between $l$ and $l'$ using sequence of existing deadheads and/or trips can be used as a stand-in. 
+
+For each trip that is covered more than once, we can now select all tasks except the first which covers this trip. For each of these tasks, remove the duplicate trip from the task and replace it with a combination of a deadhead between the starting and ending location of a trip and idle time. If this multiple deadheads occur without a previously planned charging operation or trip between them, combine the deadheads into one by going directly from the starting location of the first deadhead to the ending location of the last deadhead, padding with idle time where needed. This will ensure that no more SoC is used and distance is driven than in the original task, and in most cases less crew time is required in order to complete the task.  
+
+\subsubsection{Crew considerations}
+Creation of vehicle tasks as described may not always result in a task which can be executed in real life. Crew members, as discussed in more detail in both Section \ref{sec:problem_def} and \ref{sec:csp-method}, are subject to a different set of constraints than the vehicles themselves. Most notably, crew members under most common labor regulations have a limit on continuous driving time. If a vehicle task contains a set of continuous trips without break or handover time which is longer than this limit, this immediately implies that this vehicle task can never be driven, and is therefore not feasible.  
+
+Another problem arises when considering crew signing on and off for the day. Usually, the depot and maybe a select number of other locations can be used in order for a crew member to start and end their shift. Depending on the instance, a vehicle may not visit these places often enough for crew members to get on and off throughout the day, resulting in blocks that can never be driven. It can therefore be beneficial to ensure that a vehicle visits one of these crew hubs at least once in every unit. \todo{afmaken}
+
+This problem can be resolved in one of two ways: adjusting the results of the E-VSP during the crew scheduling phase (notably something that commercial solvers such as Hastus do), or adding these crew constraints to the feasibility of the vehicle task. We selected the latter of the two options: adding additional constraints to our feasibility check during the generation of our vehicle task set. Note that for both labeling as wel as local search based approaches, this was made a hard constraint.
+
+\subsection{CSP} \label{sec:csp-method}
+For the CSP, a similar approach is taken to that of the E-VSP: (truncated) column generation of a set covering ILP. The set to be covered is now the blocks present in the selected vehicle tasks. As before, this process is broken up into steps: 
+\begin{itemize}
+  \item \textit{Preprocessing}, in which vehicle tasks are transformed into a set of blocks, and these blocks are in turn used to generate a graph. 
+  \item \textit{Solving}, in which truncated column generation using two sources is applied in order to solve the problem of finding a set of crew duties which cover all blocks. 
+\end{itemize} 
+
+\subsubsection{Preprocessing}
+In order to assign crew members to vehicles, the previously generated vehicle tasks must first be broken up into blocks. As defined previously, a block is part of a vehicle task which must be driven by a single driver; there is no possibility of handover between drivers during the block. Let $VT$ be the collection of vehicle tasks that was previously selected. For each vehicle task $vt \in VT$, let $B_{vt}$ be the set of blocks that are contained in $vt$. The total collection of to be covered blocks can then be defined as the union of all $B_{vt}$. 
+
+Next, let us define a graph $G_{cd} = (V_{cd}, A_{cd})$ in which paths will represent crew duties. Let $V_{cd} = \{ s, e \} \cup B$, where $s$ and $e$ represent the start and end of a duty respectively. For every block $b \in B$ whose starting location is a crew base, add a \textit{sign-on arc} from $s$ to $b$. If the end location of $b$ is a crew base, add a \textit{sign-off arc} between $b$ and $e$ and $e$. Next, between each pair of blocks $b$ and $b'$, attempt to add an arc if the ending location of $b$ is the same as the starting location of $b'$ and the ending time of $b$ is not later than the starting time of $b'$. The type of the arc depends on the ending location of $b$:
+\begin{itemize}
+  \item If the ending location of $b$ has a place for crew members to rest and the amount of idle time is a feasible to be a break, add a \textit{break arc}.
+  \item If the location is a crew base and has an idle time greater than some threshold $\nu$, add a \textit{long idle arc}. Here, the crew member signs off at the beginning of the idle time, before signing on to drive the next block. 
+  \item Otherwise, add a \textit{short idle arc}, in which the crew member remains in their vehicle. 
+\end{itemize}
+
+As with $A_{vt}$, the amount of arcs $A_{cd}$ can be significantly reduced if we apply some domain knowledge in order to determine arcs that may be part of a good quality solution. In our case, this was done by filtering on a reasonable length for each arc type. The following filters were used: \todo{formatting}
+\begin{itemize}
+  \item Sign-on/off: Any
+  \item Break arcs: [15min, 60min]
+  \item Short idle arcs: [0min, 30min]
+  \item Long idle arcs: [1.5h, 5h]
+\end{itemize} 
+Any feasible crew duty can now be represented as a path between $s$ and $e$ in $G_{cd}$. We again note that not every path from $s$ to $e$ represents a feasible duty; depending on local labor regulations and duty type constraints, differing combinations of duty length, break times and idle times might be feasible.   
+\subsubsection{Solving}
+Similarly to our model for the E-VSP, let us define a set covering ILP. In this, let $\textit{CD}$ be the available crew duties, let $y_j$ be a binary decision variable indicating the usage of $cd_j \in \textit{CD}$, and let $m_{j,b}$ be a parameter indicating that crew duty $cd_j$ covers block $b \in B$. Additionally, let $d_j$ be a parameter containing the total working duration of duty $cd_j$, and let $\rho_{j,\textit{broken}}$ and $\rho_{j,\textit{between}}$ be parameters indicating that $cd_j$ is of duty type \textit{broken} or \textit{between} respectively.
+\begin{align}
+\min \quad
+& \sum_{cd_j \in \textit{CD}} y_{j} \cdot cost(cd_j)
+\end{align}
+Subject to:
+\begin{align}
+\sum_{cd_j \in \textit{CD}} y_{j}m_{j,b} &\geq 1 && \forall b \in B \label{form:block-cover}\\
+\sum_{cd_j \in \textit{CD}} y_{j}(\frac{d_{j}}{\textit{8 hours}} - 1) &\leq 0 && \label{form:max-avg-shift-length}\\
+\sum_{cd_j \in \textit{CD}} y_{j}*(0.3 - \rho_{j,\textit{broken}}) &\geq 0 && \label{form:max-broken-shifts}\\
+\sum_{cd_j \in \textit{CD}} y_{j}*(0.1 - \rho_{j,\textit{between}}) &\geq 0 && \label{form:max-between-shifts}\\
+y_{j} &\in \{ 0, 1 \} && \forall cd_j \in \textit{CD} \label{form:y-integer}
+\end{align}
+Here, constraint (\ref{form:block-cover}) ensures that all blocks are covered, constraint (\ref{form:max-avg-shift-length}) ensures a maximum average duty length and constraints (\ref{form:max-broken-shifts}) and (\ref{form:max-between-shifts}) ensure that a maximum of 30\% of selected duties are of type broken and 10\% are of type between respectively. This problem can be relaxed to an LP by replacing constraint (\ref{form:y-integer}) with the following:
+\begin{align}
+0 &\leq y_{j} \leq 1 && \forall cd_j \in \textit{CD}
+\end{align}
+In this relaxed problem, let the dual cost of constraints (\ref{form:block-cover}-\ref{form:max-between-shifts}) be $\tau_{\textit{cover},b}, \tau_{\textit{dur}}, \tau_{\textit{broken}}$ and $\tau_{\textit{between}}$ respectively.
+
+The LP relaxation can once again initially be solved with dummy columns containing one block each. Note that not all of these dummy columns will be feasible, as not all blocks will start and end at a crew base; we therefore assign a penalty for the use of these dummy duties, guaranteeing that it will be cheaper to incorporate the block in a shift when possible. After the initial solution, column generation is applied using two methods: labeling in order to solve the pricing problem, and a local search to cover all blocks at once. Of these, only our labeling algorithm can make use of the dual costs $\tau$.
+
+\paragraph{Labeling}
+Let us consider our previously defined graph $G_{cd} = (V_{cd}, A_{cd})$. As with the labeling algorithm described in the E-VSP section, we can once again attempt to find a path of minimum cost through our graph $G_{cd}$ in order to generate a crew duty with minimum reduced cost. For a more detailed overview of the algorithm, we refer to Section \ref{sec:labeling-evsp}, however we will discuss details specific to the crew duty variant here. 
+
+First, let us define our reduced costs; for a new crew duty $cd_0$, our reduced costs can be defined as 
+\begin{align}
+& \text{cost}(cd_0) 
+- \sum_{b \in B} m_{0,b} \tau_{\textit{cover},b} 
+- \left( \frac{d_0}{\text{8 hours}} \right) \tau_{\textit{dur}}  
+- \tau_{\textit{broken}} (0.3 - \rho_{0,\textit{broken}}) 
+- \tau_{\textit{between}} (0.1 - \rho_{0,\textit{between}})
+\end{align}
+
+Using this, we can now start with a set empty labels in $s$, one for each available duty type. During propagation, in each label keep track of:
+\begin{itemize}
+  \item The duty type of the label.
+  \item The previous label.
+  \item The starting time of the duty, defined by the first duty after $s$.
+  \item The breaks arcs taken in this duty.
+  \item The long idle arcs taken in this duty.
+\end{itemize}
+Clear domination rules are not present; the accrued reduced costs are only dominated if start time, breaks and idles are identical. As this is unlikely, removing as many labels as possible through feasibility constraints remains as the best option to ensure that computational efficiency is maintained.
+
+Checking for feasibility during propagation can however only be done for a subset of the provided labor regulation rules. Properties such as continuous driving time, maximum end time and use of long idle arcs can already be used in order to remove labels which cannot result in a feasible duty of a given type. Before reaching $e$ however, the end time and distribution of breaks the in duty are not yet finalized. This notably implies that it is not possible to check for sufficient breaks while propagation is still in progress: suppose some label in the process indicates that its corresponding duty will have a length of at least 6 hours, requiring a total of 40 minutes of break time under Dutch labor regulations. If the current amount of break time is 20 minutes, this may still become feasible before reaching $e$ by taking another break arc; we can therefore not discard this label before we know when the duty will end.  
+
+Once propagation has completed, the duties described by the labels in $e$ can be finalized. Only then can we do our full feasibility check, discarding any labels which are not valid given their state in $e$. As with the E-VSP, what remains is a list of labels which describe feasible duties with negative reduced cost. We will then take at most $N$ of these duties, prioritizing block-disjoint duties. Next, secondary columns are generated for the best $M \leq N$ of the found duties. After this, the complete set of duties is made available to the LP relaxation, before repeating the process with new values of $\tau$. 
 \printbibliography
 \end{document}

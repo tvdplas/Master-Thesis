@@ -40,6 +40,13 @@ namespace E_VCSP.Objects.ParsedData
 
             // Trips are parsed directly; Can add locations that were not previously known.
             Trips = new ParserTrips().Parse(path, Locations);
+            Trips.Sort((a, b) => a.EndTime.CompareTo(b.EndTime));
+            for (int i = 0; i < Trips.Count; i++)
+            {
+                Trips[i].Index = i;
+                Trips[i].Id = "t" + i;
+            }
+
 
             // Vehicle types; can add charging curve info to locations
             VehicleTypes = new ParserVehicleTypes().Parse(path, Locations);
