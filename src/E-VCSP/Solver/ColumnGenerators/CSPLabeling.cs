@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects;
+using E_VCSP.Objects.ParsedData;
 using Gurobi;
 using System.Collections;
 
@@ -20,7 +21,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         internal int StartTime = 0;
         internal required BitArray CoveredBlockIds;
         internal List<(int startTime, int breakTime)> Breaks = new();
-        internal (int startTime, int longIdleTime) Idle = (-1, -1); // Only set once for split
+        internal (int startTime, int longIdleTime) Idle = (-1, 0); // Only set once for split
 
         internal bool breaksFeasible(int currEndTime, bool final)
         {
@@ -115,6 +116,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             // Max shift length (normal / broken)
             if (duration > Config.CR_MAX_SHIFT_LENGTH && Type != DutyType.Broken) return false;
             if (duration > Config.CR_MAX_SHIFT_LENGTH + Config.CR_MAX_LONG_IDLE_TIME) return false;
+            if (Idle.startTime != -1 && duration - Idle.longIdleTime > Config.CR_MAX_SHIFT_LENGTH) return false;
             // No long idles in non-broken shifts
             if (Type != DutyType.Broken && Idle.startTime != -1)
                 return false;
@@ -134,7 +136,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                     if (Idle.startTime == -1)
                         return false;
                     // Too long
-                    if (duration - Idle.longIdleTime >= Config.CR_MAX_SHIFT_LENGTH)
+                    if (duration - Idle.longIdleTime > Config.CR_MAX_SHIFT_LENGTH)
                         return false;
                 }
                 // End times in range
@@ -161,6 +163,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         List<double> rcBlocks = [];
         double rcMaxBroken;
         double rcMaxBetween;
+        double rcMaxAvg;
 
         List<List<CSPLabel>> allLabels = [];
         List<List<CSPLabel>> activeLabels = [];
@@ -182,6 +185,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 for (int i = 0; i < blocks.Count; i++) rcBlocks[i] = constrs[i].Pi;
                 rcMaxBroken = model.GetConstrByName("max_broken").Pi;
                 rcMaxBetween = model.GetConstrByName("max_between").Pi;
+                rcMaxAvg = model.GetConstrByName("limited_average_length").Pi;
             }
         }
 
@@ -196,11 +200,12 @@ namespace E_VCSP.Solver.ColumnGenerators
             for (int i = 0; i < (int)DutyType.Count; i++)
             {
                 DutyType dt = (DutyType)i;
+                int rho_broken = dt == DutyType.Broken ? 1 : 0;
+                int rho_between = dt == DutyType.Between ? 1 : 0;
 
-                double baseCost = Config.CR_SHIFT_COST;
-                if (dt != DutyType.Broken) baseCost -= rcMaxBroken;
-                else baseCost += Config.CR_BROKEN_SHIFT_COST;
-                if (dt != DutyType.Between) baseCost -= rcMaxBetween;
+                double baseCost = Config.CR_SHIFT_COST + rho_broken * Config.CR_BROKEN_SHIFT_COST;
+                baseCost -= rcMaxBroken * (Config.CR_MAX_BROKEN_SHIFTS - rho_broken);
+                baseCost -= rcMaxBetween * (Config.CR_MAX_BETWEEN_SHIFTS - rho_between);
 
                 // Start by setting out all possible duty types from the depot start
                 for (int targetBlockId = 0; targetBlockId < blocks.Count; targetBlockId++)
@@ -259,7 +264,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                     BitArray newCoverage = new(currentLabel.CoveredBlockIds);
                     if (targetBlockIndex < blocks.Count) newCoverage.Set(targetBlockIndex, true);
 
-                    int prevEndTime = targetBlockIndex >= blocks.Count ? currentLabel.StartTime : blocks[currentNodeIndex].EndTime;
+                    int prevEndTime = currentNodeIndex >= blocks.Count ? currentLabel.StartTime : blocks[currentNodeIndex].EndTime;
                     int currentEndTime = targetBlockIndex >= blocks.Count ? arc.TravelTime + blocks[currentNodeIndex].EndTime : blocks[targetBlockIndex].EndTime;
 
                     int timeDiff = currentEndTime - prevEndTime;
@@ -286,6 +291,13 @@ namespace E_VCSP.Solver.ColumnGenerators
                     // Dominated if feasible and less coverage (i think)
                     else addLabel(newLabel, targetBlockIndex);
                 }
+            }
+
+            // Adjust costs to include finalized duration
+            for (int i = 0; i < allLabels[^1].Count; i++)
+            {
+                CSPLabel l = allLabels[^1][i];
+                l.Cost -= rcMaxAvg * ((blocks[l.PrevBlockId].EndTime - l.StartTime) / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
             }
         }
 
@@ -344,21 +356,38 @@ namespace E_VCSP.Solver.ColumnGenerators
                     var labelFrom = usedLabels[j];
                     var labelTo = usedLabels[j + 1];
                     BlockArc arc = adjFull[labelFrom.currBlockId][labelTo.currBlockId] ?? throw new InvalidDataException("hier gaat nog iets mis");
-                    if (arc.Type == BlockArcType.SignOnOff)
+                    if (arc.Type == BlockArcType.LongIdle)
                     {
-                        cdes.Add(new CDESignOnOff(blocks[labelFrom.currBlockId].EndTime, blocks[labelFrom.currBlockId].EndTime + arc.TravelTime, blocks[labelFrom.currBlockId].EndLocation));
-                    }
-                    if (arc.IdleTime > 0)
-                    {
-                        cdes.Add(new CDEIdle(arc.FromBlock!.EndTime, arc.FromBlock.EndTime + arc.IdleTime, arc.FromBlock.EndLocation, arc.ToBlock!.StartLocation));
-                    }
-                    if (arc.BreakTime > 0)
-                    {
-                        cdes.Add(new CDEBreak(arc.FromBlock!.EndTime, arc.FromBlock.EndTime + arc.BreakTime + arc.BruttoNettoTime, arc.FromBlock.EndLocation, arc.ToBlock!.StartLocation));
-                    }
-                    if (labelTo.currBlockId < blocks.Count)
-                    {
+                        Block from = arc.FromBlock!;
+                        Location loc = from.EndLocation;
+
+                        int startTime = from!.EndTime;
+                        int nettoIdleTime = arc.IdleTime - loc.SignOffTime - loc.SignOnTime;
+
+
+                        cdes.Add(new CDESignOnOff(startTime, startTime + loc.SignOffTime, loc));
+                        cdes.Add(new CDEIdle(startTime + loc.SignOffTime, startTime + loc.SignOffTime + nettoIdleTime, loc, loc));
+                        cdes.Add(new CDESignOnOff(startTime + loc.SignOffTime + nettoIdleTime, startTime + loc.SignOffTime + nettoIdleTime + loc.SignOnTime, loc));
                         cdes.Add(new CDEBlock(blocks[labelTo.currBlockId]));
+                    }
+                    else if (arc.Type == BlockArcType.SignOnOff)
+                    {
+                        cdes.Add(new CDESignOnOff(blocks[labelFrom.currBlockId].EndTime, blocks[labelFrom.currBlockId].EndTime + blocks[labelFrom.currBlockId].EndLocation.SignOffTime, blocks[labelFrom.currBlockId].EndLocation));
+                    }
+                    else
+                    {
+                        if (arc.IdleTime > 0)
+                        {
+                            cdes.Add(new CDEIdle(arc.FromBlock!.EndTime, arc.FromBlock.EndTime + arc.IdleTime, arc.FromBlock.EndLocation, arc.ToBlock!.StartLocation));
+                        }
+                        if (arc.BreakTime > 0)
+                        {
+                            cdes.Add(new CDEBreak(arc.FromBlock!.EndTime, arc.FromBlock.EndTime + arc.BreakTime + arc.BruttoNettoTime, arc.FromBlock.EndLocation, arc.ToBlock!.StartLocation));
+                        }
+                        if (labelTo.currBlockId < blocks.Count)
+                        {
+                            cdes.Add(new CDEBlock(blocks[labelTo.currBlockId]));
+                        }
                     }
                 }
 
@@ -383,14 +412,14 @@ namespace E_VCSP.Solver.ColumnGenerators
             List<(double reducedCost, CrewDuty crewDuty)> primaryTasks = extractDuties("primary");
             List<(double reducedCost, CrewDuty crewDuty)> secondaryTasks = [];
 
-            for (int i = 0; i < Math.Min(primaryTasks.Count, Config.VSP_LB_SEC_COL_COUNT); i++)
+            for (int i = 0; i < Math.Min(primaryTasks.Count, Config.CSP_LB_SEC_COL_COUNT); i++)
             {
                 var baseTask = primaryTasks[i];
 
-                for (int j = 1; j < (Config.VSP_LB_SEC_COL_ATTEMPTS + 1); j++)
+                for (int j = 1; j < (Config.CSP_LB_SEC_COL_ATTEMPTS + 1); j++)
                 {
                     reset();
-                    for (int k = 0; k < (int)((double)j * baseTask.crewDuty.Covers.Count / (Config.VSP_LB_SEC_COL_ATTEMPTS + 1)); k++)
+                    for (int k = 0; k < (int)((double)j * baseTask.crewDuty.Covers.Count / (Config.CSP_LB_SEC_COL_ATTEMPTS + 1)); k++)
                     {
                         blockedBlock[baseTask.crewDuty.Covers[k]] = true;
                     }

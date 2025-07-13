@@ -123,6 +123,8 @@
         public static double CSP_LABELING_WEIGHT = 0;
         public static int CSP_LB_MAX_COLS = 50;
         public static bool CSP_LB_ATTEMPT_DISJOINT = true; // try to find disjoint paths; if none can be found, return any arbitrary path
+        public static double CSP_LB_SEC_COL_COUNT = 0; // Number of primary columns to generate secondary columns for 
+        public static double CSP_LB_SEC_COL_ATTEMPTS = 2; // Number of attempts per secondary column
 
         public static Header CSP_LS_GLOBAL = new();
         public static double CSP_LS_GLOBAL_WEIGHT = 0;
