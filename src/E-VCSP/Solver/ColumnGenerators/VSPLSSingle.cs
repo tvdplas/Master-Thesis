@@ -17,7 +17,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         // Always has the form of depot -> dh -> idle -> (trip -> dh -> idle) * n -> depot w/ n >= 0
         // Depot are guaranteed to be before / after all other trips + dh time. 
-        private LLNode? head = null;
+        private VSPLSNode? head = null;
         private List<int> activeTrips = [];
         private List<int> inactiveTrips = [];
         private LSOperations ops;
@@ -58,7 +58,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             DeadheadTemplate dht = arc.DeadheadTemplate;
 
             // Create depot nodes, connecting dh + idle time to ensure that there is always a feasible start / end to the vehicle task
-            head = new LLNode()
+            head = new VSPLSNode()
             {
                 PVE = new PVEDepot(Depot, StartTime - Config.MIN_NODE_TIME, StartTime),
             };
@@ -74,7 +74,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// Adds random unused trip
         /// </summary>
-        private LSOpResult addTrip(LLNode? head)
+        private LSOpResult addTrip(VSPLSNode? head)
         {
             // Select random trip
             int selectIndex = random.Next(inactiveTrips.Count);
@@ -93,7 +93,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return res;
         }
 
-        private LSOpResult removeTrip(LLNode? head)
+        private LSOpResult removeTrip(VSPLSNode? head)
         {
             if (activeTrips.Count == 0) return LSOpResult.Invalid;
 
@@ -105,7 +105,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             Trip t = instance.Trips[selectedTrip];
 
             // Find the trip in the current ll
-            LLNode? curr = head;
+            VSPLSNode? curr = head;
             while (curr != null)
             {
                 if (curr.PVE is PVETrip vet && vet.Trip == t)
@@ -143,7 +143,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         {
             Reset();
 
-            List<(Func<LLNode?, LSOpResult> operation, double chance)> operations = [
+            List<(Func<VSPLSNode?, LSOpResult> operation, double chance)> operations = [
                 (addTrip, Config.VSP_LS_S_ADD_TRIP),
                 (removeTrip, Config.VSP_LS_S_REM_TRIP),
                 (ops.addChargeStop, Config.VSP_LS_S_ADD_CHARGE),

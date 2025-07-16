@@ -132,9 +132,10 @@
         public static double CSP_LS_G_ENDING_T = 0.01;
         public static double CSP_LS_G_COOLING_RATE = 0.98;
         public static double CSP_LS_G_ITERATIONS = 10_000_000;
-        public static double CSP_LS_G_SWAP_TAILS = 20;
+        public static double CSP_LS_G_SWAP_TAILS = 5;
+        public static double CSP_LS_G_MOVE_RANGE = 2;
         public static double CSP_LS_G_MOVE_SINGLE = 5;
-        public static double CSP_LS_G_CHANGE_TYPE = 1;
+        public static double CSP_LS_G_CREWHUB_PENALTY = 10_000;
 
     }
 }

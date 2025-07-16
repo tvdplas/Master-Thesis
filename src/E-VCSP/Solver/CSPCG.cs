@@ -225,10 +225,10 @@ namespace E_VCSP.Solver
             GRBLinExpr maxBetween = new(); // max 10% between
             GRBLinExpr maxSingle = new(); // Use singles at a cost
 
-            GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, 10, GRB.CONTINUOUS, "noExcessiveLengthSlack");
-            GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, 10, GRB.CONTINUOUS, "limitedAverageLengthSlack");
-            GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, 10, GRB.CONTINUOUS, "maxBrokenSlack");
-            GRBVar maxBetweenSlack = model.AddVar(0, GRB.INFINITY, 10, GRB.CONTINUOUS, "maxBetweenSlack");
+            GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "noExcessiveLengthSlack");
+            GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "limitedAverageLengthSlack");
+            GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "maxBrokenSlack");
+            GRBVar maxBetweenSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "maxBetweenSlack");
 
             for (int i = 0; i < dutyVars.Count; i++)
             {
@@ -294,6 +294,7 @@ namespace E_VCSP.Solver
                 currIts = 1,                // Number of CG / solution rounds had
                 totalGenerated = 0,         // Total number of columns generated
                 lbGenerated = 0,            // Generated with labeling
+                lsGenerated = 0,            // Generated with labeling
                 seqWithoutRC = 0,           // Number of sequential columns without reduced cost found
                 totWithoutRC = 0,           // Total columns generated with no RC
                 notFound = 0;               // Number of columns that could not be generated
@@ -350,7 +351,6 @@ namespace E_VCSP.Solver
                             else if (c.ConstrName == "limited_average_length") return (newDuty.Duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
                             else if (c.ConstrName == "max_broken") return newDuty.Type == DutyType.Broken ? Config.CR_MAX_BROKEN_SHIFTS - 1 : Config.CR_MAX_BROKEN_SHIFTS;
                             else if (c.ConstrName == "max_between") return newDuty.Type == DutyType.Between ? Config.CR_MAX_BETWEEN_SHIFTS - 1 : Config.CR_MAX_BETWEEN_SHIFTS;
-                            else if (c.ConstrName == "max_single") return 0;
                             else throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
                         })], constrs);
 
@@ -392,6 +392,7 @@ namespace E_VCSP.Solver
                 switch (selectedMethodÍndex)
                 {
                     case 0: lbGenerated += colsGenerated; break;
+                    case 1: lsGenerated += colsGenerated; break;
                     default: throw new InvalidOperationException("You forgot to add a case");
                 }
 

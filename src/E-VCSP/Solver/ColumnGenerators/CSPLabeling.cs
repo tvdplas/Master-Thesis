@@ -27,20 +27,29 @@ namespace E_VCSP.Solver.ColumnGenerators
         {
             // Check driving time between breaks
             int lastBreak = StartTime;
+            bool longIdleUsed = false;
 
             for (int i = 0; i < Breaks.Count; i++)
             {
                 (int st, int bt) = Breaks[i];
-                if (Idle.startTime != -1 && Idle.startTime < st)
+                if (!longIdleUsed && Idle.startTime != -1 && Idle.startTime < st)
                 {
                     // First check time traveled before big idle, then update last break time accordingly
                     if (Idle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
                     lastBreak = Idle.startTime + Idle.longIdleTime;
+                    longIdleUsed = true;
                 }
 
                 // Too long between breaks
                 if (st - lastBreak > Config.MAX_STEERING_TIME) return false;
                 lastBreak = st + bt;
+            }
+            if (!longIdleUsed && Idle.startTime != -1 && Idle.startTime < currEndTime)
+            {
+                // First check time traveled before big idle, then update last break time accordingly
+                if (Idle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
+                lastBreak = Idle.startTime + Idle.longIdleTime;
+                longIdleUsed = true;
             }
             if (currEndTime - lastBreak > Config.MAX_STEERING_TIME) return false;
 
@@ -70,7 +79,6 @@ namespace E_VCSP.Solver.ColumnGenerators
                     else if (afterDuration >= 5.5 * 60 * 60)
                     {
                         if (afterBreaks.Sum(x => x.breakTime) < 40 * 60 || afterBreaks.FindIndex(x => x.breakTime >= 20 * 60) == -1) return false;
-
                     }
                 }
                 // Continouos shift

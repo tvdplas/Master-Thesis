@@ -130,9 +130,15 @@ namespace E_VCSP.Objects
                         .OrderByDescending(e => e.EndTime - e.StartTime)
                         .FirstOrDefault();
 
-                    if (largestIdle == null) throw new InvalidDataException("Broken shift with no idle");
+                    if (largestIdle == null)
+                    {
+                        //throw new InvalidDataException("Broken shift with no idle");
+                    }
+                    else
+                    {
+                        cost -= (largestIdle.EndTime - largestIdle.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST; // remove largest idle
+                    }
 
-                    cost -= (largestIdle.EndTime - largestIdle.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST; // remove largest idle
                     cost += Config.CR_BROKEN_SHIFT_COST;
                 }
 

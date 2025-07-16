@@ -3,7 +3,7 @@ using E_VCSP.Objects.ParsedData;
 
 namespace E_VCSP.Solver.ColumnGenerators
 {
-    public class LLNode
+    public class VSPLSNode
     {
         #region debug
         public int DEBUG_INDEX;
@@ -17,13 +17,13 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// Previous vehicle element
         /// </summary>
-        public LLNode? Prev;
+        public VSPLSNode? Prev;
         /// <summary>
         /// Next vehicle element
         /// </summary>
-        public LLNode? Next;
+        public VSPLSNode? Next;
 
-        public LLNode()
+        public VSPLSNode()
         {
             DEBUG_INDEX = DEBUG_INDEX_COUNTER++;
         }
@@ -34,10 +34,10 @@ namespace E_VCSP.Solver.ColumnGenerators
         }
 
         #region find
-        public LLNode? FindBefore(Func<LLNode, bool> predicate, bool first)
+        public VSPLSNode? FindBefore(Func<VSPLSNode, bool> predicate, bool first)
         {
-            LLNode? curr = Prev;
-            LLNode? res = null;
+            VSPLSNode? curr = Prev;
+            VSPLSNode? res = null;
             while (curr != null)
             {
                 if (predicate(curr))
@@ -50,13 +50,13 @@ namespace E_VCSP.Solver.ColumnGenerators
             return res;
         }
 
-        public LLNode? FindFirstBefore(Func<LLNode, bool> predicate) => FindBefore(predicate, true);
-        public LLNode? FindLastBefore(Func<LLNode, bool> predicate) => FindBefore(predicate, false);
+        public VSPLSNode? FindFirstBefore(Func<VSPLSNode, bool> predicate) => FindBefore(predicate, true);
+        public VSPLSNode? FindLastBefore(Func<VSPLSNode, bool> predicate) => FindBefore(predicate, false);
 
-        public LLNode? FindAfter(Func<LLNode, bool> predicate, bool first)
+        public VSPLSNode? FindAfter(Func<VSPLSNode, bool> predicate, bool first)
         {
-            LLNode? curr = Next;
-            LLNode? res = null;
+            VSPLSNode? curr = Next;
+            VSPLSNode? res = null;
             while (curr != null)
             {
                 if (predicate(curr))
@@ -68,8 +68,8 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
             return res;
         }
-        public LLNode? FindFirstAfter(Func<LLNode, bool> predicate) => FindAfter(predicate, true);
-        public LLNode? FindLastAfter(Func<LLNode, bool> predicate) => FindAfter(predicate, false);
+        public VSPLSNode? FindFirstAfter(Func<VSPLSNode, bool> predicate) => FindAfter(predicate, true);
+        public VSPLSNode? FindLastAfter(Func<VSPLSNode, bool> predicate) => FindAfter(predicate, false);
 
         #endregion
 
@@ -77,7 +77,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         public int Count(bool head)
         {
-            LLNode? curr = this;
+            VSPLSNode? curr = this;
             int c = 0;
             while (curr != null)
             {
@@ -97,10 +97,10 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// </summary>
         /// <param name="count">Amount of nodes to remove</param>
         /// <returns>List of removed nodes</returns>
-        public List<LLNode> RemoveAfter(int count)
+        public List<VSPLSNode> RemoveAfter(int count)
         {
-            List<LLNode> removedNodes = new(count);
-            LLNode? curr = Next;
+            List<VSPLSNode> removedNodes = new(count);
+            VSPLSNode? curr = Next;
             for (int i = 0; i < count && curr != null; i++)
             {
                 removedNodes.Add(curr);
@@ -112,7 +112,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return removedNodes;
         }
 
-        public LLNode AddAfter(LLNode node)
+        public VSPLSNode AddAfter(VSPLSNode node)
         {
             ArgumentNullException.ThrowIfNull(node);
 
@@ -133,9 +133,9 @@ namespace E_VCSP.Solver.ColumnGenerators
             return node;
         }
 
-        public LLNode AddAfter(PartialVehicleElement ve)
+        public VSPLSNode AddAfter(PartialVehicleElement ve)
         {
-            return AddAfter(new LLNode()
+            return AddAfter(new VSPLSNode()
             {
                 PVE = ve,
             });
@@ -182,7 +182,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             bool handoverValid(int currTime) => currTime - drivingSince <= Config.MAX_STEERING_TIME;
 
-            LLNode? curr = this.Next!; // First travel after depot head
+            VSPLSNode? curr = this.Next!; // First travel after depot head
 
             int its = 0;
 
@@ -305,7 +305,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
 
 
-            LLNode? curr = this; // First travel after depot head
+            VSPLSNode? curr = this; // First travel after depot head
             while (curr != null) // end at depot
             {
                 PartialVehicleElement VE = curr.PVE;
@@ -425,18 +425,18 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <param name="ve"></param>
         /// <param name="reducedCostsDiff"></param>
         /// <returns></returns>
-        public LSOpResult addStop(LLNode? head, PartialVehicleElement ve, double reducedCostsDiff)
+        public LSOpResult addStop(VSPLSNode? head, PartialVehicleElement ve, double reducedCostsDiff)
         {
             if (ve.Type == PVEType.Depot || ve.Type == PVEType.Travel)
                 throw new InvalidOperationException("Are you sure?");
 
             // Find addition targetss
-            LLNode? prev = head!.FindLastAfter((node) =>
+            VSPLSNode? prev = head!.FindLastAfter((node) =>
             {
                 PVEType type = node.PVE.Type;
                 return type != PVEType.Travel && node.PVE.EndTime <= ve.StartTime;
             }) ?? head;
-            LLNode? next = prev!.FindFirstAfter((node) =>
+            VSPLSNode? next = prev!.FindFirstAfter((node) =>
             {
                 PVEType type = node.PVE.Type;
                 return type != PVEType.Travel;
@@ -480,7 +480,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             double costDiff = reducedCostsDiff;
 
             // Costs lost due to previous travel
-            LLNode oldTravel = prev.Next!;
+            VSPLSNode oldTravel = prev.Next!;
 
             // Old charge / driving costs
             var oldRes = head!.validateTail(vehicleType);
@@ -489,13 +489,13 @@ namespace E_VCSP.Solver.ColumnGenerators
             costDiff -= oldRes.chargingCost;
 
             // Add new part into mix
-            LLNode travel1 = new LLNode()
+            VSPLSNode travel1 = new VSPLSNode()
             {
                 PVE = new PVETravel(travel1Template, prev.PVE.EndTime, ve.StartTime, vehicleType)
             };
             travel1.Prev = prev;
-            LLNode stop = travel1.AddAfter(ve);
-            LLNode travel2 = stop.AddAfter(new PVETravel(travel2Template, ve.EndTime, next.PVE.StartTime, vehicleType));
+            VSPLSNode stop = travel1.AddAfter(ve);
+            VSPLSNode travel2 = stop.AddAfter(new PVETravel(travel2Template, ve.EndTime, next.PVE.StartTime, vehicleType));
             travel2.Next = next;
 
             prev.Next = travel1;
@@ -519,14 +519,14 @@ namespace E_VCSP.Solver.ColumnGenerators
             return (costDiff < 0) ? LSOpResult.Improvement : LSOpResult.Accept;
         }
 
-        public LSOpResult removeStop(LLNode? head, LLNode node, double reducedCostsDiff)
+        public LSOpResult removeStop(VSPLSNode? head, VSPLSNode node, double reducedCostsDiff)
         {
             if (node.PVE.Type == PVEType.Depot || node.PVE.Type == PVEType.Travel)
                 throw new InvalidOperationException("Are you sure?");
 
             // Find addition targets
-            LLNode prev = node.Prev!.Prev!;
-            LLNode next = node.Next!.Next!;
+            VSPLSNode prev = node.Prev!.Prev!;
+            VSPLSNode next = node.Next!.Next!;
 
             // See if travels can be made to connect prev -travel1> ve -travel2> next
             DeadheadTemplate? travelTemplate = null;
@@ -550,8 +550,8 @@ namespace E_VCSP.Solver.ColumnGenerators
             double costDiff = reducedCostsDiff;
 
             // Previous travels
-            LLNode oldTravel1 = prev.Next!;
-            LLNode oldTravel2 = next.Prev!;
+            VSPLSNode oldTravel1 = prev.Next!;
+            VSPLSNode oldTravel2 = next.Prev!;
 
             // Old charge / driving costs
             var oldRes = head!.validateTail(vehicleType);
@@ -560,7 +560,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             costDiff -= oldRes.chargingCost;
 
             // Add new part into mix
-            LLNode travel = new LLNode()
+            VSPLSNode travel = new VSPLSNode()
             {
                 PVE = new PVETravel(travelTemplate, prev.PVE.EndTime, next.PVE.StartTime, vehicleType)
             };
@@ -591,14 +591,14 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// adds random charging stop
         /// </summary>
-        public LSOpResult addChargeStop(LLNode? head)
+        public LSOpResult addChargeStop(VSPLSNode? head)
         {
             // Select random trip
             int selectIndex = random.Next(instance.ChargingLocations.Count);
             Location selectedLocation = instance.ChargingLocations[selectIndex];
 
             List<(int start, int end)> times = new();
-            LLNode? curr = head;
+            VSPLSNode? curr = head;
             while (curr != null)
             {
                 if (curr.PVE.Type == PVEType.Travel)
@@ -628,11 +628,11 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// Removes random charging stop
         /// </summary>
         /// <returns></returns>
-        public LSOpResult removeChargeStop(LLNode? head)
+        public LSOpResult removeChargeStop(VSPLSNode? head)
         {
-            List<LLNode> targets = new();
+            List<VSPLSNode> targets = new();
 
-            LLNode? curr = head;
+            VSPLSNode? curr = head;
             while (curr != null)
             {
                 if (curr.PVE.Type == PVEType.ChargeDetour) targets.Add(curr);
@@ -647,7 +647,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// adds random charging stop
         /// </summary>
-        public LSOpResult addHandoverStop(LLNode? head)
+        public LSOpResult addHandoverStop(VSPLSNode? head)
         {
             // Select random trip
             List<Location> handoverLocations = instance.Locations.Where(x => x.HandoverAllowed).ToList();
@@ -655,7 +655,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             Location selectedLocation = handoverLocations[selectIndex];
 
             List<(int start, int end)> times = new();
-            LLNode? curr = head;
+            VSPLSNode? curr = head;
             while (curr != null)
             {
                 if (curr.PVE.Type == PVEType.Travel)
@@ -685,11 +685,11 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// Removes random charging stop
         /// </summary>
         /// <returns></returns>
-        public LSOpResult removeHandoverStop(LLNode? head)
+        public LSOpResult removeHandoverStop(VSPLSNode? head)
         {
-            List<LLNode> targets = new();
+            List<VSPLSNode> targets = new();
 
-            LLNode? curr = head;
+            VSPLSNode? curr = head;
             while (curr != null)
             {
                 if (curr.PVE.Type == PVEType.ChargeDetour) targets.Add(curr);

@@ -12,7 +12,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         }
 
         private LSOperations ops;
-        private List<LLNode> tasks = new();
+        private List<VSPLSNode> tasks = new();
         private List<double> reducedCostsTrip = new();
         private List<List<DeadheadTemplate?>> locationDHT = [];
         private Random rnd = new();
@@ -51,14 +51,14 @@ namespace E_VCSP.Solver.ColumnGenerators
                 VSPArc tripDepotArc = adjFull[i][instance.DepotEndIndex] ?? throw new InvalidDataException("No trip depot arc found in initial LSGLobal");
 
                 // Create depot -> dh1 -> idle1 -> trip -> dh2 -> idle2 -> depot
-                LLNode depotStart = new()
+                VSPLSNode depotStart = new()
                 {
                     PVE = new PVEDepot(Depot, StartTime - Config.MIN_NODE_TIME, StartTime),
                 };
-                LLNode travel1 = depotStart.AddAfter(new PVETravel(depotTripArc.DeadheadTemplate, StartTime, t.StartTime, vehicleType));
-                LLNode trip = travel1.AddAfter(new PVETrip(t, vehicleType));
-                LLNode travel2 = trip.AddAfter(new PVETravel(tripDepotArc.DeadheadTemplate, t.EndTime, EndTime, vehicleType));
-                LLNode depotEnd = travel2.AddAfter(new PVEDepot(Depot, EndTime, EndTime + Config.MIN_NODE_TIME));
+                VSPLSNode travel1 = depotStart.AddAfter(new PVETravel(depotTripArc.DeadheadTemplate, StartTime, t.StartTime, vehicleType));
+                VSPLSNode trip = travel1.AddAfter(new PVETrip(t, vehicleType));
+                VSPLSNode travel2 = trip.AddAfter(new PVETravel(tripDepotArc.DeadheadTemplate, t.EndTime, EndTime, vehicleType));
+                VSPLSNode depotEnd = travel2.AddAfter(new PVEDepot(Depot, EndTime, EndTime + Config.MIN_NODE_TIME));
 
                 tasks.Add(depotStart);
             }
@@ -67,13 +67,13 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// Attempt to do a 2opt operation; Select a rnd time in the day, swap all trip assignments after that point
         /// </summary>
-        private LSOpResult opt2(LLNode? _)
+        private LSOpResult opt2(VSPLSNode? _)
         {
             int t1Index = rnd.Next(tasks.Count);
             int t2Index = rnd.Next(tasks.Count);
             while (t1Index == t2Index) t2Index = rnd.Next(tasks.Count);
-            LLNode t1Head = tasks[t1Index];
-            LLNode t2Head = tasks[t2Index];
+            VSPLSNode t1Head = tasks[t1Index];
+            VSPLSNode t2Head = tasks[t2Index];
 
             // Select a random point in time 
             int time = rnd.Next(StartTime, EndTime);
@@ -82,11 +82,11 @@ namespace E_VCSP.Solver.ColumnGenerators
             //                  time
             // d -> t1 -> t2 ... -> tat1 | tfa1 -> ... -> d 
             // d -> t1 -> ...... -> tat2 | tfa2 -> ... -> d
-            LLNode? t1FirstAffected = null;
-            LLNode? t2FirstAffected = null;
+            VSPLSNode? t1FirstAffected = null;
+            VSPLSNode? t2FirstAffected = null;
             int t1TripsBefore = 0, t1TripsAfter = 0, t2TripsBefore = 0, t2TripsAfter = 0;
 
-            LLNode? curr = t1Head;
+            VSPLSNode? curr = t1Head;
             while (curr != null)
             {
                 if (t1FirstAffected == null && (curr.PVE.Type == PVEType.Depot || curr.PVE.Type == PVEType.Trip) && curr.PVE.StartTime >= time)
@@ -133,13 +133,13 @@ namespace E_VCSP.Solver.ColumnGenerators
             // d -> t1 -> ... -> tat2 | -> d (=tfa2)
             if (t1FirstAffected.PVE.Type == PVEType.Depot && t2FirstAffected.PVE.Type == PVEType.Depot) return LSOpResult.Invalid;
 
-            LLNode? t1AdditionTarget = t1FirstAffected.FindFirstBefore(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
-            LLNode? t2AdditionTarget = t2FirstAffected.FindFirstBefore(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
+            VSPLSNode? t1AdditionTarget = t1FirstAffected.FindFirstBefore(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
+            VSPLSNode? t2AdditionTarget = t2FirstAffected.FindFirstBefore(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
 
             if (t1AdditionTarget == null || t2AdditionTarget == null) throw new InvalidDataException("Heh");
 
 
-            (bool feasible, double costDiff, LLNode? travel) glue(LLNode head, LLNode additionTarget, LLNode firstAffected)
+            (bool feasible, double costDiff, VSPLSNode? travel) glue(VSPLSNode head, VSPLSNode additionTarget, VSPLSNode firstAffected)
             {
                 // Attempt to glue the two trip parts together; if this results in infeasibility / , return invalid
                 PVETrip? additionTargetAsTrip = additionTarget.PVE.Type == PVEType.Trip ? ((PVETrip)additionTarget.PVE) : null;
@@ -153,7 +153,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 // Arc exists; check if results in invalid charge by temporarily replacing at tail with fa (with travel to glue)
                 Location from = additionTargetAsTrip?.Trip?.From ?? Depot;
 
-                LLNode travel = new()
+                VSPLSNode travel = new()
                 {
                     Prev = additionTarget,
                     Next = firstAffected,
@@ -161,8 +161,8 @@ namespace E_VCSP.Solver.ColumnGenerators
                 };
 
                 // save copies of previous "glue"
-                LLNode atNext = additionTarget.Next!;
-                LLNode faPrev = firstAffected.Prev!;
+                VSPLSNode atNext = additionTarget.Next!;
+                VSPLSNode faPrev = firstAffected.Prev!;
 
                 // Current state: (?) is onesided link
                 // tat2at -> ..... -> ........ -> t2fa -> ....
@@ -263,17 +263,17 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// Select two tasks, select a range of entries from the one to try and insert into the other
         /// </summary>
-        private LSOpResult moveRange(LLNode? _)
+        private LSOpResult moveRange(VSPLSNode? _)
         {
             int t1Index = rnd.Next(tasks.Count);
             int t2Index = rnd.Next(tasks.Count);
             while (t1Index == t2Index) t2Index = rnd.Next(tasks.Count);
-            LLNode t1Head = tasks[t1Index];
-            LLNode t2Head = tasks[t2Index];
+            VSPLSNode t1Head = tasks[t1Index];
+            VSPLSNode t2Head = tasks[t2Index];
 
             // Get trips from t2 in order to attempt to move to t1
-            List<LLNode> t2trips = new();
-            LLNode? curr = t2Head;
+            List<VSPLSNode> t2trips = new();
+            VSPLSNode? curr = t2Head;
             while (curr != null)
             {
                 if (curr.PVE.Type == PVEType.Trip) t2trips.Add(curr);
@@ -285,14 +285,14 @@ namespace E_VCSP.Solver.ColumnGenerators
             int t2StartIndex = rnd.Next(t2trips.Count),
                 t2EndIndex = rnd.Next(t2StartIndex, t2trips.Count);
 
-            LLNode t2Start = t2trips[t2StartIndex];
-            LLNode t2End = t2trips[t2EndIndex];
+            VSPLSNode t2Start = t2trips[t2StartIndex];
+            VSPLSNode t2End = t2trips[t2EndIndex];
 
             if (t2Start == null || t2End == null) throw new InvalidDataException("could not get trip nodes");
 
             // Check if connecting the remainder of t2 is feasible
-            LLNode? t2Prev = t2Start.FindFirstBefore(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
-            LLNode? t2Next = t2End.FindFirstAfter(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
+            VSPLSNode? t2Prev = t2Start.FindFirstBefore(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
+            VSPLSNode? t2Next = t2End.FindFirstAfter(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
 
             if (t2Prev == null || t2Next == null) throw new InvalidDataException("heh");
 
@@ -310,9 +310,9 @@ namespace E_VCSP.Solver.ColumnGenerators
             // Can be checked by finding the trip preceding t2S in t1,
             // then checking the trip coming after that to see if it is possible
             // to travel from t2E to it.
-            LLNode? t1Prev = t1Head.FindLastAfter(x => x.PVE.EndTime < t2Start.PVE.StartTime && (x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip)) ?? t1Head;
+            VSPLSNode? t1Prev = t1Head.FindLastAfter(x => x.PVE.EndTime < t2Start.PVE.StartTime && (x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip)) ?? t1Head;
             if (t1Prev == null) throw new InvalidOperationException("heh");
-            LLNode? t1Next = t1Prev.FindFirstAfter(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
+            VSPLSNode? t1Next = t1Prev.FindFirstAfter(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
             if (t1Next == null) throw new InvalidOperationException("heh");
             PVETrip t2StartRangeAsTrip = (PVETrip)t2Start.PVE,
                     t2EndRangeAsTrip = (PVETrip)t2End.PVE;
@@ -337,7 +337,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             // t2: ... -> t2Prev -(newTravel)> t2Next -> ...
 
             // Copies of previous dh/idle
-            LLNode t1PrevTravel = t1Prev.Next!,
+            VSPLSNode t1PrevTravel = t1Prev.Next!,
                     t1NextTravel = t1Next.Prev!,
                     t2PrevTravel = t2Prev.Next!,
                     t2StartTravel = t2Start.Prev!,
@@ -346,21 +346,21 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             // New glue
             // t1Prev -> t2Start
-            LLNode newStartTravel = new()
+            VSPLSNode newStartTravel = new()
             {
                 PVE = new PVETravel(t1PrevTot2Start.DeadheadTemplate, t1Prev.PVE.EndTime, t2Start.PVE.StartTime, vehicleType),
                 Prev = t1Prev,
                 Next = t2Start,
             };
             // t2End -> t1Next
-            LLNode newEndTravel = new()
+            VSPLSNode newEndTravel = new()
             {
                 PVE = new PVETravel(t2EndTot1Next.DeadheadTemplate, t2End.PVE.EndTime, t1Next.PVE.StartTime, vehicleType),
                 Prev = t2End,
                 Next = t1Next,
             };
             // t2Prev -> t2Next
-            LLNode newTravel = new()
+            VSPLSNode newTravel = new()
             {
                 PVE = new PVETravel(t2PrevTot2Next.DeadheadTemplate, t2Prev.PVE.EndTime, t2Next.PVE.StartTime, vehicleType),
                 Prev = t2Prev,
@@ -436,7 +436,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         {
             reset();
 
-            List<(Func<LLNode?, LSOpResult> operation, double chance)> operations = [
+            List<(Func<VSPLSNode?, LSOpResult> operation, double chance)> operations = [
                 (opt2, Config.VSP_LS_G_2OPT),
                 (moveRange, Config.VSP_LS_G_MOVE_RANGE),
                 (ops.addChargeStop, Config.VSP_LS_G_ADD_CHARGE),
@@ -482,7 +482,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 double r = rnd.NextDouble() * sums[^1];
                 int operationIndex = sums.FindIndex(x => r <= x);
                 int selectedIndex = rnd.Next(tasks.Count);
-                LLNode selectedHead = tasks[selectedIndex] ?? throw new InvalidDataException("selected head invalid");
+                VSPLSNode selectedHead = tasks[selectedIndex] ?? throw new InvalidDataException("selected head invalid");
                 var res = operations[operationIndex].operation(selectedHead);
                 if (operationIndex >= 2 && selectedHead.TailCount() <= 3) tasks.RemoveAt(selectedIndex);
             }
