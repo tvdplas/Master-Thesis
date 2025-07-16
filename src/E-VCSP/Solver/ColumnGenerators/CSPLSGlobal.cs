@@ -150,6 +150,19 @@ namespace E_VCSP.Solver.ColumnGenerators
         public required CSPLSNode? head;
         public CSPLSNode? tail => head?.FindLastAfter(_ => true) ?? head;
 
+        public List<int> CoveredBlocks()
+        {
+            List<int> res = [];
+            CSPLSNode? curr = head;
+            while (curr != null)
+            {
+                if (curr.CDE.Type == CrewDutyElementType.Block)
+                    res.Add(((CDEBlock)curr.CDE).Block.Index);
+                curr = curr.Next;
+            }
+            return res;
+        }
+
         private (int minStartTime, int maxStartTime, int minEndTime, int maxEndTime)[] DutyTypeTimeframes =
         [
             (int.MinValue, int.MaxValue, int.MinValue, (int)(16.5 * 60 * 60)), // Early
@@ -494,13 +507,13 @@ namespace E_VCSP.Solver.ColumnGenerators
 
                     // Update prev / next
                     if (curr.CDE.EndTime <= rangeStart.CDE.StartTime) prevIn1 = curr;
-                    if (rangeEnd.CDE.StartTime <= curr.CDE.StartTime) nextIn1 = curr;
+                    if (rangeEnd.CDE.EndTime <= curr.CDE.StartTime && nextIn1 == null) nextIn1 = curr;
                 }
                 curr = curr.Next;
             }
 
             // Do the same for duty2;
-            CSPLSNode? prevIn2 = rangeStart.Prev?.Prev, nextIn2 = rangeStart.Next?.Next;
+            CSPLSNode? prevIn2 = rangeStart.Prev?.Prev, nextIn2 = rangeEnd.Next?.Next;
 
             // We can now start to generate connecting arcs: we have the current setup known:
             // Duty1: ... -> prevIn1? -> Idle/Break -> nextIn1? -> ...
@@ -533,13 +546,18 @@ namespace E_VCSP.Solver.ColumnGenerators
             costDiff -= duty1.Cost;
             costDiff -= duty2.Cost;
 
+            if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
+
+
             // Change links, reevaluate heads
             if (prevIn1 != null) prevIn1.Next = linkPrev1ToRange;
             if (nextIn1 != null) nextIn1.Prev = linkNext1ToRange;
             if (prevIn2 != null) prevIn2.Next = linkPrev2ToNext2;
-            if (nextIn2 != null) nextIn2.Prev = rangeEndNext;
-            rangeStart.Next = linkNext1ToRange;
-            rangeEnd.Prev = linkPrev2ToNext2;
+            if (nextIn2 != null) nextIn2.Prev = linkPrev2ToNext2;
+
+            rangeStart.Prev = linkPrev1ToRange;
+            rangeEnd.Next = linkNext1ToRange;
+
             duty1.head = rangeStart.FindLastBefore(_ => true) ?? rangeStart;
             duty2.head = prevIn2?.FindLastBefore(_ => true) ?? prevIn2 ?? nextIn2;
 
@@ -554,6 +572,9 @@ namespace E_VCSP.Solver.ColumnGenerators
             // If the second duty is now empty, remove it
             if (duty2.head == null) costDiff -= duty2.BaseCost;
 
+            if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
+
+
             // If infeasible or cost change not acceptable, revert  
             if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff))
             {
@@ -566,6 +587,8 @@ namespace E_VCSP.Solver.ColumnGenerators
                 rangeEnd.Next = rangeEndNext;
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
+
+                if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
 
                 return (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0) ? LSOpResult.Invalid : LSOpResult.Decline;
             }
@@ -588,20 +611,37 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             // Select a random time to swap the two tails
             List<int> interestingTimes = [];
+            List<(int, int)> startEndTimes = [];
+
             CSPLSNode? curr = duty1.head;
             while (curr != null)
             {
-                interestingTimes.Add(curr.CDE.StartTime);
+                startEndTimes.Add((curr.CDE.StartTime, curr.CDE.EndTime));
                 curr = curr.Next;
             }
             curr = duty2.head;
             while (curr != null)
             {
-                interestingTimes.Add(curr.CDE.StartTime);
+                startEndTimes.Add((curr.CDE.StartTime, curr.CDE.EndTime));
                 curr = curr.Next;
             }
-            interestingTimes.Add(duty1.tail!.CDE.EndTime);
-            interestingTimes.Add(duty2.tail!.CDE.EndTime);
+
+            // Filter out times which would cause 2 blocks to overlap when swap occurs
+            for (int i = 0; i < startEndTimes.Count; i++)
+            {
+                (int s, int e) = startEndTimes[i];
+                bool startValid = true;
+                bool endValid = true;
+                for (int j = 0; j < startEndTimes.Count && (startValid || endValid); j++)
+                {
+                    (int sb, int eb) = startEndTimes[j];
+                    if (sb < s && s < eb) startValid = false;
+                    if (sb < e && e < eb) endValid = false;
+                }
+
+                if (startValid) interestingTimes.Add(s);
+                if (endValid) interestingTimes.Add(e);
+            }
             interestingTimes.Sort();
             int time = interestingTimes[random.Next(interestingTimes.Count - 1) + 1];
 
@@ -627,15 +667,15 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
 
             CSPLSNode? firstBlockInTail1 = duty1.head!.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Block && x.CDE.StartTime >= time);
-            if (firstBlockInTail1 == null && duty1.head.CDE.Type == CrewDutyElementType.Block && duty1.head.CDE.StartTime >= time)
+            if (duty1.head.CDE.Type == CrewDutyElementType.Block && duty1.head.CDE.StartTime >= time)
             {
-                // Check if head can be used; if not, entire duty is shifted
+                // Head takes priority as it is always earlier
                 firstBlockInTail1 = duty1.head;
             }
             CSPLSNode? firstBlockInTail2 = duty2.head!.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Block && x.CDE.StartTime >= time);
-            if (firstBlockInTail2 == null && duty2.head.CDE.Type == CrewDutyElementType.Block && duty2.head.CDE.StartTime >= time)
+            if (duty2.head.CDE.Type == CrewDutyElementType.Block && duty2.head.CDE.StartTime >= time)
             {
-                // Check if head can be used; if not, entire duty is shifted
+                // Head takes priority as it is always earlier
                 firstBlockInTail2 = duty2.head;
             }
 
@@ -660,16 +700,20 @@ namespace E_VCSP.Solver.ColumnGenerators
             CSPLSNode? firstBlockInTail1Prev = firstBlockInTail1?.Prev;
             CSPLSNode? firstBlockInTail2Prev = firstBlockInTail2?.Prev;
             CSPLSNode? prevHead1 = duty1.head;
-            CSPLSNode? prevTail1 = duty1.tail;
             CSPLSNode? prevHead2 = duty2.head;
-            CSPLSNode? prevTail2 = duty2.tail;
 
             if (lastRemainingBlock1 != null) lastRemainingBlock1.Next = link1To2;
             if (lastRemainingBlock2 != null) lastRemainingBlock2.Next = link2To1;
             if (firstBlockInTail1 != null) firstBlockInTail1.Prev = link2To1;
             if (firstBlockInTail2 != null) firstBlockInTail2.Prev = link1To2;
-            duty1.head = prevTail2.FindLastBefore(_ => true) ?? prevTail2;
-            duty2.head = prevTail1.FindLastBefore(_ => true) ?? prevTail1;
+            duty1.head = lastRemainingBlock1?.FindLastBefore(_ => true)
+                ?? lastRemainingBlock1
+                ?? firstBlockInTail2?.FindLastBefore(_ => true)
+                ?? firstBlockInTail2;
+            duty2.head = lastRemainingBlock2?.FindLastBefore(_ => true)
+                ?? lastRemainingBlock2
+                ?? firstBlockInTail1?.FindLastBefore(_ => true)
+                ?? firstBlockInTail1;
 
             // Check feasibility
             var feasibleTypes1 = duty1.FeasibleTypes();
@@ -683,6 +727,9 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (duty1.head == null) costDiff -= duty1.BaseCost;
             if (duty2.head == null) costDiff -= duty2.BaseCost;
 
+            if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
+
+
             // If either of the changes is not feasible or costs are not accepted, revert
             if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff))
             {
@@ -692,12 +739,17 @@ namespace E_VCSP.Solver.ColumnGenerators
                 if (firstBlockInTail2 != null) firstBlockInTail2.Prev = firstBlockInTail2Prev;
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
+
+                if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
+
                 return LSOpResult.Invalid;
             }
 
             // Finalize operation 
             duty1.Type = feasibleTypes1[0];
             duty2.Type = feasibleTypes2[0];
+
+            if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
 
             if (duty1.head == null) duties.Remove(duty1);
             if (duty2.head == null) duties.Remove(duty2);
@@ -739,10 +791,10 @@ namespace E_VCSP.Solver.ColumnGenerators
                 resCounts[(int)res]++;
             }
 
-            Console.WriteLine("Op results: " + string.Join('\t', resCounts.Select(x => x.ToString())));
-            Console.WriteLine("Total duties: " + duties.Count);
+            //Console.WriteLine("Op results: " + string.Join('\t', resCounts.Select(x => x.ToString())));
+            //Console.WriteLine($"Total duties/blocks covered: {duties.Count} / {duties.Sum(x => x.CoveredBlocks().Count)}");
             var fs = duties.Select(x => (-1.0, x.ToCrewDuty())).Where(x => x.Item2 != null).ToList();
-            Console.WriteLine("Total feasible: " + fs.Count);
+            //Console.WriteLine($"Feasible duties/blocks covered: {fs.Count} / {fs.Sum(x => x.Item2!.Covers.Count)}");
             return fs;
         }
     }
