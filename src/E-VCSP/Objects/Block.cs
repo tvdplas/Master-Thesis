@@ -167,5 +167,10 @@ namespace E_VCSP.Objects
                 .Where(b => b.Elements.Count > 0)
                 .ToList();
         }
+
+        public override string ToString()
+        {
+            return $"Block {Index}";
+        }
     }
 }
