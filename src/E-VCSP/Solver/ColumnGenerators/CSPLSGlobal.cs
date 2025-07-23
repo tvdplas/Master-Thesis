@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects;
+using E_VCSP.Solver.SolutionState;
 using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators {
@@ -161,10 +162,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
             Config.CR_MAX_SHIFT_LENGTH, // Broken
         ];
 
-
         public bool IsFeasible(DutyType dt, bool final = false) {
             if (final) {
-                if (!head.CDE.StartLocation.CrewHub || !tail.CDE.EndLocation.CrewHub) return false;
+                if (!head!.CDE.StartLocation.CrewHub || !tail!.CDE.EndLocation.CrewHub) return false;
             }
 
             // Check start / end times
@@ -199,7 +199,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 int breakDuration = cde.StartTime - cde.EndTime - cde.StartLocation.BrutoNetto;
                 breaks.Add((breakStartTime, breakDuration));
 
-
                 if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime < breakStartTime) {
                     // First check time traveled before big idle, then update last break time accordingly
                     if (longIdle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
@@ -223,7 +222,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 longIdleUsed = true;
             }
             if (tail.CDE.EndTime - lastBreak > Config.MAX_STEERING_TIME) return false;
-
 
             if (longIdle.startTime != -1) {
                 // Before / after long idle is handled seperately
@@ -252,7 +250,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 else if (PaidDuration >= 5.5 * 60 * 60 && (breaks.Sum(x => x.duration) < 40 * 60 || !breaks.Any(x => x.duration > 20 * 60))) return false;
             }
 
-
             // Additional check for late duties with dinner break
             if (dt == DutyType.Late && head.CDE.StartTime <= 15 * 60 * 60 && tail.CDE.EndTime >= 20.5 * 60 * 60) {
                 if (breaks.FindIndex(
@@ -264,7 +261,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             return true;
         }
-
 
         /// <summary>
         /// Determines which duty types are feasible for this duty.
@@ -346,7 +342,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private double alpha;
         private int Q;
 
-        internal CSPLSGlobal(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull) : base(blocks, model, adj, adjFull) {
+        internal CSPLSGlobal(GRBModel model, CrewSolutionState css) : base(model, css) {
             this.random = LSShared.random;
         }
 
@@ -359,8 +355,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
             Q = (int)Math.Round(-Config.CSP_LS_G_ITERATIONS / (Math.Log(Config.CSP_LS_G_STARTING_T / Config.CSP_LS_G_ENDING_T) / Math.Log(alpha)));
 
             // Reset duties to unit
-            for (int i = 0; i < blocks.Count; i++) {
-                Block b = blocks[i];
+            for (int i = 0; i < css.instance.Blocks.Count; i++) {
+                Block b = css.instance.Blocks[i];
 
                 CrewDutyElement cde = new CDEBlock(b);
                 CSPLSNode head = new CSPLSNode() { CDE = cde };
@@ -375,13 +371,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
         }
 
         /// <summary>
-        /// Generates the linking node of two blocks if it exists.
+        /// Generates the linking node of two Blocks if it exists.
         /// </summary>
         /// <param name="prev">CDE must be block</param>
         /// <param name="next">CDE must be block</param>
         private (bool feasible, CSPLSNode? link) linkBlocks(CSPLSNode? prev, CSPLSNode? next) {
             if (prev == null || next == null) return (true, null);
-            BlockArc? arc = adjFull[((CDEBlock)prev.CDE).Block.Index][((CDEBlock)next.CDE).Block.Index];
+            BlockArc? arc = css.adjFull[((CDEBlock)prev.CDE).Block.Index][((CDEBlock)next.CDE).Block.Index];
             if (arc == null) return (false, null);
             if (prev == next) throw new Exception("Dat hoort nie");
 
@@ -421,14 +417,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 curr = curr.Next;
             }
 
-            // Select a random range of blocks to move  
+            // Select a random range of css.instance.Blocks to move  
             int startIndex = random.Next(blocksIn2.Count);
             int endIndex = startIndex + random.Next(0, Math.Min(maxRangeSize, blocksIn2.Count - startIndex) - 1);
             CSPLSNode rangeStart = blocksIn2[startIndex];
             CSPLSNode rangeEnd = blocksIn2[endIndex];
 
-
-            // Next, find the connecting blocks in duty1 (if they exist)
+            // Next, find the connecting css.instance.Blocks in duty1 (if they exist)
             // In the meantime, check if a blo in duty1 overlaps with the selected range in duty2
             CSPLSNode? prevIn1 = null, nextIn1 = null;
             curr = duty1.head;
@@ -436,7 +431,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (curr.CDE.Type == CrewDutyElementType.Block) {
                     // Check for overlap
                     if (curr.CDE.StartTime <= rangeEnd.CDE.EndTime && curr.CDE.EndTime >= rangeStart.CDE.StartTime) {
-                        // Selected range overlaps with blocks in duty1
+                        // Selected range overlaps with css.instance.Blocks in duty1
                         return LSOpResult.Invalid;
                     }
 
@@ -480,8 +475,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             costDiff -= duty1.Cost;
             costDiff -= duty2.Cost;
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
-
+            if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
 
             // Change links, reevaluate heads
             if (prevIn1 != null) prevIn1.Next = linkPrev1ToRange;
@@ -506,8 +500,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // If the second duty is now empty, remove it
             if (duty2.head == null) costDiff -= duty2.BaseCost;
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
-
+            if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
 
             // If infeasible or cost change not acceptable, revert  
             if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
@@ -521,7 +514,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
 
-                if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
+                if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
 
                 return (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0) ? LSOpResult.Invalid : LSOpResult.Decline;
             }
@@ -556,7 +549,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 curr = curr.Next;
             }
 
-            // Filter out times which would cause 2 blocks to overlap when swap occurs
+            // Filter out times which would cause 2 css.instance.Blocks to overlap when swap occurs
             for (int i = 0; i < startEndTimes.Count; i++) {
                 (int s, int e) = startEndTimes[i];
                 bool startValid = true;
@@ -611,7 +604,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 return LSOpResult.Invalid;
             }
 
-
             // Calculate costs before swap
             double costDiff = 0;
             costDiff -= duty1.Cost;
@@ -650,8 +642,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (duty1.head == null) costDiff -= duty1.BaseCost;
             if (duty2.head == null) costDiff -= duty2.BaseCost;
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
-
+            if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
 
             // If either of the changes is not feasible or costs are not accepted, revert
             if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
@@ -662,7 +653,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
 
-                if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
+                if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
 
                 return LSOpResult.Invalid;
             }
@@ -671,7 +662,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             duty1.Type = feasibleTypes1[0];
             duty2.Type = feasibleTypes2[0];
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != blocks.Count) throw new Exception();
+            if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
 
             if (duty1.head == null) duties.Remove(duty1);
             if (duty2.head == null) duties.Remove(duty2);
@@ -710,9 +701,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
             }
 
             //Console.WriteLine("Op results: " + string.Join('\t', resCounts.Select(x => x.ToString())));
-            //Console.WriteLine($"Total duties/blocks covered: {duties.Count} / {duties.Sum(x => x.CoveredBlocks().Count)}");
+            //Console.WriteLine($"Total duties/css.instance.Blocks covered: {duties.Count} / {duties.Sum(x => x.CoveredBlocks().Count)}");
             var fs = duties.Select(x => (-1.0, x.ToCrewDuty())).Where(x => x.Item2 != null).ToList();
-            //Console.WriteLine($"Feasible duties/blocks covered: {fs.Count} / {fs.Sum(x => x.Item2!.Covers.Count)}");
+            //Console.WriteLine($"Feasible duties/css.instance.Blocks covered: {fs.Count} / {fs.Sum(x => x.Item2!.Covers.Count)}");
             return fs;
         }
     }

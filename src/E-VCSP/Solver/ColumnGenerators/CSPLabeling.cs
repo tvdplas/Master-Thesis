@@ -1,5 +1,6 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
+using E_VCSP.Solver.SolutionState;
 using Gurobi;
 using System.Collections;
 
@@ -155,17 +156,17 @@ namespace E_VCSP.Solver.ColumnGenerators {
         List<List<CSPLabel>> activeLabels = [];
         List<bool> blockedBlock = [];
 
-        internal CSPLabeling(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull) : base(blocks, model, adj, adjFull) { }
+        internal CSPLabeling(GRBModel model, CrewSolutionState css) : base(model, css) { }
 
         private void reset() {
             var constrs = model.GetConstrs();
-            rcBlocks = Enumerable.Range(0, blocks.Count).Select(_ => 0.0).ToList();
-            blockedBlock = Enumerable.Range(0, blocks.Count + 2).Select(_ => false).ToList();
-            allLabels = [.. Enumerable.Range(0, blocks.Count + 2).Select(x => new List<CSPLabel>())];
-            activeLabels = [.. Enumerable.Range(0, blocks.Count + 2).Select(x => new List<CSPLabel>())];
+            rcBlocks = Enumerable.Range(0, css.instance.Blocks.Count).Select(_ => 0.0).ToList();
+            blockedBlock = Enumerable.Range(0, css.instance.Blocks.Count + 2).Select(_ => false).ToList();
+            allLabels = [.. Enumerable.Range(0, css.instance.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
+            activeLabels = [.. Enumerable.Range(0, css.instance.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
 
             if (model.Status != GRB.Status.INFEASIBLE) {
-                for (int i = 0; i < blocks.Count; i++) rcBlocks[i] = constrs[i].Pi;
+                for (int i = 0; i < css.instance.Blocks.Count; i++) rcBlocks[i] = constrs[i].Pi;
                 rcMaxBroken = model.GetConstrByName("max_broken").Pi;
                 rcMaxBetween = model.GetConstrByName("max_between").Pi;
                 rcMaxAvg = model.GetConstrByName("limited_average_length").Pi;
@@ -188,12 +189,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 baseCost -= rcMaxBetween * (Config.CR_MAX_BETWEEN_SHIFTS - rho_between);
 
                 // Start by setting out all possible duty types from the depot start
-                for (int targetBlockId = 0; targetBlockId < blocks.Count; targetBlockId++) {
-                    BlockArc? arc = adjFull[^2][targetBlockId];
+                for (int targetBlockId = 0; targetBlockId < css.instance.Blocks.Count; targetBlockId++) {
+                    BlockArc? arc = css.adjFull[^2][targetBlockId];
                     if (arc == null) continue;
                     CSPLabel l = new() {
-                        StartTime = blocks[targetBlockId].StartTime - arc.TravelTime, // signon
-                        CoveredBlockIds = new BitArray(blocks.Count, false),
+                        StartTime = css.instance.Blocks[targetBlockId].StartTime - arc.TravelTime, // signon
+                        CoveredBlockIds = new BitArray(css.instance.Blocks.Count, false),
                         PrevLabelId = -1,
                         PrevBlockId = -1,
                         Type = dt,
@@ -203,12 +204,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                     l.CoveredBlockIds.Set(targetBlockId, true);
 
-                    if (l.isFeasible(blocks[i].EndTime, false))
+                    if (l.isFeasible(css.instance.Blocks[i].EndTime, false))
                         addLabel(l, arc.ToBlock!.Index);
                 }
             }
 
-            while (activeLabels.Where((x, i) => i <= blocks.Count).Sum(x => x.Count) > 0) {
+            while (activeLabels.Where((x, i) => i <= css.instance.Blocks.Count).Sum(x => x.Count) > 0) {
                 // Find node with active label
                 CSPLabel? currentLabel = null;
                 int currentNodeIndex = -1;
@@ -223,10 +224,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (currentLabel == null) throw new InvalidOperationException("heh");
 
                 // Expand node if possible 
-                for (int targetBlockIndex = 0; targetBlockIndex < blocks.Count + 2; targetBlockIndex++) {
-                    if (targetBlockIndex == blocks.Count || blockedBlock[targetBlockIndex]) continue;
+                for (int targetBlockIndex = 0; targetBlockIndex < css.instance.Blocks.Count + 2; targetBlockIndex++) {
+                    if (targetBlockIndex == css.instance.Blocks.Count || blockedBlock[targetBlockIndex]) continue;
 
-                    BlockArc? arc = adjFull[currentNodeIndex][targetBlockIndex];
+                    BlockArc? arc = css.adjFull[currentNodeIndex][targetBlockIndex];
                     if (arc == null) continue;
 
                     // Cant use long idle arcs / already used in shift.
@@ -235,17 +236,17 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     }
 
                     BitArray newCoverage = new(currentLabel.CoveredBlockIds);
-                    if (targetBlockIndex < blocks.Count) newCoverage.Set(targetBlockIndex, true);
+                    if (targetBlockIndex < css.instance.Blocks.Count) newCoverage.Set(targetBlockIndex, true);
 
-                    int prevEndTime = currentNodeIndex >= blocks.Count ? currentLabel.StartTime : blocks[currentNodeIndex].EndTime;
-                    int currentEndTime = targetBlockIndex >= blocks.Count ? arc.TravelTime + blocks[currentNodeIndex].EndTime : blocks[targetBlockIndex].EndTime;
+                    int prevEndTime = currentNodeIndex >= css.instance.Blocks.Count ? currentLabel.StartTime : css.instance.Blocks[currentNodeIndex].EndTime;
+                    int currentEndTime = targetBlockIndex >= css.instance.Blocks.Count ? arc.TravelTime + css.instance.Blocks[currentNodeIndex].EndTime : css.instance.Blocks[targetBlockIndex].EndTime;
 
                     int timeDiff = currentEndTime - prevEndTime;
 
                     int addedTime = arc.Type != BlockArcType.LongIdle ? timeDiff : timeDiff - arc.IdleTime;
 
                     double costFromTime = addedTime / (60.0 * 60.0) * Config.CR_HOURLY_COST;
-                    double costFromRc = targetBlockIndex < blocks.Count ? -rcBlocks[targetBlockIndex] : 0;
+                    double costFromRc = targetBlockIndex < css.instance.Blocks.Count ? -rcBlocks[targetBlockIndex] : 0;
 
                     CSPLabel newLabel = new() {
                         CoveredBlockIds = newCoverage,
@@ -268,20 +269,20 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Adjust costs to include finalized duration
             for (int i = 0; i < allLabels[^1].Count; i++) {
                 CSPLabel l = allLabels[^1][i];
-                l.Cost -= rcMaxAvg * ((blocks[l.PrevBlockId].EndTime - l.StartTime) / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
+                l.Cost -= rcMaxAvg * ((css.instance.Blocks[l.PrevBlockId].EndTime - l.StartTime) / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
             }
         }
 
         private List<(double reducedCost, CrewDuty crewDuty)> extractDuties(string source) {
             // Walk back through in order to get the minimum costs
             var feasibleEnds = allLabels[^1]
-                .Where(x => x.isFeasible(blocks[x.PrevBlockId].EndTime, true) && x.Cost < 0)
+                .Where(x => x.isFeasible(css.instance.Blocks[x.PrevBlockId].EndTime, true) && x.Cost < 0)
                 .OrderBy(x => x.Cost).ToList();
 
             List<CSPLabel> validTargets = [];
             if (!Config.CSP_LB_ATTEMPT_DISJOINT) validTargets = feasibleEnds.Take(Config.CSP_LB_MAX_COLS).ToList();
             else {
-                BitArray currCover = new(blocks.Count);
+                BitArray currCover = new(css.instance.Blocks.Count);
                 // Priority on disjoint labels
                 for (int i = 0; i < feasibleEnds.Count; i++) {
                     BitArray ba = new(currCover);
@@ -301,7 +302,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 var currLabel = cl; //non-readonly
                 double reducedCost = currLabel.Cost;
                 DutyType type = currLabel.Type;
-                List<(int currBlockId, CSPLabel label)> usedLabels = [(blocks.Count + 1, currLabel)];
+                List<(int currBlockId, CSPLabel label)> usedLabels = [(css.instance.Blocks.Count + 1, currLabel)];
                 while (currLabel.PrevBlockId != -1) {
                     int currBlockId = currLabel.PrevBlockId;
                     currLabel = allLabels[currLabel.PrevBlockId].Find(x => x.Id == currLabel.PrevLabelId)!;
@@ -309,17 +310,17 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 }
                 usedLabels.Reverse();
 
-                BlockArc signOnArc = adjFull[^2][usedLabels[0].currBlockId] ?? throw new InvalidDataException("SignOn arc not found");
-                int firstBlockTime = blocks[usedLabels[0].currBlockId].StartTime;
+                BlockArc signOnArc = css.adjFull[^2][usedLabels[0].currBlockId] ?? throw new InvalidDataException("SignOn arc not found");
+                int firstBlockTime = css.instance.Blocks[usedLabels[0].currBlockId].StartTime;
 
                 List<CrewDutyElement> cdes = [
-                    new CDESignOnOff(firstBlockTime - signOnArc.TotalTime, firstBlockTime, blocks[usedLabels[0].currBlockId].StartLocation),
-                    new CDEBlock(blocks[usedLabels[0].currBlockId])
+                    new CDESignOnOff(firstBlockTime - signOnArc.TotalTime, firstBlockTime, css.instance.Blocks[usedLabels[0].currBlockId].StartLocation),
+                    new CDEBlock(css.instance.Blocks[usedLabels[0].currBlockId])
                 ];
                 for (int j = 0; j < usedLabels.Count - 1; j++) {
                     var labelFrom = usedLabels[j];
                     var labelTo = usedLabels[j + 1];
-                    BlockArc arc = adjFull[labelFrom.currBlockId][labelTo.currBlockId] ?? throw new InvalidDataException("hier gaat nog iets mis");
+                    BlockArc arc = css.adjFull[labelFrom.currBlockId][labelTo.currBlockId] ?? throw new InvalidDataException("hier gaat nog iets mis");
                     if (arc.Type == BlockArcType.LongIdle) {
                         Block from = arc.FromBlock!;
                         Location loc = from.EndLocation;
@@ -327,14 +328,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         int startTime = from!.EndTime;
                         int nettoIdleTime = arc.IdleTime - loc.SignOffTime - loc.SignOnTime;
 
-
                         cdes.Add(new CDESignOnOff(startTime, startTime + loc.SignOffTime, loc));
                         cdes.Add(new CDEIdle(startTime + loc.SignOffTime, startTime + loc.SignOffTime + nettoIdleTime, loc, loc));
                         cdes.Add(new CDESignOnOff(startTime + loc.SignOffTime + nettoIdleTime, startTime + loc.SignOffTime + nettoIdleTime + loc.SignOnTime, loc));
-                        cdes.Add(new CDEBlock(blocks[labelTo.currBlockId]));
+                        cdes.Add(new CDEBlock(css.instance.Blocks[labelTo.currBlockId]));
                     }
                     else if (arc.Type == BlockArcType.SignOnOff) {
-                        cdes.Add(new CDESignOnOff(blocks[labelFrom.currBlockId].EndTime, blocks[labelFrom.currBlockId].EndTime + blocks[labelFrom.currBlockId].EndLocation.SignOffTime, blocks[labelFrom.currBlockId].EndLocation));
+                        cdes.Add(new CDESignOnOff(css.instance.Blocks[labelFrom.currBlockId].EndTime, css.instance.Blocks[labelFrom.currBlockId].EndTime + css.instance.Blocks[labelFrom.currBlockId].EndLocation.SignOffTime, css.instance.Blocks[labelFrom.currBlockId].EndLocation));
                     }
                     else {
                         if (arc.IdleTime > 0) {
@@ -343,8 +343,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         if (arc.BreakTime > 0) {
                             cdes.Add(new CDEBreak(arc.FromBlock!.EndTime, arc.FromBlock.EndTime + arc.BreakTime + arc.BruttoNettoTime, arc.FromBlock.EndLocation, arc.ToBlock!.StartLocation));
                         }
-                        if (labelTo.currBlockId < blocks.Count) {
-                            cdes.Add(new CDEBlock(blocks[labelTo.currBlockId]));
+                        if (labelTo.currBlockId < css.instance.Blocks.Count) {
+                            cdes.Add(new CDEBlock(css.instance.Blocks[labelTo.currBlockId]));
                         }
                     }
                 }

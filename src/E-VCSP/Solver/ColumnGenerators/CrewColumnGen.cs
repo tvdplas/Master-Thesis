@@ -1,20 +1,16 @@
 ﻿using E_VCSP.Objects;
+using E_VCSP.Solver.SolutionState;
 using Gurobi;
 
 namespace E_VCSP.Solver {
     public abstract class CrewColumnGen {
         // Information about current instance / model state
-        internal List<Block> blocks;
-        internal GRBModel model;
+        public GRBModel model;
+        public CrewSolutionState css;
 
-        internal List<List<BlockArc>> adj = [];
-        internal List<List<BlockArc?>> adjFull = [];
-
-        internal CrewColumnGen(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull) {
-            this.blocks = blocks;
+        internal CrewColumnGen(GRBModel model, CrewSolutionState css) {
             this.model = model;
-            this.adj = adj;
-            this.adjFull = adjFull;
+            this.css = css;
         }
 
         public abstract List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties();

@@ -2,153 +2,15 @@
 using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
+using E_VCSP.Solver.SolutionState;
 using Gurobi;
 using System.Collections;
 using System.Data;
 
 namespace E_VCSP.Solver {
-    enum BlockArcType {
-        Break,
-        LongIdle,
-        ShortIdle,
-        Travel,
-        SignOnOff,
-        Invalid,
-    }
-
-
-    internal class BlockArc {
-        internal Block? FromBlock;
-        internal Block? ToBlock;
-        internal int BreakTime;
-        internal int BruttoNettoTime;
-        internal int IdleTime;
-        internal int TravelTime;
-        internal BlockArcType Type = BlockArcType.Invalid;
-
-        internal int TotalTime => BreakTime + BruttoNettoTime + IdleTime + TravelTime;
-    }
-
-
-    public class CSPCG : Solver {
+    public class CSPCG(Instance instance) : Solver {
         private GRBModel? model;
-        private Instance instance;
-        private List<List<BlockArc>> adj = [];
-        private List<List<BlockArc?>> adjFull = [];
-
-
-        private List<CrewDuty> duties = [];
-        private Dictionary<string, CrewDuty> varnameDutyMapping = [];
-        private Dictionary<BitArray, CrewDuty> coverDutyMapping = new(new Utils.BitArrayComparer());
-
-        public CSPCG(Instance instance) {
-            this.instance = instance;
-            this.duties = [];
-
-            // Generate initial set of vehicle duties
-            GenerateInitialDuties();
-
-            // Generate possible transfers between blocks
-            GenerateArcs();
-
-            Console.WriteLine($"Ready for CSP: total of {instance.Blocks.Count} blocks to cover");
-        }
-
-        private void GenerateInitialDuties() {
-            // For each block, generate a unit duty
-            for (int i = 0; i < instance.Blocks.Count; i++) {
-                duties.Add(new CrewDuty([new CDEBlock(instance.Blocks[i])]) { Index = i, Type = DutyType.Single });
-            }
-        }
-
-        private void GenerateArcs() {
-            adjFull = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc?>()).ToList();
-            adj = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc>()).ToList();
-
-            for (int blockIndex1 = 0; blockIndex1 < instance.Blocks.Count; blockIndex1++) {
-                Block block1 = instance.Blocks[blockIndex1];
-                for (int blockIndex2 = 0; blockIndex2 < instance.Blocks.Count; blockIndex2++) {
-                    Block block2 = instance.Blocks[blockIndex2];
-
-                    // Determine whether or not it is feasible to string to arcs together
-                    // If so: what actually happens during this time. 
-
-                    // For now; only allow transfer if already at same location
-                    // Based on times, determine whether its idle / break / whatever. 
-                    BlockArc? arc = null;
-
-                    if (block1.EndTime <= block2.StartTime && block1.EndLocation == block2.StartLocation) {
-                        // Arc might be formed; start with base time layout, check for validity
-                        BlockArcType blockArcType = BlockArcType.Invalid;
-                        int idleTime = block2.StartTime - block1.EndTime;
-                        int breakTime = 0;
-                        int bruttoNettoTime = 0;
-                        int travelTime = 0;
-                        int nettoBreakTime = block1.EndLocation.BreakAllowed
-                            ? idleTime - block1.EndLocation.BrutoNetto
-                            : 0;
-
-                        if (nettoBreakTime >= Config.CR_MIN_BREAK_TIME && nettoBreakTime <= Config.CR_MAX_BREAK_TIME) {
-                            breakTime = idleTime - block1.EndLocation.BrutoNetto;
-                            bruttoNettoTime = block1.EndLocation.BrutoNetto;
-                            idleTime = 0;
-                            blockArcType = BlockArcType.Break;
-                        }
-
-                        // Short idle; can happen anywhere (driver remains in bus)
-                        else if (Config.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_SHORT_IDLE_TIME)
-                            blockArcType = BlockArcType.ShortIdle;
-
-                        // Long idle used for split shifts
-                        else if (block1.EndLocation.CrewHub && Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
-                            blockArcType = BlockArcType.LongIdle;
-
-                        if (blockArcType != BlockArcType.Invalid) {
-                            arc = new() {
-                                FromBlock = block1,
-                                ToBlock = block2,
-                                IdleTime = idleTime,
-                                BreakTime = breakTime,
-                                BruttoNettoTime = bruttoNettoTime,
-                                TravelTime = travelTime,
-                                Type = blockArcType
-                            };
-                        }
-                    }
-
-                    if (arc != null) adj[blockIndex1].Add(arc);
-                    adjFull[blockIndex1].Add(arc);
-                }
-            }
-
-            // Add depot arcs if signon / signoff is allowed
-            for (int blockIndex = 0; blockIndex < instance.Blocks.Count; blockIndex++) {
-                Block block = instance.Blocks[blockIndex];
-                BlockArc? start = block.StartLocation.CrewHub ? new BlockArc() {
-                    ToBlock = block,
-                    IdleTime = 0,
-                    BreakTime = 0,
-                    BruttoNettoTime = 0,
-                    TravelTime = block.StartLocation.SignOnTime,
-                    Type = BlockArcType.SignOnOff
-                } : null;
-                if (start != null) adj[^2].Add(start);
-                adjFull[^2].Add(start);
-                adjFull[blockIndex].Add(null);
-
-                BlockArc? end = block.EndLocation.CrewHub ? new BlockArc() {
-                    FromBlock = block,
-                    IdleTime = 0,
-                    BreakTime = 0,
-                    BruttoNettoTime = 0,
-                    TravelTime = block.StartLocation.SignOffTime,
-                    Type = BlockArcType.SignOnOff
-                } : null;
-                if (end != null)
-                    adj[block.Index].Add(end);
-                adjFull[block.Index].Add(end);
-            }
-        }
+        private CrewSolutionState css = new(instance);
 
         /// <summary>
         /// Initialize model for column generaton
@@ -172,22 +34,22 @@ namespace E_VCSP.Solver {
             });
 
             List<GRBVar> dutyVars = [];
-            for (int i = 0; i < duties.Count; i++) {
+            for (int i = 0; i < css.duties.Count; i++) {
                 string name = $"cd_{i}";
-                GRBVar v = model.AddVar(0, GRB.INFINITY, duties[i].Cost + 1_000, GRB.CONTINUOUS, name);
+                GRBVar v = model.AddVar(0, GRB.INFINITY, css.duties[i].Cost + 1_000, GRB.CONTINUOUS, name);
 
                 // Bookkeeping to find variable based on name / cover easily
                 dutyVars.Add(v);
-                varnameDutyMapping[name] = duties[i];
-                coverDutyMapping.Add(duties[i].ToBitArray(instance.Blocks.Count), duties[i]);
+                css.varnameDutyMapping[name] = css.duties[i];
+                css.coverDutyMapping.Add(css.duties[i].ToBitArray(instance.Blocks.Count), css.duties[i]);
             }
 
             // Add cover constraint for each of the trips
             // Note: index of constraint corresponds directly to index of trip 
             foreach (Block b in instance.Blocks) {
                 GRBLinExpr expr = new();
-                for (int i = 0; i < duties.Count; i++) {
-                    if (duties[i].Covers.Contains(b.Index)) expr.AddTerm(1, dutyVars[i]);
+                for (int i = 0; i < css.duties.Count; i++) {
+                    if (css.duties[i].Covers.Contains(b.Index)) expr.AddTerm(1, dutyVars[i]);
                 }
 
                 // Switch between set partition and cover
@@ -209,7 +71,7 @@ namespace E_VCSP.Solver {
 
             for (int i = 0; i < dutyVars.Count; i++) {
                 GRBVar v = dutyVars[i];
-                CrewDuty duty = duties[i];
+                CrewDuty duty = css.duties[i];
 
                 int duration = duty.Elements[^1].EndTime - duty.Elements[0].StartTime;
                 noExcessiveLength += Config.CR_MAX_OVER_LONG_SHIFT * v - (duration > Config.CR_LONG_SHIFT_LENGTH ? v : 0);
@@ -217,7 +79,6 @@ namespace E_VCSP.Solver {
                 maxBroken += v * Config.CR_MAX_BROKEN_SHIFTS - (duty.Type == DutyType.Broken ? v : 0);
                 maxBetween += v * Config.CR_MAX_BETWEEN_SHIFTS - (duty.Type == DutyType.Between ? v : 0);
             }
-
 
             model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, "no_excessive_length");
             model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, "limited_average_length");
@@ -235,7 +96,7 @@ namespace E_VCSP.Solver {
             int[] covered = new int[instance.Blocks.Count];
             foreach (GRBVar v in model.GetVars()) {
                 if (v.VarName.StartsWith("cd_") && v.X == 1) {
-                    CrewDuty dvt = varnameDutyMapping[v.VarName];
+                    CrewDuty dvt = css.varnameDutyMapping[v.VarName];
                     duties.Add(dvt);
                     foreach (int i in dvt.Covers) covered[i]++;
                 }
@@ -272,8 +133,8 @@ namespace E_VCSP.Solver {
 
             // Multithreaded shortestpath searching
             List<List<CrewColumnGen>> instances = [
-                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(instance.Blocks, model, adj, adjFull))], // Labeling
-                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLSGlobal(instance.Blocks, model, adj, adjFull))], // Labeling
+                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(model, css))], // Labeling
+                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLSGlobal(model, css))], // Labeling
             ];
             List<double> operationChances = [Config.CSP_LABELING_WEIGHT, Config.CSP_LS_GLOBAL_WEIGHT];
             List<double> sums = [operationChances[0]];
@@ -284,7 +145,7 @@ namespace E_VCSP.Solver {
 
             Random rnd = new();
 
-            // Process a collection of generated duties
+            // Process a collection of generated css.duties
             void processDuties(List<(double reducedCost, CrewDuty cd)> dutySet) {
                 if (dutySet.Count == 0) {
                     notFound++;
@@ -296,14 +157,14 @@ namespace E_VCSP.Solver {
 
                     // Check if task is already in model 
                     BitArray ba = newDuty.ToBitArray(instance.Trips.Count);
-                    bool coverExists = coverDutyMapping.ContainsKey(ba);
+                    bool coverExists = css.coverDutyMapping.ContainsKey(ba);
 
                     // Add column to model 
                     if (reducedCost < 0) {
                         // Reset non-reduced costs iterations
-                        int index = duties.Count;
+                        int index = css.duties.Count;
                         string name = $"cd_{index}";
-                        duties.Add(newDuty);
+                        css.duties.Add(newDuty);
                         newDuty.Index = index;
 
                         // Create new column to add to model
@@ -323,8 +184,8 @@ namespace E_VCSP.Solver {
 
                         // Add column to model
                         dutyVars.Add(model.AddVar(0, GRB.INFINITY, newDuty.Cost, GRB.CONTINUOUS, col, name));
-                        varnameDutyMapping[name] = duties[^1];
-                        coverDutyMapping[ba] = duties[^1];
+                        css.varnameDutyMapping[name] = css.duties[^1];
+                        css.coverDutyMapping[ba] = css.duties[^1];
                     }
                     else {
                         seqWithoutRC++;
@@ -343,7 +204,7 @@ namespace E_VCSP.Solver {
                     Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{notFound}\t{totWithoutRC}\t{model.ObjVal}");
                 }
 
-                // Select solution strategy, generate new duties
+                // Select solution strategy, generate new css.css.duties
                 List<(double, CrewDuty)>[] generatedDuties = new List<(double, CrewDuty)>[Config.CSP_INSTANCES_PER_IT];
                 double r = rnd.NextDouble() * sums[^1];
                 int selectedMethodÍndex = sums.FindIndex(x => r <= x);
@@ -370,7 +231,7 @@ namespace E_VCSP.Solver {
 
                 // Stop model solving if no improvements are found
                 if (seqWithoutRC >= Config.CSP_OPT_IT_THRESHOLD) {
-                    Console.WriteLine($"Stopped due to RC > 0 for {Config.CSP_OPT_IT_THRESHOLD} consecutive duties");
+                    Console.WriteLine($"Stopped due to RC > 0 for {Config.CSP_OPT_IT_THRESHOLD} consecutive css.css.duties");
                     break;
                 }
             }
@@ -387,7 +248,7 @@ namespace E_VCSP.Solver {
             Console.WriteLine($"Value of relaxation: {model.ObjVal}");
             Console.WriteLine($"Total generation attempts: ${totalGenerated}");
             Console.WriteLine($"{totWithoutRC} columns were not added due to positive reduced costs.");
-            Console.WriteLine($"Solving non-relaxed model with total of {duties.Count} columns");
+            Console.WriteLine($"Solving non-relaxed model with total of {css.duties.Count} columns");
 
             // Make model binary again
             foreach (GRBVar var in dutyVars) {
