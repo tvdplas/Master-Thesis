@@ -1,9 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace E_VCSP.Objects.ParsedData
-{
-    public class Location
-    {
+namespace E_VCSP.Objects.ParsedData {
+    public class Location {
         [JsonInclude]
         public required string Id;
         [JsonIgnore]
@@ -41,8 +39,7 @@ namespace E_VCSP.Objects.ParsedData
         [JsonIgnore]
         public bool CanCharge => ChargePowerPerSpot > 0;
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return Id;
         }
     }

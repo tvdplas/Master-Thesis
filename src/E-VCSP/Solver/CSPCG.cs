@@ -6,10 +6,8 @@ using Gurobi;
 using System.Collections;
 using System.Data;
 
-namespace E_VCSP.Solver
-{
-    enum BlockArcType
-    {
+namespace E_VCSP.Solver {
+    enum BlockArcType {
         Break,
         LongIdle,
         ShortIdle,
@@ -19,8 +17,7 @@ namespace E_VCSP.Solver
     }
 
 
-    internal class BlockArc
-    {
+    internal class BlockArc {
         internal Block? FromBlock;
         internal Block? ToBlock;
         internal int BreakTime;
@@ -33,8 +30,7 @@ namespace E_VCSP.Solver
     }
 
 
-    public class CSPCG : Solver
-    {
+    public class CSPCG : Solver {
         private GRBModel? model;
         private Instance instance;
         private List<List<BlockArc>> adj = [];
@@ -45,8 +41,7 @@ namespace E_VCSP.Solver
         private Dictionary<string, CrewDuty> varnameDutyMapping = [];
         private Dictionary<BitArray, CrewDuty> coverDutyMapping = new(new Utils.BitArrayComparer());
 
-        public CSPCG(Instance instance)
-        {
+        public CSPCG(Instance instance) {
             this.instance = instance;
             this.duties = [];
 
@@ -59,25 +54,20 @@ namespace E_VCSP.Solver
             Console.WriteLine($"Ready for CSP: total of {instance.Blocks.Count} blocks to cover");
         }
 
-        private void GenerateInitialDuties()
-        {
+        private void GenerateInitialDuties() {
             // For each block, generate a unit duty
-            for (int i = 0; i < instance.Blocks.Count; i++)
-            {
+            for (int i = 0; i < instance.Blocks.Count; i++) {
                 duties.Add(new CrewDuty([new CDEBlock(instance.Blocks[i])]) { Index = i, Type = DutyType.Single });
             }
         }
 
-        private void GenerateArcs()
-        {
+        private void GenerateArcs() {
             adjFull = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc?>()).ToList();
             adj = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc>()).ToList();
 
-            for (int blockIndex1 = 0; blockIndex1 < instance.Blocks.Count; blockIndex1++)
-            {
+            for (int blockIndex1 = 0; blockIndex1 < instance.Blocks.Count; blockIndex1++) {
                 Block block1 = instance.Blocks[blockIndex1];
-                for (int blockIndex2 = 0; blockIndex2 < instance.Blocks.Count; blockIndex2++)
-                {
+                for (int blockIndex2 = 0; blockIndex2 < instance.Blocks.Count; blockIndex2++) {
                     Block block2 = instance.Blocks[blockIndex2];
 
                     // Determine whether or not it is feasible to string to arcs together
@@ -87,8 +77,7 @@ namespace E_VCSP.Solver
                     // Based on times, determine whether its idle / break / whatever. 
                     BlockArc? arc = null;
 
-                    if (block1.EndTime <= block2.StartTime && block1.EndLocation == block2.StartLocation)
-                    {
+                    if (block1.EndTime <= block2.StartTime && block1.EndLocation == block2.StartLocation) {
                         // Arc might be formed; start with base time layout, check for validity
                         BlockArcType blockArcType = BlockArcType.Invalid;
                         int idleTime = block2.StartTime - block1.EndTime;
@@ -99,8 +88,7 @@ namespace E_VCSP.Solver
                             ? idleTime - block1.EndLocation.BrutoNetto
                             : 0;
 
-                        if (nettoBreakTime >= Config.CR_MIN_BREAK_TIME && nettoBreakTime <= Config.CR_MAX_BREAK_TIME)
-                        {
+                        if (nettoBreakTime >= Config.CR_MIN_BREAK_TIME && nettoBreakTime <= Config.CR_MAX_BREAK_TIME) {
                             breakTime = idleTime - block1.EndLocation.BrutoNetto;
                             bruttoNettoTime = block1.EndLocation.BrutoNetto;
                             idleTime = 0;
@@ -115,10 +103,8 @@ namespace E_VCSP.Solver
                         else if (block1.EndLocation.CrewHub && Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
                             blockArcType = BlockArcType.LongIdle;
 
-                        if (blockArcType != BlockArcType.Invalid)
-                        {
-                            arc = new()
-                            {
+                        if (blockArcType != BlockArcType.Invalid) {
+                            arc = new() {
                                 FromBlock = block1,
                                 ToBlock = block2,
                                 IdleTime = idleTime,
@@ -136,11 +122,9 @@ namespace E_VCSP.Solver
             }
 
             // Add depot arcs if signon / signoff is allowed
-            for (int blockIndex = 0; blockIndex < instance.Blocks.Count; blockIndex++)
-            {
+            for (int blockIndex = 0; blockIndex < instance.Blocks.Count; blockIndex++) {
                 Block block = instance.Blocks[blockIndex];
-                BlockArc? start = block.StartLocation.CrewHub ? new BlockArc()
-                {
+                BlockArc? start = block.StartLocation.CrewHub ? new BlockArc() {
                     ToBlock = block,
                     IdleTime = 0,
                     BreakTime = 0,
@@ -152,8 +136,7 @@ namespace E_VCSP.Solver
                 adjFull[^2].Add(start);
                 adjFull[blockIndex].Add(null);
 
-                BlockArc? end = block.EndLocation.CrewHub ? new BlockArc()
-                {
+                BlockArc? end = block.EndLocation.CrewHub ? new BlockArc() {
                     FromBlock = block,
                     IdleTime = 0,
                     BreakTime = 0,
@@ -172,11 +155,9 @@ namespace E_VCSP.Solver
         /// </summary>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Model where first <c>n</c> constraints correspond to the <c>n</c> trips, and a list of initial vehicle task vars</returns>
-        private (GRBModel model, List<GRBVar> dutyVars) InitModel(CancellationToken ct)
-        {
+        private (GRBModel model, List<GRBVar> dutyVars) InitModel(CancellationToken ct) {
             // Env
-            GRBEnv env = new()
-            {
+            GRBEnv env = new() {
                 LogToConsole = 1,
                 LogFile = Path.Combine(Config.RUN_LOG_FOLDER, "cspcg_gurobi.log")
             };
@@ -185,15 +166,13 @@ namespace E_VCSP.Solver
             GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.CSP_SOLVER_TIMEOUT_SEC;
             model.SetCallback(new CustomGRBCallback());
-            ct.Register(() =>
-            {
+            ct.Register(() => {
                 Console.WriteLine("Cancellation requested during crew scheduling. Terminating Gurobi model...");
                 model?.Terminate();
             });
 
             List<GRBVar> dutyVars = [];
-            for (int i = 0; i < duties.Count; i++)
-            {
+            for (int i = 0; i < duties.Count; i++) {
                 string name = $"cd_{i}";
                 GRBVar v = model.AddVar(0, GRB.INFINITY, duties[i].Cost + 1_000, GRB.CONTINUOUS, name);
 
@@ -205,11 +184,9 @@ namespace E_VCSP.Solver
 
             // Add cover constraint for each of the trips
             // Note: index of constraint corresponds directly to index of trip 
-            foreach (Block b in instance.Blocks)
-            {
+            foreach (Block b in instance.Blocks) {
                 GRBLinExpr expr = new();
-                for (int i = 0; i < duties.Count; i++)
-                {
+                for (int i = 0; i < duties.Count; i++) {
                     if (duties[i].Covers.Contains(b.Index)) expr.AddTerm(1, dutyVars[i]);
                 }
 
@@ -230,8 +207,7 @@ namespace E_VCSP.Solver
             GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "maxBrokenSlack");
             GRBVar maxBetweenSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "maxBetweenSlack");
 
-            for (int i = 0; i < dutyVars.Count; i++)
-            {
+            for (int i = 0; i < dutyVars.Count; i++) {
                 GRBVar v = dutyVars[i];
                 CrewDuty duty = duties[i];
 
@@ -252,16 +228,13 @@ namespace E_VCSP.Solver
             return (model, dutyVars);
         }
 
-        private List<CrewDuty> getSelectedDuties()
-        {
+        private List<CrewDuty> getSelectedDuties() {
             if (model == null) throw new InvalidOperationException("Cannot generate solution graph without model instance");
 
             List<CrewDuty> duties = [];
             int[] covered = new int[instance.Blocks.Count];
-            foreach (GRBVar v in model.GetVars())
-            {
-                if (v.VarName.StartsWith("cd_") && v.X == 1)
-                {
+            foreach (GRBVar v in model.GetVars()) {
+                if (v.VarName.StartsWith("cd_") && v.X == 1) {
                     CrewDuty dvt = varnameDutyMapping[v.VarName];
                     duties.Add(dvt);
                     foreach (int i in dvt.Covers) covered[i]++;
@@ -269,8 +242,7 @@ namespace E_VCSP.Solver
             }
 
             int coveredTotal = 0;
-            for (int i = 0; i < covered.Length; i++)
-            {
+            for (int i = 0; i < covered.Length; i++) {
                 int val = covered[i];
                 if (val >= 1) coveredTotal++;
                 if (val >= 2) Console.WriteLine($"(!) Block {instance.Blocks[i]} covered {val} times");
@@ -283,8 +255,7 @@ namespace E_VCSP.Solver
             return duties;
         }
 
-        public override bool Solve(CancellationToken cancellationToken)
-        {
+        public override bool Solve(CancellationToken cancellationToken) {
             (var model, var dutyVars) = InitModel(cancellationToken);
             model.Optimize();
 
@@ -314,16 +285,13 @@ namespace E_VCSP.Solver
             Random rnd = new();
 
             // Process a collection of generated duties
-            void processDuties(List<(double reducedCost, CrewDuty cd)> dutySet)
-            {
-                if (dutySet.Count == 0)
-                {
+            void processDuties(List<(double reducedCost, CrewDuty cd)> dutySet) {
+                if (dutySet.Count == 0) {
                     notFound++;
                     return;
                 }
 
-                foreach (var task in dutySet)
-                {
+                foreach (var task in dutySet) {
                     (double reducedCost, CrewDuty newDuty) = ((double, CrewDuty))task;
 
                     // Check if task is already in model 
@@ -331,8 +299,7 @@ namespace E_VCSP.Solver
                     bool coverExists = coverDutyMapping.ContainsKey(ba);
 
                     // Add column to model 
-                    if (reducedCost < 0)
-                    {
+                    if (reducedCost < 0) {
                         // Reset non-reduced costs iterations
                         int index = duties.Count;
                         string name = $"cd_{index}";
@@ -359,8 +326,7 @@ namespace E_VCSP.Solver
                         varnameDutyMapping[name] = duties[^1];
                         coverDutyMapping[ba] = duties[^1];
                     }
-                    else
-                    {
+                    else {
                         seqWithoutRC++;
                         totWithoutRC++;
                     }
@@ -369,12 +335,10 @@ namespace E_VCSP.Solver
 
             // Continue until max number of columns is found, model isn't feasible during solve or break
             // due to RC constraint. 
-            while (currIts < Config.CSP_MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE && !cancellationToken.IsCancellationRequested)
-            {
+            while (currIts < Config.CSP_MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE && !cancellationToken.IsCancellationRequested) {
                 // Display progress
                 int percent = (int)((totalGenerated / (double)maxColumns) * 100);
-                if (percent >= lastReportedPercent + 10)
-                {
+                if (percent >= lastReportedPercent + 10) {
                     lastReportedPercent = percent - (percent % 10);
                     Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{notFound}\t{totWithoutRC}\t{model.ObjVal}");
                 }
@@ -389,8 +353,7 @@ namespace E_VCSP.Solver
                 // Update generated totals
                 totalGenerated += generatedDuties.Length;
                 int colsGenerated = generatedDuties.Sum(t => t.Count);
-                switch (selectedMethodÍndex)
-                {
+                switch (selectedMethodÍndex) {
                     case 0: lbGenerated += colsGenerated; break;
                     case 1: lsGenerated += colsGenerated; break;
                     default: throw new InvalidOperationException("You forgot to add a case");
@@ -406,15 +369,13 @@ namespace E_VCSP.Solver
                 currIts++;
 
                 // Stop model solving if no improvements are found
-                if (seqWithoutRC >= Config.CSP_OPT_IT_THRESHOLD)
-                {
+                if (seqWithoutRC >= Config.CSP_OPT_IT_THRESHOLD) {
                     Console.WriteLine($"Stopped due to RC > 0 for {Config.CSP_OPT_IT_THRESHOLD} consecutive duties");
                     break;
                 }
             }
 
-            if (model.Status == GRB.Status.INFEASIBLE || model.Status == GRB.Status.INTERRUPTED)
-            {
+            if (model.Status == GRB.Status.INFEASIBLE || model.Status == GRB.Status.INTERRUPTED) {
                 Console.WriteLine("Model infeasible / canceled");
                 model.ComputeIIS();
                 model.Write("infeasible_CSPCG.ilp");
@@ -429,8 +390,7 @@ namespace E_VCSP.Solver
             Console.WriteLine($"Solving non-relaxed model with total of {duties.Count} columns");
 
             // Make model binary again
-            foreach (GRBVar var in dutyVars)
-            {
+            foreach (GRBVar var in dutyVars) {
                 if (var.VarName.StartsWith("cd_"))
                     var.Set(GRB.CharAttr.VType, GRB.BINARY);
             }
@@ -442,8 +402,7 @@ namespace E_VCSP.Solver
 
             bool succes = !(model.Status == GRB.Status.INFEASIBLE || model.Status == GRB.Status.INTERRUPTED);
 
-            if (!succes)
-            {
+            if (!succes) {
                 Console.WriteLine("Model infeasible / canceled");
                 model.ComputeIIS();
                 model.Write("infeasible_CSPCG.ilp");

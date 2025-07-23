@@ -1,12 +1,9 @@
 ﻿using E_VCSP.Objects.ParsedData;
 
-namespace E_VCSP.Parsing
-{
+namespace E_VCSP.Parsing {
     public class Empty { };
-    public class ParserCrew : ParserBase<Empty>
-    {
-        public ParserCrew()
-        {
+    public class ParserCrew : ParserBase<Empty> {
+        public ParserCrew() {
             filename = "crew.csv";
             attributeNameMapping = new()
             {
@@ -25,8 +22,7 @@ namespace E_VCSP.Parsing
             List<string> line,
             Dictionary<string, int> attributeIndexMapping,
             List<Location> locations
-        )
-        {
+        ) {
             Location loc = GetOrCreateLocation(line[attributeIndexMapping["Id"]], locations);
             loc.HandoverAllowed = line[attributeIndexMapping["HandoverAllowed"]] == "1";
             loc.BreakAllowed = line[attributeIndexMapping["BreakAllowed"]] == "1";

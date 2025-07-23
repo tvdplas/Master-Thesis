@@ -1,13 +1,11 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace E_VCSP.Objects.ParsedData
-{
+namespace E_VCSP.Objects.ParsedData {
     /// <summary>
     /// Vehicle descriptor; Only 1 in use per instance
     /// Everything except for capacity scaled for [0, 100] SoC range
     /// </summary>
-    public class VehicleType
-    {
+    public class VehicleType {
         /// <summary>
         /// Data ID
         /// </summary>

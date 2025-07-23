@@ -1,9 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace E_VCSP.Objects.ParsedData
-{
-    public class Trip
-    {
+namespace E_VCSP.Objects.ParsedData {
+    public class Trip {
         public string Route = "unknown";
         public Location From;
         public Location To;
@@ -17,12 +15,10 @@ namespace E_VCSP.Objects.ParsedData
         public required string Id;
         public int Index = -1;
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return Id;
         }
-        public string ToLongString(bool showTime)
-        {
+        public string ToLongString(bool showTime) {
             return $"{From} -> {To}" + (showTime ? $"\n{Formatting.Time.HHMMSS(StartTime)} - {Formatting.Time.HHMMSS(EndTime)}" : "");
         }
     }

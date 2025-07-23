@@ -1,17 +1,11 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
+using E_VCSP.Solver.SolutionState;
 using Gurobi;
 
-namespace E_VCSP.Solver.ColumnGenerators
-{
-    public class VSPLSGlobal : VehicleColumnGen
-    {
-        public VSPLSGlobal(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj, List<List<DeadheadTemplate?>> locationDHT) : base(model, instance, vehicleType, nodes, adjFull, adj)
-        {
-            this.locationDHT = locationDHT;
-        }
-
-        private LSOperations ops;
+namespace E_VCSP.Solver.ColumnGenerators {
+    public class VSPLSGlobal(GRBModel model, VehicleSolutionState vss) : VehicleColumnGen(model, vss) {
+        private LSOperations ops = new(vss, Config.VSP_LS_G_STARTING_T, "LS Global");
         private List<VSPLSNode> tasks = new();
         private List<double> reducedCostsTrip = new();
         private List<List<DeadheadTemplate?>> locationDHT = [];
@@ -21,44 +15,35 @@ namespace E_VCSP.Solver.ColumnGenerators
         private double alpha;
         private int Q;
 
-        private void reset()
-        {
+        private void reset() {
             T = Config.VSP_LS_G_STARTING_T;
             alpha = Config.VSP_LS_G_COOLING_RATE;
             Q = (int)Math.Round(-Config.VSP_LS_G_ITERATIONS / (Math.Log(Config.VSP_LS_G_STARTING_T / Config.VSP_LS_G_ENDING_T) / Math.Log(alpha)));
-
-            ops = new(instance, adjFull, locationDHT, vehicleType, T)
-            {
-                type = "LS Global",
-            };
-
+            ops = new(vss, T, "LS Global");
 
             tasks.Clear();
             reducedCostsTrip.Clear();
 
             GRBConstr[] constrs = model.GetConstrs();
-            for (int i = 0; i < instance.Trips.Count; i++)
-            {
+            for (int i = 0; i < vss.Instance.Trips.Count; i++) {
                 reducedCostsTrip.Add(constrs[i].Pi);
             }
 
             // Generate initial set of routes
-            for (int i = 0; i < instance.Trips.Count; i++)
-            {
-                Trip t = instance.Trips[i];
-                if (Depot == null) throw new InvalidDataException("No depot found when constructing depot vehicleelements in LS ShortestPath");
-                VSPArc depotTripArc = adjFull[instance.DepotStartIndex][i] ?? throw new InvalidDataException("No depot trip arc found in initial LSGLobal");
-                VSPArc tripDepotArc = adjFull[i][instance.DepotEndIndex] ?? throw new InvalidDataException("No trip depot arc found in initial LSGLobal");
+            for (int i = 0; i < vss.Instance.Trips.Count; i++) {
+                Trip t = vss.Instance.Trips[i];
+                if (vss.Depot == null) throw new InvalidDataException("No depot found when constructing depot vehicleelements in LS ShortestPath");
+                VSPArc depotTripArc = vss.AdjFull[vss.Instance.DepotStartIndex][i] ?? throw new InvalidDataException("No depot trip arc found in initial LSGLobal");
+                VSPArc tripDepotArc = vss.AdjFull[i][vss.Instance.DepotEndIndex] ?? throw new InvalidDataException("No trip depot arc found in initial LSGLobal");
 
                 // Create depot -> dh1 -> idle1 -> trip -> dh2 -> idle2 -> depot
-                VSPLSNode depotStart = new()
-                {
-                    PVE = new PVEDepot(Depot, StartTime - Config.MIN_NODE_TIME, StartTime),
+                VSPLSNode depotStart = new() {
+                    PVE = new PVEDepot(vss.Depot, vss.StartTime - Config.MIN_NODE_TIME, vss.StartTime),
                 };
-                VSPLSNode travel1 = depotStart.AddAfter(new PVETravel(depotTripArc.DeadheadTemplate, StartTime, t.StartTime, vehicleType));
-                VSPLSNode trip = travel1.AddAfter(new PVETrip(t, vehicleType));
-                VSPLSNode travel2 = trip.AddAfter(new PVETravel(tripDepotArc.DeadheadTemplate, t.EndTime, EndTime, vehicleType));
-                VSPLSNode depotEnd = travel2.AddAfter(new PVEDepot(Depot, EndTime, EndTime + Config.MIN_NODE_TIME));
+                VSPLSNode travel1 = depotStart.AddAfter(new PVETravel(depotTripArc.DeadheadTemplate, vss.StartTime, t.StartTime, vss.VehicleType));
+                VSPLSNode trip = travel1.AddAfter(new PVETrip(t, vss.VehicleType));
+                VSPLSNode travel2 = trip.AddAfter(new PVETravel(tripDepotArc.DeadheadTemplate, t.EndTime, vss.EndTime, vss.VehicleType));
+                VSPLSNode depotEnd = travel2.AddAfter(new PVEDepot(vss.Depot, vss.EndTime, vss.EndTime + Config.MIN_NODE_TIME));
 
                 tasks.Add(depotStart);
             }
@@ -67,8 +52,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// Attempt to do a 2opt operation; Select a rnd time in the day, swap all trip assignments after that point
         /// </summary>
-        private LSOpResult opt2(VSPLSNode? _)
-        {
+        private LSOpResult opt2(VSPLSNode? _) {
             int t1Index = rnd.Next(tasks.Count);
             int t2Index = rnd.Next(tasks.Count);
             while (t1Index == t2Index) t2Index = rnd.Next(tasks.Count);
@@ -76,7 +60,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             VSPLSNode t2Head = tasks[t2Index];
 
             // Select a random point in time 
-            int time = rnd.Next(StartTime, EndTime);
+            int time = rnd.Next(vss.StartTime, vss.EndTime);
 
             // Go through the tasks; find the first trip after the crossover point
             //                  time
@@ -87,38 +71,31 @@ namespace E_VCSP.Solver.ColumnGenerators
             int t1TripsBefore = 0, t1TripsAfter = 0, t2TripsBefore = 0, t2TripsAfter = 0;
 
             VSPLSNode? curr = t1Head;
-            while (curr != null)
-            {
-                if (t1FirstAffected == null && (curr.PVE.Type == PVEType.Depot || curr.PVE.Type == PVEType.Trip) && curr.PVE.StartTime >= time)
-                {
+            while (curr != null) {
+                if (t1FirstAffected == null && (curr.PVE.Type == PVEType.Depot || curr.PVE.Type == PVEType.Trip) && curr.PVE.StartTime >= time) {
                     t1FirstAffected = curr;
                 }
 
-                if (curr.PVE.Type == PVEType.Trip)
-                {
+                if (curr.PVE.Type == PVEType.Trip) {
                     if (t1FirstAffected == null) t1TripsBefore++;
                     else t1TripsAfter++;
                 }
                 curr = curr.Next;
             }
             curr = t2Head;
-            while (curr != null)
-            {
-                if (t2FirstAffected == null && (curr.PVE.Type == PVEType.Depot || curr.PVE.Type == PVEType.Trip) && curr.PVE.StartTime >= time)
-                {
+            while (curr != null) {
+                if (t2FirstAffected == null && (curr.PVE.Type == PVEType.Depot || curr.PVE.Type == PVEType.Trip) && curr.PVE.StartTime >= time) {
                     t2FirstAffected = curr;
                 }
 
-                if (curr.PVE.Type == PVEType.Trip)
-                {
+                if (curr.PVE.Type == PVEType.Trip) {
                     if (t2FirstAffected == null) t2TripsBefore++;
                     else t2TripsAfter++;
                 }
                 curr = curr.Next;
             }
 
-            if (t1TripsAfter == 0 && t2TripsAfter == 0)
-            {
+            if (t1TripsAfter == 0 && t2TripsAfter == 0) {
                 // Skip; cant do anything interesting
                 return LSOpResult.Invalid;
             }
@@ -139,25 +116,23 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (t1AdditionTarget == null || t2AdditionTarget == null) throw new InvalidDataException("Heh");
 
 
-            (bool feasible, double costDiff, VSPLSNode? travel) glue(VSPLSNode head, VSPLSNode additionTarget, VSPLSNode firstAffected)
-            {
+            (bool feasible, double costDiff, VSPLSNode? travel) glue(VSPLSNode head, VSPLSNode additionTarget, VSPLSNode firstAffected) {
                 // Attempt to glue the two trip parts together; if this results in infeasibility / , return invalid
                 PVETrip? additionTargetAsTrip = additionTarget.PVE.Type == PVEType.Trip ? ((PVETrip)additionTarget.PVE) : null;
-                int fromIndex = additionTargetAsTrip?.Trip.Index ?? instance.DepotStartIndex;
+                int fromIndex = additionTargetAsTrip?.Trip.Index ?? vss.Instance.DepotStartIndex;
                 int toIndex = firstAffected.PVE.Type == PVEType.Trip
                     ? ((PVETrip)firstAffected.PVE).Trip.Index
-                    : instance.DepotEndIndex;
-                VSPArc? arc = adjFull[fromIndex][toIndex];
+                    : vss.Instance.DepotEndIndex;
+                VSPArc? arc = vss.AdjFull[fromIndex][toIndex];
                 if (arc == null) return (false, double.MinValue, null);
 
                 // Arc exists; check if results in invalid charge by temporarily replacing at tail with fa (with travel to glue)
-                Location from = additionTargetAsTrip?.Trip?.From ?? Depot;
+                Location from = additionTargetAsTrip?.Trip?.From ?? vss.Depot;
 
-                VSPLSNode travel = new()
-                {
+                VSPLSNode travel = new() {
                     Prev = additionTarget,
                     Next = firstAffected,
-                    PVE = new PVETravel(arc.DeadheadTemplate, additionTarget.PVE.EndTime, firstAffected.PVE.StartTime, vehicleType)
+                    PVE = new PVETravel(arc.DeadheadTemplate, additionTarget.PVE.EndTime, firstAffected.PVE.StartTime, vss.VehicleType)
                 };
 
                 // save copies of previous "glue"
@@ -173,7 +148,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 // Now going to compare costs of both solutions; charging costs + driving costs
                 double costDiff = 0;
 
-                var originalRes = head.validateTail(vehicleType);
+                var originalRes = head.validateTail(vss.VehicleType);
                 if (!originalRes.handoversFeasible || !originalRes.chargeFeasible) throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
                 costDiff -= originalRes.chargingCost;
                 costDiff -= originalRes.drivingCost;
@@ -182,7 +157,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 additionTarget.Next = travel;
                 firstAffected.Prev = travel;
 
-                var newRes = head.validateTail(vehicleType);
+                var newRes = head.validateTail(vss.VehicleType);
                 // Continue with calculation either way; otherwise revert might be skipped
                 costDiff += newRes.chargingCost;
                 costDiff += newRes.drivingCost;
@@ -198,8 +173,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             var res1 = glue(t1Head, t1AdditionTarget, t2FirstAffected);
             var res2 = glue(t2Head, t2AdditionTarget, t1FirstAffected);
 
-            if (!res1.feasible || !res2.feasible)
-            {
+            if (!res1.feasible || !res2.feasible) {
                 // At least one glue failed
                 return LSOpResult.Invalid;
             }
@@ -207,16 +181,14 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             double overallCostDiff = res1.costDiff + res2.costDiff;
             // Extra savings if amount of used vehicles would be reduced
-            if (t1TripsBefore + t2TripsAfter == 0 || t2TripsBefore + t1TripsAfter == 0)
-            {
+            if (t1TripsBefore + t2TripsAfter == 0 || t2TripsBefore + t1TripsAfter == 0) {
                 overallCostDiff -= tasks.Count > Config.MAX_VEHICLES
                     ? Config.VH_OVER_MAX_COST + Config.VH_PULLOUT_COST // TODO: check if this cost is correct
                     : Config.VH_PULLOUT_COST;
             }
 
 
-            if (!accept(overallCostDiff))
-            {
+            if (!accept(overallCostDiff)) {
                 return LSOpResult.Decline;
             }
 
@@ -230,20 +202,16 @@ namespace E_VCSP.Solver.ColumnGenerators
             bool t1HasTrip = false;
             bool t2HasTrip = false;
             curr = t1Head;
-            while (curr != null)
-            {
-                if (curr.PVE.Type == PVEType.Trip)
-                {
+            while (curr != null) {
+                if (curr.PVE.Type == PVEType.Trip) {
                     t1HasTrip = true;
                     //break;
                 }
                 curr = curr.Next;
             }
             curr = t2Head;
-            while (curr != null)
-            {
-                if (curr.PVE.Type == PVEType.Trip)
-                {
+            while (curr != null) {
+                if (curr.PVE.Type == PVEType.Trip) {
                     t2HasTrip = true;
                     //break;
                 }
@@ -263,8 +231,7 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// <summary>
         /// Select two tasks, select a range of entries from the one to try and insert into the other
         /// </summary>
-        private LSOpResult moveRange(VSPLSNode? _)
-        {
+        private LSOpResult moveRange(VSPLSNode? _) {
             int t1Index = rnd.Next(tasks.Count);
             int t2Index = rnd.Next(tasks.Count);
             while (t1Index == t2Index) t2Index = rnd.Next(tasks.Count);
@@ -274,8 +241,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             // Get trips from t2 in order to attempt to move to t1
             List<VSPLSNode> t2trips = new();
             VSPLSNode? curr = t2Head;
-            while (curr != null)
-            {
+            while (curr != null) {
                 if (curr.PVE.Type == PVEType.Trip) t2trips.Add(curr);
                 curr = curr.Next;
             }
@@ -298,10 +264,9 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             PVETrip? t2PrevAsTrip = t2Prev.PVE.Type == PVEType.Trip ? (PVETrip)t2Prev.PVE : null,
                     t2NextAsTrip = t2Next.PVE.Type == PVEType.Trip ? (PVETrip)t2Next.PVE : null;
-            VSPArc? t2PrevTot2Next = adjFull[t2PrevAsTrip?.Trip?.Index ?? instance.DepotStartIndex][t2NextAsTrip?.Trip?.Index ?? instance.DepotEndIndex];
+            VSPArc? t2PrevTot2Next = vss.AdjFull[t2PrevAsTrip?.Trip?.Index ?? vss.Instance.DepotStartIndex][t2NextAsTrip?.Trip?.Index ?? vss.Instance.DepotEndIndex];
 
-            if (t2PrevTot2Next == null)
-            {
+            if (t2PrevTot2Next == null) {
                 // Cannot repair t2 if trips are removed;
                 return LSOpResult.Invalid;
             }
@@ -319,11 +284,10 @@ namespace E_VCSP.Solver.ColumnGenerators
             PVETrip? t1PrevAsTrip = t1Prev.PVE.Type == PVEType.Trip ? (PVETrip)t1Prev.PVE : null,
                     t1NextAsTrip = t1Next.PVE.Type == PVEType.Trip ? (PVETrip)t1Next.PVE : null;
 
-            VSPArc? t1PrevTot2Start = adjFull[t1PrevAsTrip?.Trip?.Index ?? instance.DepotStartIndex][t2StartRangeAsTrip.Trip.Index];
-            VSPArc? t2EndTot1Next = adjFull[t2EndRangeAsTrip.Trip.Index][t1NextAsTrip?.Trip?.Index ?? instance.DepotEndIndex];
+            VSPArc? t1PrevTot2Start = vss.AdjFull[t1PrevAsTrip?.Trip?.Index ?? vss.Instance.DepotStartIndex][t2StartRangeAsTrip.Trip.Index];
+            VSPArc? t2EndTot1Next = vss.AdjFull[t2EndRangeAsTrip.Trip.Index][t1NextAsTrip?.Trip?.Index ?? vss.Instance.DepotEndIndex];
 
-            if (t1PrevTot2Start == null || t2EndTot1Next == null)
-            {
+            if (t1PrevTot2Start == null || t2EndTot1Next == null) {
                 // Cannot connect the two trip parts
                 return LSOpResult.Invalid;
             }
@@ -346,31 +310,28 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             // New glue
             // t1Prev -> t2Start
-            VSPLSNode newStartTravel = new()
-            {
-                PVE = new PVETravel(t1PrevTot2Start.DeadheadTemplate, t1Prev.PVE.EndTime, t2Start.PVE.StartTime, vehicleType),
+            VSPLSNode newStartTravel = new() {
+                PVE = new PVETravel(t1PrevTot2Start.DeadheadTemplate, t1Prev.PVE.EndTime, t2Start.PVE.StartTime, vss.VehicleType),
                 Prev = t1Prev,
                 Next = t2Start,
             };
             // t2End -> t1Next
-            VSPLSNode newEndTravel = new()
-            {
-                PVE = new PVETravel(t2EndTot1Next.DeadheadTemplate, t2End.PVE.EndTime, t1Next.PVE.StartTime, vehicleType),
+            VSPLSNode newEndTravel = new() {
+                PVE = new PVETravel(t2EndTot1Next.DeadheadTemplate, t2End.PVE.EndTime, t1Next.PVE.StartTime, vss.VehicleType),
                 Prev = t2End,
                 Next = t1Next,
             };
             // t2Prev -> t2Next
-            VSPLSNode newTravel = new()
-            {
-                PVE = new PVETravel(t2PrevTot2Next.DeadheadTemplate, t2Prev.PVE.EndTime, t2Next.PVE.StartTime, vehicleType),
+            VSPLSNode newTravel = new() {
+                PVE = new PVETravel(t2PrevTot2Next.DeadheadTemplate, t2Prev.PVE.EndTime, t2Next.PVE.StartTime, vss.VehicleType),
                 Prev = t2Prev,
                 Next = t2Next,
             };
 
             // Find previous costs
             double costDiff = 0;
-            var t1OriginalRes = t1Head.validateTail(vehicleType);
-            var t2OriginalRes = t2Head.validateTail(vehicleType);
+            var t1OriginalRes = t1Head.validateTail(vss.VehicleType);
+            var t2OriginalRes = t2Head.validateTail(vss.VehicleType);
             if (!t1OriginalRes.chargeFeasible || !t1OriginalRes.handoversFeasible || !t2OriginalRes.chargeFeasible || !t2OriginalRes.handoversFeasible)
                 throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
             costDiff -= t1OriginalRes.drivingCost;
@@ -387,24 +348,22 @@ namespace E_VCSP.Solver.ColumnGenerators
             t2Next.Prev = newTravel;
 
             // Add new costs
-            var t1NewRes = t1Head.validateTail(vehicleType);
-            var t2NewRes = t2Head.validateTail(vehicleType);
+            var t1NewRes = t1Head.validateTail(vss.VehicleType);
+            var t2NewRes = t2Head.validateTail(vss.VehicleType);
             costDiff += t1NewRes.drivingCost;
             costDiff += t1NewRes.chargingCost;
             costDiff += t2NewRes.drivingCost;
             costDiff += t2NewRes.chargingCost;
 
             bool t2Remove = t2Head.TailCount() <= 3;
-            if (t2Remove)
-            {
+            if (t2Remove) {
                 costDiff -= tasks.Count > Config.MAX_VEHICLES
                     ? Config.VH_OVER_MAX_COST + Config.VH_PULLOUT_COST// TODO: check if this cost is correct
                     : Config.VH_PULLOUT_COST;
             }
 
             // Check acceptance
-            if (!t1NewRes.chargeFeasible || !t1NewRes.handoversFeasible || !t2NewRes.chargeFeasible || !t2NewRes.handoversFeasible || !accept(costDiff))
-            {
+            if (!t1NewRes.chargeFeasible || !t1NewRes.handoversFeasible || !t2NewRes.chargeFeasible || !t2NewRes.handoversFeasible || !accept(costDiff)) {
                 // Restore original structue
                 t1Prev.Next = t1PrevTravel;
                 t1Next.Prev = t1NextTravel;
@@ -426,14 +385,12 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// </summary>
         /// <param name="deltaScore">score change</param>
         /// <returns>accept/deny</returns>
-        private bool accept(double deltaScore)
-        {
+        private bool accept(double deltaScore) {
             if (deltaScore < 0) return true;
             return Math.Exp(-deltaScore / T) > rnd.NextDouble();
         }
 
-        public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
-        {
+        public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks() {
             reset();
 
             List<(Func<VSPLSNode?, LSOpResult> operation, double chance)> operations = [
@@ -451,14 +408,11 @@ namespace E_VCSP.Solver.ColumnGenerators
 
             List<(double reducedCosts, VehicleTask vehicleTask)> generatedColumns = [];
 
-            void dumpTasks()
-            {
-                generatedColumns.AddRange(tasks.Select(taskHead =>
-                {
-                    VehicleTask vehicleTask = taskHead.ToVehicleTask(vehicleType, "LS Global");
+            void dumpTasks() {
+                generatedColumns.AddRange(tasks.Select(taskHead => {
+                    VehicleTask vehicleTask = taskHead.ToVehicleTask(vss.VehicleType, "LS Global");
                     double reducedCost = vehicleTask.Cost;
-                    foreach (int coveredTripIndex in vehicleTask.Covers)
-                    {
+                    foreach (int coveredTripIndex in vehicleTask.Covers) {
                         reducedCost -= reducedCostsTrip[coveredTripIndex];
                     }
                     return (reducedCost, vehicleTask);
@@ -466,16 +420,13 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
 
             int currIts = 0;
-            while (currIts < Config.VSP_LS_G_ITERATIONS)
-            {
+            while (currIts < Config.VSP_LS_G_ITERATIONS) {
                 currIts++;
-                if (currIts % Q == 0)
-                {
+                if (currIts % Q == 0) {
                     T *= alpha;
                     ops.T = T;
                 }
-                if (currIts % itsPerColumn == 0)
-                {
+                if (currIts % itsPerColumn == 0) {
 
                 }
 

@@ -1,12 +1,9 @@
 ﻿using E_VCSP.Objects.ParsedData;
 using System.Globalization;
 
-namespace E_VCSP.Parsing
-{
-    public class ParserTrips : ParserBase<Trip>
-    {
-        public ParserTrips()
-        {
+namespace E_VCSP.Parsing {
+    public class ParserTrips : ParserBase<Trip> {
+        public ParserTrips() {
             filename = "trips.csv";
             attributeNameMapping = new()
             {
@@ -22,13 +19,11 @@ namespace E_VCSP.Parsing
             };
         }
 
-        public override Trip ParseSingle(int index, List<string> headers, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations)
-        {
+        public override Trip ParseSingle(int index, List<string> headers, List<string> line, Dictionary<string, int> attributeIndexMapping, List<Location> locations) {
             Location from = GetOrCreateLocation(line[attributeIndexMapping["FromId"]], locations);
             Location to = GetOrCreateLocation(line[attributeIndexMapping["ToId"]], locations);
 
-            return new Trip()
-            {
+            return new Trip() {
                 Route = line[attributeIndexMapping["Route"]],
                 From = from,
                 To = to,

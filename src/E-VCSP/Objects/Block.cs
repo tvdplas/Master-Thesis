@@ -1,17 +1,14 @@
 ﻿using E_VCSP.Objects.ParsedData;
 using System.Text.Json.Serialization;
 
-namespace E_VCSP.Objects
-{
-    public enum BlockElementType
-    {
+namespace E_VCSP.Objects {
+    public enum BlockElementType {
         Idle,
         Trip,
         Deadhead,
         Charge,
     }
-    public class BlockElement
-    {
+    public class BlockElement {
         [JsonInclude]
         public int StartTime;
         [JsonInclude]
@@ -23,14 +20,11 @@ namespace E_VCSP.Objects
         [JsonInclude]
         public BlockElementType Type;
 
-        public static List<BlockElement> FromVE(VehicleElement ve)
-        {
+        public static List<BlockElement> FromVE(VehicleElement ve) {
             List<BlockElement> elements = new();
 
-            if (ve is VEIdle vei)
-            {
-                elements.Add(new()
-                {
+            if (ve is VEIdle vei) {
+                elements.Add(new() {
                     Type = BlockElementType.Idle,
                     EndTime = ve.EndTime,
                     StartTime = ve.StartTime,
@@ -38,10 +32,8 @@ namespace E_VCSP.Objects
                     EndLocation = vei.EndLocation!,
                 });
             }
-            else if (ve is VETrip vet)
-            {
-                elements.Add(new BETrip()
-                {
+            else if (ve is VETrip vet) {
+                elements.Add(new BETrip() {
                     Type = BlockElementType.Trip,
                     Trip = vet.Trip,
                     StartTime = vet.StartTime,
@@ -50,13 +42,10 @@ namespace E_VCSP.Objects
                     EndLocation = vet.Trip.To,
                 });
             }
-            else if (ve is VEDeadhead ved)
-            {
+            else if (ve is VEDeadhead ved) {
                 // Edge case for self arc "deadhead" 
-                if (ved.DeadheadTemplate.Duration > 0)
-                {
-                    elements.Add(new BEDeadhead()
-                    {
+                if (ved.DeadheadTemplate.Duration > 0) {
+                    elements.Add(new BEDeadhead() {
                         DeadheadTemplate = ved.DeadheadTemplate,
                         EndTime = ved.EndTime,
                         StartTime = ved.StartTime,
@@ -66,10 +55,8 @@ namespace E_VCSP.Objects
                     });
                 }
             }
-            else if (ve is VECharge vec)
-            {
-                elements.Add(new BlockElement()
-                {
+            else if (ve is VECharge vec) {
+                elements.Add(new BlockElement() {
                     EndTime = vec.EndTime,
                     StartTime = vec.StartTime,
                     StartLocation = vec.StartLocation!,
@@ -77,8 +64,7 @@ namespace E_VCSP.Objects
                     Type = BlockElementType.Charge,
                 });
             }
-            else
-            {
+            else {
                 throw new InvalidDataException("Forgot to add VE case in conversion to BE");
             }
 
@@ -86,13 +72,11 @@ namespace E_VCSP.Objects
         }
     }
 
-    public class BETrip : BlockElement
-    {
+    public class BETrip : BlockElement {
         public required Trip Trip;
     }
 
-    public class BEDeadhead : BlockElement
-    {
+    public class BEDeadhead : BlockElement {
         public required DeadheadTemplate DeadheadTemplate;
     }
 
@@ -100,60 +84,48 @@ namespace E_VCSP.Objects
     /// <summary>
     /// Part of a vehicle task / crew schedule
     /// </summary>
-    public class Block
-    {
+    public class Block {
         static List<BlockElementType> IDLE_TYPES = [BlockElementType.Idle, BlockElementType.Charge];
 
         List<BlockElement> Elements = new();
         public int Index = -1;
 
-        public Location StartLocation
-        {
-            get
-            {
+        public Location StartLocation {
+            get {
                 return Elements[0].StartLocation;
             }
         }
-        public Location EndLocation
-        {
-            get
-            {
+        public Location EndLocation {
+            get {
                 return Elements[^1].EndLocation;
             }
         }
 
-        public int StartTime
-        {
-            get
-            {
+        public int StartTime {
+            get {
                 return Elements[0].StartTime;
             }
         }
-        public int EndTime
-        {
-            get
-            {
+        public int EndTime {
+            get {
                 return Elements[^1].EndTime;
             }
         }
 
-        public static List<Block> FromVehicleTask(VehicleTask vt)
-        {
+        public static List<Block> FromVehicleTask(VehicleTask vt) {
             // Transform into list of block elements
             List<BlockElement> elements = vt.Elements.SelectMany(e => BlockElement.FromVE(e)).ToList();
 
             // Iterate through elements in order to actually determine blocks
             List<Block> blocks = [new Block()];
-            for (int i = 0; i < elements.Count; i++)
-            {
+            for (int i = 0; i < elements.Count; i++) {
                 BlockElement element = elements[i];
 
                 if (
                     IDLE_TYPES.Contains(element.Type) // vehicle is idle
                     && element.StartLocation.HandoverAllowed   // handover at this location is allowed
                     && Math.Max(element.StartLocation.SignOffTime, element.StartLocation.SignOnTime) <= element.EndTime - element.StartTime // idle time is greater than signon/off time
-                )
-                {
+                ) {
                     // Start new block; skip this element as we dont need idle time in block
                     blocks.Add(new());
                     continue;
@@ -168,8 +140,7 @@ namespace E_VCSP.Objects
                 .ToList();
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"Block {Index}";
         }
     }

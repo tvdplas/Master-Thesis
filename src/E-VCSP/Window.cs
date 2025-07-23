@@ -3,14 +3,13 @@ using E_VCSP.Formatting;
 using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver;
+using E_VCSP.Solver.SolutionState;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
 
-namespace E_VCSP
-{
-    public partial class MainView : Form
-    {
+namespace E_VCSP {
+    public partial class MainView : Form {
         private readonly Dictionary<string, Control> controlsMap = [];
         public string activeFolder = "No folder selected";
 
@@ -24,8 +23,7 @@ namespace E_VCSP
         int view = 0; // 0 = vt, 1 = blocks, 2 = cd
 
 
-        public MainView()
-        {
+        public MainView() {
             InitializeComponent();
             splitContainer.Panel1.Controls.Add(rd);
             Console.SetOut(new ConsoleIntercept(consoleView));
@@ -35,13 +33,11 @@ namespace E_VCSP
             GenerateConfigUI();
         }
 
-        private void GenerateConfigUI()
-        {
+        private void GenerateConfigUI() {
             Type configType = typeof(Config);
             FieldInfo[] fields = configType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
 
-            Panel scrollablePanel = new()
-            {
+            Panel scrollablePanel = new() {
                 AutoScroll = true,
                 BorderStyle = BorderStyle.FixedSingle,
                 Location = new System.Drawing.Point(10, 105),
@@ -52,27 +48,22 @@ namespace E_VCSP
             configPanel.Controls.Add(scrollablePanel);
 
             int yOffset = 10;
-            foreach (FieldInfo field in fields)
-            {
-                Label label = new()
-                {
+            foreach (FieldInfo field in fields) {
+                Label label = new() {
                     Text = field.Name.Replace('_', ' ').ToLower(),
                     AutoSize = true,
                     Location = new System.Drawing.Point(10, yOffset)
                 };
                 scrollablePanel.Controls.Add(label);
 
-                if (field.FieldType == typeof(Header))
-                {
+                if (field.FieldType == typeof(Header)) {
                     yOffset += 30;
                     continue;
                 }
 
                 Control inputControl;
-                if (field.FieldType == typeof(int) || field.FieldType == typeof(double) || field.FieldType == typeof(string))
-                {
-                    TextBox textBox = new()
-                    {
+                if (field.FieldType == typeof(int) || field.FieldType == typeof(double) || field.FieldType == typeof(string)) {
+                    TextBox textBox = new() {
                         Text = field.GetValue(null)?.ToString()?.Replace('_', ' ').ToLower(),
                         Location = new System.Drawing.Point(150, yOffset),
                         Width = 100
@@ -80,10 +71,8 @@ namespace E_VCSP
                     textBox.TextChanged += (sender, e) => UpdateString(field, textBox.Text ?? "");
                     inputControl = textBox;
                 }
-                else if (field.FieldType.IsEnum)
-                {
-                    ComboBox comboBox = new()
-                    {
+                else if (field.FieldType.IsEnum) {
+                    ComboBox comboBox = new() {
                         DropDownStyle = ComboBoxStyle.DropDownList,
                         Location = new System.Drawing.Point(150, yOffset),
                         Width = 100
@@ -94,18 +83,15 @@ namespace E_VCSP
                         field.SetValue(null, Enum.Parse(field.FieldType, comboBox.SelectedItem?.ToString() ?? ""));
                     inputControl = comboBox;
                 }
-                else if (field.FieldType == typeof(bool))
-                {
-                    CheckBox check = new()
-                    {
+                else if (field.FieldType == typeof(bool)) {
+                    CheckBox check = new() {
                         Checked = (bool)(field.GetValue(null) ?? false),
                         Location = new System.Drawing.Point(150, yOffset),
                     };
                     check.CheckedChanged += (_, _) => field.SetValue(null, check.Checked);
                     inputControl = check;
                 }
-                else
-                {
+                else {
                     continue;
                 }
 
@@ -114,8 +100,7 @@ namespace E_VCSP
                 yOffset += 30;
             }
 
-            Button applyButton = new()
-            {
+            Button applyButton = new() {
                 Text = "Apply Changes",
                 Location = new System.Drawing.Point(10, yOffset + 10),
                 Width = 200
@@ -124,8 +109,7 @@ namespace E_VCSP
             scrollablePanel.Controls.Add(applyButton);
         }
 
-        private static void UpdateString(FieldInfo field, string text)
-        {
+        private static void UpdateString(FieldInfo field, string text) {
             if (field.FieldType == typeof(string))
                 field.SetValue(null, text);
 
@@ -136,11 +120,9 @@ namespace E_VCSP
                 field.SetValue(null, d);
         }
 
-        private void loadButtonClick(object sender, EventArgs e)
-        {
+        private void loadButtonClick(object sender, EventArgs e) {
             var res = loadFolderBrowser.ShowDialog();
-            if (res == DialogResult.OK)
-            {
+            if (res == DialogResult.OK) {
                 activeFolder = loadFolderBrowser.SelectedPath;
                 activeFolderLabel.Text = activeFolder.Split("\\").Last();
                 Console.WriteLine($"Loaded folder: {activeFolder}");
@@ -148,18 +130,15 @@ namespace E_VCSP
             reload();
         }
 
-        private void stopButtonClick(object sender, EventArgs e)
-        {
-            if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
-            {
+        private void stopButtonClick(object sender, EventArgs e) {
+            if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested) {
                 Console.WriteLine("Stopping");
                 cancellationTokenSource.Cancel();
                 stopButton.Enabled = false; // Disable stop button immediately
             }
         }
 
-        private async void solveVSPClick(object sender, EventArgs e)
-        {
+        private async void solveVSPClick(object sender, EventArgs e) {
             reload(); // Ensure instance and solver are ready
             if (vspSolver == null) return;
 
@@ -170,29 +149,24 @@ namespace E_VCSP
             var token = cancellationTokenSource.Token;
 
             bool success = false;
-            try
-            {
+            try {
                 success = await Task.Run(() => vspSolver.Solve(token), token);
 
-                if (success)
-                {
+                if (success) {
                     view = 0;
                     rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(instance.SelectedTasks));
                     viewToggleButton.Enabled = true;
                     solveCSPButton.Enabled = true;
                     Console.WriteLine("Solver finished successfully.");
                 }
-                else
-                {
+                else {
                     Console.WriteLine("Solver did not find a solution or was cancelled.");
                 }
             }
-            catch (OperationCanceledException)
-            {
+            catch (OperationCanceledException) {
                 Console.WriteLine("Solver operation was cancelled.");
             }
-            finally
-            {
+            finally {
                 working = false;
                 solveVSPButton.Enabled = true;
                 stopButton.Enabled = false;
@@ -201,8 +175,7 @@ namespace E_VCSP
             }
         }
 
-        private void reload()
-        {
+        private void reload() {
             if (activeFolder == "No folder selected") return;
 
             solveVSPButton.Enabled = true;
@@ -226,8 +199,7 @@ namespace E_VCSP
             Console.WriteLine($"Instance reloaded. Current config state dumped to {Config.RUN_LOG_FOLDER + "config.txt"}");
         }
 
-        private void toggleGraphView(object sender, EventArgs e)
-        {
+        private void toggleGraphView(object sender, EventArgs e) {
             if (instance == null || working) return;
             view = (view + 1) % 3;
 
@@ -242,8 +214,7 @@ namespace E_VCSP
             rd.UpdateRosterNodes(newNodes);
         }
 
-        private async void solveCSPClick(object sender, EventArgs e)
-        {
+        private async void solveCSPClick(object sender, EventArgs e) {
             if (instance == null || instance.Blocks.Count == 0) return;
 
             cspSolver = new CSPCG(instance);
@@ -255,19 +226,16 @@ namespace E_VCSP
             var token = cancellationTokenSource.Token;
 
             bool success = false;
-            try
-            {
+            try {
                 success = await Task.Run(() => cspSolver.Solve(token), token);
 
                 if (success) Console.WriteLine("CSP Solver finished successfully.");
                 else Console.WriteLine("No solution/cancelled.");
             }
-            catch (OperationCanceledException)
-            {
+            catch (OperationCanceledException) {
                 Console.WriteLine("Solver operation was cancelled.");
             }
-            finally
-            {
+            finally {
                 view = 2;
                 working = false;
                 solveCSPButton.Enabled = true;
@@ -277,19 +245,17 @@ namespace E_VCSP
             }
         }
 
-        private void loadEVSPResultClick(object sender, EventArgs e)
-        {
+        private void loadEVSPResultClick(object sender, EventArgs e) {
             var res = openFileDialog1.ShowDialog();
-            if (res == DialogResult.OK)
-            {
+            if (res == DialogResult.OK) {
                 Console.WriteLine("Starting load of " + openFileDialog1.FileName);
-                var dump = JsonSerializer.Deserialize<EVSPCGDump>(File.ReadAllText(openFileDialog1.FileName), new JsonSerializerOptions());
+                var dump = JsonSerializer.Deserialize<VehicleSolutionStateDump>(File.ReadAllText(openFileDialog1.FileName), new JsonSerializerOptions());
                 if (dump == null) throw new InvalidDataException("Dump not valid");
 
                 activeFolder = dump.path;
                 reload();
 
-                vspSolver!.LoadFromDump(dump);
+                vspSolver!.vss.LoadFromDump(dump);
                 view = 0;
                 rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(instance!.SelectedTasks));
                 viewToggleButton.Enabled = true;

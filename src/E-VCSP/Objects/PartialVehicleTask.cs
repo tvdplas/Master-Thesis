@@ -1,9 +1,7 @@
 ﻿using E_VCSP.Objects.ParsedData;
 
-namespace E_VCSP.Objects
-{
-    public enum PVEType
-    {
+namespace E_VCSP.Objects {
+    public enum PVEType {
         /// <summary>
         /// Vehicle travel + idle in given time. Not considered a stop.
         /// </summary>
@@ -29,8 +27,7 @@ namespace E_VCSP.Objects
     /// <summary>
     /// Vehicle element which has not yet been finalized
     /// </summary>
-    public class PartialVehicleElement
-    {
+    public class PartialVehicleElement {
         #region debug
         public int DEBUG_INDEX;
         public static int DEBUG_INDEX_COUNTER;
@@ -65,23 +62,19 @@ namespace E_VCSP.Objects
         /// </summary>
         public Location EndLocation;
 
-        public PartialVehicleElement()
-        {
+        public PartialVehicleElement() {
             DEBUG_INDEX = DEBUG_INDEX_COUNTER++;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"[{DEBUG_INDEX.ToString()}]";
         }
     }
 
-    public class PVETrip : PartialVehicleElement
-    {
+    public class PVETrip : PartialVehicleElement {
         public Trip Trip;
 
-        public PVETrip(Trip trip, VehicleType vt) : base()
-        {
+        public PVETrip(Trip trip, VehicleType vt) : base() {
             Type = PVEType.Trip;
             Trip = trip;
             DrivingCost = trip.Distance * Config.VH_M_COST;
@@ -92,24 +85,20 @@ namespace E_VCSP.Objects
             EndLocation = trip.To;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{base.ToString()} VE Trip {Trip.Id}";
         }
     }
 
-    public class PVETravel : PartialVehicleElement
-    {
+    public class PVETravel : PartialVehicleElement {
         public DeadheadTemplate DeadheadTemplate;
 
         /// <summary>
         /// Determines whether the idle period is at the beginning or end of the travel;
         /// tries to minimize block length
         /// </summary>
-        public bool IdleAtStart
-        {
-            get
-            {
+        public bool IdleAtStart {
+            get {
                 bool fromHandover = DeadheadTemplate.From.HandoverAllowed;
                 bool toHandover = DeadheadTemplate.To.HandoverAllowed;
                 return fromHandover || !fromHandover && !toHandover;
@@ -127,8 +116,7 @@ namespace E_VCSP.Objects
         /// </summary>
         public int DepartureTime => IdleAtStart ? StartTime + IdleTime : StartTime;
 
-        public PVETravel(DeadheadTemplate dht, int startTime, int endTime, VehicleType vt) : base()
-        {
+        public PVETravel(DeadheadTemplate dht, int startTime, int endTime, VehicleType vt) : base() {
             Type = PVEType.Travel;
             StartTime = startTime;
             DeadheadTemplate = dht;
@@ -145,16 +133,13 @@ namespace E_VCSP.Objects
             SoCDiff = -(dht.Distance * vt.DriveUsage) + idleSoCDiff;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{base.ToString()} VE DH {DeadheadTemplate.Id}";
         }
     }
 
-    public class PVEHandover : PartialVehicleElement
-    {
-        public PVEHandover(Location location, int startTime, int endTime) : base()
-        {
+    public class PVEHandover : PartialVehicleElement {
+        public PVEHandover(Location location, int startTime, int endTime) : base() {
             if (!location.HandoverAllowed)
                 throw new InvalidOperationException("Handover visit planned at location without handover possibility");
 
@@ -167,16 +152,13 @@ namespace E_VCSP.Objects
             EndLocation = location;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{base.ToString()} VE Handover {StartLocation!.Id}";
         }
     }
 
-    public class PVEDepot : PartialVehicleElement
-    {
-        public PVEDepot(Location location, int startTime, int endTime) : base()
-        {
+    public class PVEDepot : PartialVehicleElement {
+        public PVEDepot(Location location, int startTime, int endTime) : base() {
             Type = PVEType.Depot;
             DrivingCost = 0;
             SoCDiff = 0;
@@ -186,16 +168,13 @@ namespace E_VCSP.Objects
             EndLocation = location;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{base.ToString()} VE Depot {StartLocation!.Id}";
         }
     }
 
-    public class PVECharge : PartialVehicleElement
-    {
-        public PVECharge(Location location, int startTime, int endTime)
-        {
+    public class PVECharge : PartialVehicleElement {
+        public PVECharge(Location location, int startTime, int endTime) {
             Type = PVEType.ChargeDetour;
             DrivingCost = 0;
             SoCDiff = 0;
@@ -205,8 +184,7 @@ namespace E_VCSP.Objects
             EndLocation = location;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{base.ToString()} VE Charge {StartLocation!.Id} ({SoCDiff}%)";
         }
     }

@@ -1,7 +1,5 @@
-﻿namespace E_VCSP.Solver
-{
-    public abstract class Solver
-    {
+﻿namespace E_VCSP.Solver {
+    public abstract class Solver {
         /// <summary>
         /// Solve loaded instance
         /// </summary>

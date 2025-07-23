@@ -2,10 +2,8 @@
 using System.Collections;
 using System.Text.Json.Serialization;
 
-namespace E_VCSP.Objects
-{
-    public enum VEType
-    {
+namespace E_VCSP.Objects {
+    public enum VEType {
         /// <summary>
         /// Vehicle traveling a deadhead
         /// </summary>
@@ -34,8 +32,7 @@ namespace E_VCSP.Objects
     [JsonDerivedType(typeof(VEDeadhead), "deadhead")]
     [JsonDerivedType(typeof(VETrip), "trip")]
     [JsonDerivedType(typeof(VECharge), "charge")]
-    public class VehicleElement
-    {
+    public class VehicleElement {
         #region debug
         [JsonInclude]
         public int DEBUG_INDEX;
@@ -88,19 +85,16 @@ namespace E_VCSP.Objects
         [JsonInclude]
         public bool Postprocessed = false;
 
-        public VehicleElement()
-        {
+        public VehicleElement() {
             DEBUG_INDEX = DEBUG_INDEX_COUNTER++;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"[{DEBUG_INDEX.ToString()}]";
         }
     }
 
-    public class VETrip : VehicleElement
-    {
+    public class VETrip : VehicleElement {
         [JsonInclude]
         public Trip Trip;
 
@@ -118,8 +112,7 @@ namespace E_VCSP.Objects
             bool postprocessed,
             int dEBUG_INDEX,
             Trip trip
-        ) : base()
-        {
+        ) : base() {
             Type = type;
             StartTime = startTime;
             EndTime = endTime;
@@ -135,8 +128,7 @@ namespace E_VCSP.Objects
         }
 
 
-        public VETrip(Trip trip, VehicleType vt) : base()
-        {
+        public VETrip(Trip trip, VehicleType vt) : base() {
             Type = VEType.Trip;
             Trip = trip;
             Cost = trip.Distance * Config.VH_M_COST;
@@ -147,14 +139,12 @@ namespace E_VCSP.Objects
             EndLocation = trip.To;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{base.ToString()} VE Trip {Trip.Id}";
         }
     }
 
-    public class VEDeadhead : VehicleElement
-    {
+    public class VEDeadhead : VehicleElement {
         [JsonInclude]
         public DeadheadTemplate DeadheadTemplate;
 
@@ -172,8 +162,7 @@ namespace E_VCSP.Objects
             bool postprocessed,
             int dEBUG_INDEX,
             DeadheadTemplate deadheadTemplate
-        ) : base()
-        {
+        ) : base() {
             Type = type;
             StartTime = startTime;
             EndTime = endTime;
@@ -188,8 +177,7 @@ namespace E_VCSP.Objects
             DeadheadTemplate = deadheadTemplate;
         }
 
-        public VEDeadhead(DeadheadTemplate dht, int startTime, int endTime, VehicleType vt) : base()
-        {
+        public VEDeadhead(DeadheadTemplate dht, int startTime, int endTime, VehicleType vt) : base() {
             Type = VEType.Deadhead;
             StartTime = startTime;
             DeadheadTemplate = dht;
@@ -201,14 +189,12 @@ namespace E_VCSP.Objects
             SoCDiff = -(dht.Distance * vt.DriveUsage);
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"${base.ToString()} VE DH {DeadheadTemplate.Id}";
         }
     }
 
-    public class VEIdle : VehicleElement
-    {
+    public class VEIdle : VehicleElement {
         [JsonConstructor]
         public VEIdle(
             VEType type,
@@ -222,8 +208,7 @@ namespace E_VCSP.Objects
             double endSoCInTask,
             bool postprocessed,
             int dEBUG_INDEX
-        ) : base()
-        {
+        ) : base() {
             Type = type;
             StartTime = startTime;
             EndTime = endTime;
@@ -237,8 +222,7 @@ namespace E_VCSP.Objects
             DEBUG_INDEX = dEBUG_INDEX;
         }
 
-        public VEIdle(Location location, int startTime, int endTime) : base()
-        {
+        public VEIdle(Location location, int startTime, int endTime) : base() {
             Type = VEType.Idle;
             Cost = 0;
             SoCDiff = 0;
@@ -248,14 +232,12 @@ namespace E_VCSP.Objects
             EndLocation = location;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{base.ToString()} VE Handover {StartLocation!.Id}";
         }
     }
 
-    public class VECharge : VehicleElement
-    {
+    public class VECharge : VehicleElement {
         [JsonConstructor]
         public VECharge(
             VEType type,
@@ -269,8 +251,7 @@ namespace E_VCSP.Objects
             double endSoCInTask,
             bool postprocessed,
             int dEBUG_INDEX
-        ) : base()
-        {
+        ) : base() {
             Type = type;
             StartTime = startTime;
             EndTime = endTime;
@@ -283,8 +264,7 @@ namespace E_VCSP.Objects
             Postprocessed = postprocessed;
             DEBUG_INDEX = dEBUG_INDEX;
         }
-        public VECharge(Location location, int startTime, int endTime, double chargeGained, double cost)
-        {
+        public VECharge(Location location, int startTime, int endTime, double chargeGained, double cost) {
             Type = VEType.Charge;
             Cost = cost;
             SoCDiff = chargeGained;
@@ -294,14 +274,12 @@ namespace E_VCSP.Objects
             EndLocation = location;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{base.ToString()} VE Charge {StartLocation!.Id} ({SoCDiff}%)";
         }
     }
 
-    public class VehicleTask
-    {
+    public class VehicleTask {
         [JsonInclude]
         public required string Source;
         [JsonInclude]
@@ -312,10 +290,8 @@ namespace E_VCSP.Objects
         public List<VehicleElement> Elements;
         [JsonInclude]
         public int Index = -1;
-        public double Cost
-        {
-            get
-            {
+        public double Cost {
+            get {
                 // Driving / idle / charging costs throughout the day
                 double cost = Elements.Sum(e => e.Cost);
 
@@ -329,22 +305,19 @@ namespace E_VCSP.Objects
             }
         }
 
-        public BitArray ToBitArray(int tripCount)
-        {
+        public BitArray ToBitArray(int tripCount) {
             BitArray ba = new(tripCount);
             for (int i = 0; i < Covers.Count; i++) ba[Covers[i]] = true;
             return ba;
         }
 
-        public VehicleTask(List<VehicleElement> elements)
-        {
+        public VehicleTask(List<VehicleElement> elements) {
             Elements = elements;
             Covers = [];
             RecalculateCovers();
         }
 
-        public void RecalculateCovers()
-        {
+        public void RecalculateCovers() {
             Covers = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
         }
     }

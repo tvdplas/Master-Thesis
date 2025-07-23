@@ -1,13 +1,11 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
+using E_VCSP.Solver.SolutionState;
 using Gurobi;
 
-namespace E_VCSP.Solver.ColumnGenerators
-{
-    public class VSPLSSingle : VehicleColumnGen
-    {
+namespace E_VCSP.Solver.ColumnGenerators {
+    public class VSPLSSingle(GRBModel model, VehicleSolutionState vss) : VehicleColumnGen(model, vss) {
         private List<double> reducedCostsTrips = [];
-        List<List<DeadheadTemplate?>> locationDHT = [];
 
         private double T;
         private double alpha;
@@ -20,70 +18,54 @@ namespace E_VCSP.Solver.ColumnGenerators
         private VSPLSNode? head = null;
         private List<int> activeTrips = [];
         private List<int> inactiveTrips = [];
-        private LSOperations ops;
+        private LSOperations ops = new(vss, Config.VSP_LS_S_STARTING_T, "LS Single");
 
-        public VSPLSSingle(GRBModel model, Instance instance, VehicleType vehicleType, List<EVSPNode> nodes, List<List<VSPArc?>> adjFull, List<List<VSPArc>> adj, List<List<DeadheadTemplate?>> locationDHT)
-            : base(model, instance, vehicleType, nodes, adjFull, adj)
-        {
-            this.locationDHT = locationDHT;
-        }
-
-        public void Reset()
-        {
-
-            vehicleType = instance.VehicleTypes[0];
+        public void Reset() {
             T = Config.VSP_LS_S_STARTING_T;
             alpha = Config.VSP_LS_S_COOLING_RATE;
             Q = (int)Math.Round(-Config.VSP_LS_S_ITERATIONS / (Math.Log(Config.VSP_LS_S_STARTING_T / Config.VSP_LS_S_ENDING_T) / Math.Log(alpha)));
-            ops = new(instance, adjFull, locationDHT, vehicleType, T)
-            {
-                type = "LS Single",
-            };
+            ops = new(vss, T, "LS Single");
             activeTrips = [];
-            inactiveTrips = [.. instance.Trips.Select(x => x.Index)];
+            inactiveTrips = [.. vss.Instance.Trips.Select(x => x.Index)];
             reducedCostsTrips = [];
 
             GRBConstr[] constrs = model.GetConstrs();
-            for (int i = 0; i < instance.Trips.Count; i++)
-            {
+            for (int i = 0; i < vss.Instance.Trips.Count; i++) {
                 reducedCostsTrips.Add(constrs[i].Pi);
             }
 
             InitVehicleTask();
         }
 
-        private void InitVehicleTask()
-        {
-            VSPArc arc = adjFull[instance.DepotStartIndex][instance.DepotEndIndex] ?? throw new InvalidDataException();
+        private void InitVehicleTask() {
+            VSPArc arc = vss.AdjFull[vss.Instance.DepotStartIndex][vss.Instance.DepotEndIndex] ?? throw new InvalidDataException();
             DeadheadTemplate dht = arc.DeadheadTemplate;
 
             // Create depot nodes, connecting dh + idle time to ensure that there is always a feasible start / end to the vehicle task
-            head = new VSPLSNode()
-            {
-                PVE = new PVEDepot(Depot, StartTime - Config.MIN_NODE_TIME, StartTime),
+            head = new VSPLSNode() {
+                PVE = new PVEDepot(vss.Depot, vss.StartTime - Config.MIN_NODE_TIME, vss.StartTime),
             };
 
             head.AddAfter(
-                    new PVETravel(dht, StartTime, EndTime, vehicleType)
+                    new PVETravel(dht, vss.StartTime, vss.EndTime, vss.VehicleType)
                 )
                 .AddAfter(
-                    new PVEDepot(Depot, EndTime, EndTime + Config.MIN_NODE_TIME)
+                    new PVEDepot(vss.Depot, vss.EndTime, vss.EndTime + Config.MIN_NODE_TIME)
                 );
         }
 
         /// <summary>
         /// Adds random unused trip
         /// </summary>
-        private LSOpResult addTrip(VSPLSNode? head)
-        {
+        private LSOpResult addTrip(VSPLSNode? head) {
             // Select random trip
             int selectIndex = random.Next(inactiveTrips.Count);
             int selectedTrip = inactiveTrips[selectIndex];
             inactiveTrips[selectIndex] = inactiveTrips[^1];
             inactiveTrips[^1] = selectedTrip; // Order doesn't matter, simply preparing for removal
-            Trip trip = instance.Trips[selectedTrip];
+            Trip trip = vss.Instance.Trips[selectedTrip];
 
-            LSOpResult res = ops.addStop(head, new PVETrip(trip, vehicleType), -reducedCostsTrips[trip.Index]);
+            LSOpResult res = ops.addStop(head, new PVETrip(trip, vss.VehicleType), -reducedCostsTrips[trip.Index]);
 
             if (res == LSOpResult.Decline || res == LSOpResult.Invalid) return res;
 
@@ -93,8 +75,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             return res;
         }
 
-        private LSOpResult removeTrip(VSPLSNode? head)
-        {
+        private LSOpResult removeTrip(VSPLSNode? head) {
             if (activeTrips.Count == 0) return LSOpResult.Invalid;
 
             // Select random trip for removal
@@ -102,14 +83,12 @@ namespace E_VCSP.Solver.ColumnGenerators
             int selectedTrip = activeTrips[selectIndex];
             activeTrips[selectIndex] = activeTrips[^1];
             activeTrips[^1] = selectedTrip; // Order doesn't matter, simply preparing for removal
-            Trip t = instance.Trips[selectedTrip];
+            Trip t = vss.Instance.Trips[selectedTrip];
 
             // Find the trip in the current ll
             VSPLSNode? curr = head;
-            while (curr != null)
-            {
-                if (curr.PVE is PVETrip vet && vet.Trip == t)
-                {
+            while (curr != null) {
+                if (curr.PVE is PVETrip vet && vet.Trip == t) {
                     break;
                 }
                 curr = curr.Next;
@@ -128,19 +107,16 @@ namespace E_VCSP.Solver.ColumnGenerators
 
 
 
-        private (double reducedCost, VehicleTask vehicleTask) finalizeTask()
-        {
-            VehicleTask vehicleTask = head!.ToVehicleTask(vehicleType, "LS Single");
+        private (double reducedCost, VehicleTask vehicleTask) finalizeTask() {
+            VehicleTask vehicleTask = head!.ToVehicleTask(vss.VehicleType, "LS Single");
             double reducedCost = vehicleTask.Cost;
-            foreach (int coveredTripIndex in vehicleTask.Covers)
-            {
+            foreach (int coveredTripIndex in vehicleTask.Covers) {
                 reducedCost -= reducedCostsTrips[coveredTripIndex];
             }
             return (reducedCost, vehicleTask);
         }
 
-        public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks()
-        {
+        public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks() {
             Reset();
 
             List<(Func<VSPLSNode?, LSOpResult> operation, double chance)> operations = [
@@ -159,11 +135,9 @@ namespace E_VCSP.Solver.ColumnGenerators
             int itsPerColumn = (int)Config.VSP_LS_S_ITERATIONS / Config.VSP_LS_S_NUM_COLS;
 
             int currIts = 0;
-            while (currIts < Config.VSP_LS_S_ITERATIONS)
-            {
+            while (currIts < Config.VSP_LS_S_ITERATIONS) {
                 currIts++;
-                if (currIts % Q == 0)
-                {
+                if (currIts % Q == 0) {
                     T *= alpha;
                     ops.T = T;
                 }

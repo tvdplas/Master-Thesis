@@ -1,12 +1,9 @@
 ﻿using E_VCSP.Objects.ParsedData;
 using System.Text.RegularExpressions;
 
-namespace E_VCSP.Parsing
-{
-    public class ParserVehicleTypes : ParserBase<VehicleType>
-    {
-        public ParserVehicleTypes()
-        {
+namespace E_VCSP.Parsing {
+    public class ParserVehicleTypes : ParserBase<VehicleType> {
+        public ParserVehicleTypes() {
             filename = "vehicles.csv";
             attributeNameMapping = new()
             {
@@ -25,8 +22,7 @@ namespace E_VCSP.Parsing
             List<string> line,
             Dictionary<string, int> attributeIndexMapping,
             List<Location> locations
-        )
-        {
+        ) {
             double Capacity = double.Parse(line[attributeIndexMapping["Capacity"]]);
 
             // Rescale all usage patterns to percentage instead of direct KWh measures
@@ -34,8 +30,7 @@ namespace E_VCSP.Parsing
             double DriveUsage = double.Parse(line[attributeIndexMapping["DriveUsage"]]) / 1000 / Capacity * 100;
             double IdleUsage = double.Parse(line[attributeIndexMapping["IdleUsage"]]) / Capacity / 3600 * 100;
 
-            VehicleType vh = new()
-            {
+            VehicleType vh = new() {
                 Id = line[attributeIndexMapping["Id"]],
                 Index = index,
                 Capacity = Capacity,
@@ -47,10 +42,8 @@ namespace E_VCSP.Parsing
 
             // Get the columns for max charging speed
             List<(int index, int low, int high)> chargingColumns = new();
-            for (int i = 0; i < headers.Count; i++)
-            {
-                if (headers[i].StartsWith("Laadsnelheid"))
-                {
+            for (int i = 0; i < headers.Count; i++) {
+                if (headers[i].StartsWith("Laadsnelheid")) {
                     // Get the digits before/after the "-"
                     var match = Regex.Match(headers[i], @"\((\d+)-(\d+)%\)");
                     int low = int.Parse(match.Groups[1].Value);
@@ -59,12 +52,9 @@ namespace E_VCSP.Parsing
                 }
             }
 
-            foreach (Location loc in locations)
-            {
-                if (loc.CanCharge)
-                {
-                    var curveDefinition = chargingColumns.Select((val) =>
-                    {
+            foreach (Location loc in locations) {
+                if (loc.CanCharge) {
+                    var curveDefinition = chargingColumns.Select((val) => {
                         (int index, int low, int high) = val;
                         return (high, Math.Min(loc.ChargeTotalPower, double.Parse(line[index]) / 3600 / Capacity * 100));
                     }).ToList();

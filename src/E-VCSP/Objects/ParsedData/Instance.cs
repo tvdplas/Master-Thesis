@@ -1,9 +1,7 @@
 ﻿using E_VCSP.Parsing;
 
-namespace E_VCSP.Objects.ParsedData
-{
-    public class Instance
-    {
+namespace E_VCSP.Objects.ParsedData {
+    public class Instance {
         public string Path { get; private set; }
         public List<Location> ChargingLocations;
         public List<Location> Locations;
@@ -20,8 +18,7 @@ namespace E_VCSP.Objects.ParsedData
         public List<Block> Blocks = [];
         public List<CrewDuty> SelectedDuties = [];
 
-        public Instance(string path)
-        {
+        public Instance(string path) {
             Path = path;
 
             // Load initial set of locations with chargers; may not be complete.
@@ -32,8 +29,7 @@ namespace E_VCSP.Objects.ParsedData
             new ParserCrew().Parse(path, Locations);
 
             // If no depot is found yet; let the first parsed location be the depot. 
-            if (Locations.Find(loc => loc.IsDepot) == null)
-            {
+            if (Locations.Find(loc => loc.IsDepot) == null) {
                 var depotTarget = Locations.Find(x => x.CanCharge && x.BreakAllowed) ?? throw new InvalidDataException("Cannot find depot");
                 depotTarget.IsDepot = true;
             }
@@ -41,8 +37,7 @@ namespace E_VCSP.Objects.ParsedData
             // Trips are parsed directly; Can add locations that were not previously known.
             Trips = new ParserTrips().Parse(path, Locations);
             Trips.Sort((a, b) => a.EndTime.CompareTo(b.EndTime));
-            for (int i = 0; i < Trips.Count; i++)
-            {
+            for (int i = 0; i < Trips.Count; i++) {
                 Trips[i].Index = i;
                 Trips[i].Id = "t" + i;
             }
@@ -54,8 +49,7 @@ namespace E_VCSP.Objects.ParsedData
             // Deadheads between locations are given
             DeadheadTemplates = new ParserDeadheadTemplates().Parse(path, Locations);
             // Add symetric deadheads to model drives back
-            var sym = DeadheadTemplates.Select(dh => new DeadheadTemplate
-            {
+            var sym = DeadheadTemplates.Select(dh => new DeadheadTemplate {
                 From = dh.To,
                 To = dh.From,
                 Distance = dh.Distance,
@@ -65,10 +59,8 @@ namespace E_VCSP.Objects.ParsedData
             DeadheadTemplates.AddRange(sym);
 
             // Add self-edges to model waiting time
-            foreach (Location loc in Locations)
-            {
-                DeadheadTemplates.Add(new DeadheadTemplate
-                {
+            foreach (Location loc in Locations) {
+                DeadheadTemplates.Add(new DeadheadTemplate {
                     From = loc,
                     To = loc,
                     Distance = 0,
@@ -80,10 +72,8 @@ namespace E_VCSP.Objects.ParsedData
             ExtendedTemplates = [.. DeadheadTemplates];
             // For each pair that was not yet included, find either a trip which does this route, or a route via the depot; 
             // take the minimum time / distance. 
-            foreach (Location loc1 in Locations)
-            {
-                foreach (Location loc2 in Locations)
-                {
+            foreach (Location loc1 in Locations) {
+                foreach (Location loc2 in Locations) {
                     if (ExtendedTemplates.Find(x => x.From == loc1 && x.To == loc2) != null) continue;
 
                     // Trip which has this route
@@ -102,8 +92,7 @@ namespace E_VCSP.Objects.ParsedData
                     int detourDistance = (dht1 != null && dht2 != null) ? dht1.Distance + dht2.Distance : int.MaxValue;
                     int detourDuration = (dht1 != null && dht2 != null) ? dht1.Duration + dht2.Duration : int.MaxValue;
 
-                    ExtendedTemplates.Add(new DeadheadTemplate()
-                    {
+                    ExtendedTemplates.Add(new DeadheadTemplate() {
                         From = loc1,
                         To = loc2,
                         Duration = Math.Min(tripDuration, detourDuration),

@@ -1,8 +1,6 @@
-﻿namespace E_VCSP
-{
+﻿namespace E_VCSP {
     public class Header { }
-    public enum GraphElementDisplay
-    {
+    public enum GraphElementDisplay {
         None,
         Id,
         Trips,
@@ -10,15 +8,13 @@
         TripsAndDetails,
     }
 
-    public enum ChargeDisplay
-    {
+    public enum ChargeDisplay {
         ChargeOnly,
         ChargeHighlighted,
         All,
     }
 
-    public static class Config
-    {
+    public static class Config {
         public static Header PROGRAM = new();
         public static string DATA_FOLDER = "";
         public static string RUN_LOG_FOLDER = "";

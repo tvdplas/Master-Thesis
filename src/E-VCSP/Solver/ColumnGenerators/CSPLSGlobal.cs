@@ -1,10 +1,8 @@
 ﻿using E_VCSP.Objects;
 using Gurobi;
 
-namespace E_VCSP.Solver.ColumnGenerators
-{
-    public class CSPLSNode
-    {
+namespace E_VCSP.Solver.ColumnGenerators {
+    public class CSPLSNode {
         #region debug
         public int DEBUG_INDEX;
         public static int DEBUG_INDEX_COUNTER;
@@ -23,25 +21,20 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// </summary>
         public CSPLSNode? Next;
 
-        public CSPLSNode()
-        {
+        public CSPLSNode() {
             DEBUG_INDEX = DEBUG_INDEX_COUNTER++;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{DEBUG_INDEX}: {CDE}";
         }
 
         #region find
-        public CSPLSNode? FindBefore(Func<CSPLSNode, bool> predicate, bool first)
-        {
+        public CSPLSNode? FindBefore(Func<CSPLSNode, bool> predicate, bool first) {
             CSPLSNode? curr = Prev;
             CSPLSNode? res = null;
-            while (curr != null)
-            {
-                if (predicate(curr))
-                {
+            while (curr != null) {
+                if (predicate(curr)) {
                     if (first) return curr;
                     else res = curr;
                 }
@@ -53,14 +46,11 @@ namespace E_VCSP.Solver.ColumnGenerators
         public CSPLSNode? FindFirstBefore(Func<CSPLSNode, bool> predicate) => FindBefore(predicate, true);
         public CSPLSNode? FindLastBefore(Func<CSPLSNode, bool> predicate) => FindBefore(predicate, false);
 
-        public CSPLSNode? FindAfter(Func<CSPLSNode, bool> predicate, bool first)
-        {
+        public CSPLSNode? FindAfter(Func<CSPLSNode, bool> predicate, bool first) {
             CSPLSNode? curr = Next;
             CSPLSNode? res = null;
-            while (curr != null)
-            {
-                if (predicate(curr))
-                {
+            while (curr != null) {
+                if (predicate(curr)) {
                     if (first) return curr;
                     else res = curr;
                 }
@@ -75,12 +65,10 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         #region count
 
-        public int Count(bool head)
-        {
+        public int Count(bool head) {
             CSPLSNode? curr = this;
             int c = 0;
-            while (curr != null)
-            {
+            while (curr != null) {
                 c++;
                 curr = head ? curr.Next : curr.Next;
             }
@@ -97,12 +85,10 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// </summary>
         /// <param name="count">Amount of nodes to remove</param>
         /// <returns>List of removed nodes</returns>
-        public List<CSPLSNode> RemoveAfter(int count)
-        {
+        public List<CSPLSNode> RemoveAfter(int count) {
             List<CSPLSNode> removedNodes = new(count);
             CSPLSNode? curr = Next;
-            for (int i = 0; i < count && curr != null; i++)
-            {
+            for (int i = 0; i < count && curr != null; i++) {
                 removedNodes.Add(curr);
                 curr = curr.Next;
             }
@@ -112,16 +98,14 @@ namespace E_VCSP.Solver.ColumnGenerators
             return removedNodes;
         }
 
-        public CSPLSNode AddAfter(CSPLSNode node)
-        {
+        public CSPLSNode AddAfter(CSPLSNode node) {
             ArgumentNullException.ThrowIfNull(node);
 
             if (CDE.EndTime != node.CDE.StartTime)
                 throw new InvalidOperationException("Vehicle task is not continuous");
 
             // Set next correctly
-            if (Next != null)
-            {
+            if (Next != null) {
                 Next.Prev = node;
             }
 
@@ -133,29 +117,24 @@ namespace E_VCSP.Solver.ColumnGenerators
             return node;
         }
 
-        public CSPLSNode AddAfter(CrewDutyElement cde)
-        {
-            return AddAfter(new CSPLSNode()
-            {
+        public CSPLSNode AddAfter(CrewDutyElement cde) {
+            return AddAfter(new CSPLSNode() {
                 CDE = cde,
             });
         }
         #endregion
     }
 
-    internal class CSPLSDuty
-    {
+    internal class CSPLSDuty {
         public required DutyType Type = DutyType.Single;
         // Invariant: Dont include the sign on / off elements at start/end of shift
         public required CSPLSNode? head;
         public CSPLSNode? tail => head?.FindLastAfter(_ => true) ?? head;
 
-        public List<int> CoveredBlocks()
-        {
+        public List<int> CoveredBlocks() {
             List<int> res = [];
             CSPLSNode? curr = head;
-            while (curr != null)
-            {
+            while (curr != null) {
                 if (curr.CDE.Type == CrewDutyElementType.Block)
                     res.Add(((CDEBlock)curr.CDE).Block.Index);
                 curr = curr.Next;
@@ -183,10 +162,8 @@ namespace E_VCSP.Solver.ColumnGenerators
         ];
 
 
-        public bool IsFeasible(DutyType dt, bool final = false)
-        {
-            if (final)
-            {
+        public bool IsFeasible(DutyType dt, bool final = false) {
+            if (final) {
                 if (!head.CDE.StartLocation.CrewHub || !tail.CDE.EndLocation.CrewHub) return false;
             }
 
@@ -205,18 +182,15 @@ namespace E_VCSP.Solver.ColumnGenerators
             (int startTime, int duration) longIdle = (-1, 0);
             bool longIdleUsed = false;
 
-            if (dt == DutyType.Broken)
-            {
+            if (dt == DutyType.Broken) {
                 var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
                 if (longestIdle != null) longIdle = (longestIdle.CDE.StartTime, longestIdle.CDE.EndTime - longestIdle.CDE.EndTime);
             }
 
             CSPLSNode? curr = head;
-            while (curr != null)
-            {
+            while (curr != null) {
                 CrewDutyElement cde = curr.CDE;
-                if (cde.Type != CrewDutyElementType.Break)
-                {
+                if (cde.Type != CrewDutyElementType.Break) {
                     curr = curr.Next;
                     continue;
                 }
@@ -226,8 +200,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 breaks.Add((breakStartTime, breakDuration));
 
 
-                if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime < breakStartTime)
-                {
+                if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime < breakStartTime) {
                     // First check time traveled before big idle, then update last break time accordingly
                     if (longIdle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
                     lastBreak = longIdle.startTime + longIdle.duration;
@@ -235,8 +208,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 }
 
                 // Too long between breaks
-                if (cde.StartTime - lastBreak > Config.MAX_STEERING_TIME)
-                {
+                if (cde.StartTime - lastBreak > Config.MAX_STEERING_TIME) {
                     return false;
                 }
                 lastBreak = cde.EndTime;
@@ -244,8 +216,7 @@ namespace E_VCSP.Solver.ColumnGenerators
                 curr = curr.Next;
             }
 
-            if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime > lastBreak)
-            {
+            if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime > lastBreak) {
                 // Check if there is a long idle after the last break
                 if (longIdle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
                 lastBreak = longIdle.startTime + longIdle.duration;
@@ -254,33 +225,27 @@ namespace E_VCSP.Solver.ColumnGenerators
             if (tail.CDE.EndTime - lastBreak > Config.MAX_STEERING_TIME) return false;
 
 
-            if (longIdle.startTime != -1)
-            {
+            if (longIdle.startTime != -1) {
                 // Before / after long idle is handled seperately
                 int beforeDuration = longIdle.startTime - head.CDE.StartTime;
                 int afterDuration = tail.CDE.EndTime - (longIdle.startTime + longIdle.duration);
                 var beforeBreaks = breaks.Where(x => x.startTime + x.duration < head.CDE.StartTime + beforeDuration).ToList();
                 var afterBreaks = breaks.Where(x => x.startTime + x.duration > longIdle.startTime + longIdle.duration).ToList();
 
-                if (beforeDuration > 4 * 60 * 60 && beforeDuration <= 5.5 * 60 * 60)
-                {
+                if (beforeDuration > 4 * 60 * 60 && beforeDuration <= 5.5 * 60 * 60) {
                     if (beforeBreaks.Count() == 0) return false;
                 }
-                else if (beforeDuration >= 5.5 * 60 * 60)
-                {
+                else if (beforeDuration >= 5.5 * 60 * 60) {
                     if (beforeBreaks.Sum(x => x.duration) < 40 * 60 || beforeBreaks.FindIndex(x => x.duration >= 20 * 60) == -1) return false;
                 }
-                if (afterDuration > 4 * 60 * 60 && afterDuration <= 5.5 * 60 * 60)
-                {
+                if (afterDuration > 4 * 60 * 60 && afterDuration <= 5.5 * 60 * 60) {
                     if (afterBreaks.Count() == 0) return false;
                 }
-                else if (afterDuration >= 5.5 * 60 * 60)
-                {
+                else if (afterDuration >= 5.5 * 60 * 60) {
                     if (afterBreaks.Sum(x => x.duration) < 40 * 60 || afterBreaks.FindIndex(x => x.duration >= 20 * 60) == -1) return false;
                 }
             }
-            else
-            {
+            else {
                 // Min 1 break of 15 minutes
                 if (PaidDuration > 4 * 60 * 60 && PaidDuration <= 5.5 * 60 * 60 && breaks.Count == 0) return false;
                 // Min 40 min break, min 1 of length >= 20min
@@ -289,8 +254,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
 
             // Additional check for late duties with dinner break
-            if (dt == DutyType.Late && head.CDE.StartTime <= 15 * 60 * 60 && tail.CDE.EndTime >= 20.5 * 60 * 60)
-            {
+            if (dt == DutyType.Late && head.CDE.StartTime <= 15 * 60 * 60 && tail.CDE.EndTime >= 20.5 * 60 * 60) {
                 if (breaks.FindIndex(
                     x => x.duration >= 20 * 60
                     && x.startTime >= 16.5 * 60 * 60
@@ -306,19 +270,15 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// Determines which duty types are feasible for this duty.
         /// </summary>
         /// <returns></returns>
-        public List<DutyType> FeasibleTypes()
-        {
-            if (head == null)
-            {
+        public List<DutyType> FeasibleTypes() {
+            if (head == null) {
                 return [DutyType.Single]; // No elements, no duty    
             }
 
             List<DutyType> feasibleTypes = [];
-            for (int i = 0; i < (int)DutyType.Count; i++)
-            {
+            for (int i = 0; i < (int)DutyType.Count; i++) {
                 DutyType type = (DutyType)i;
-                if (IsFeasible(type))
-                {
+                if (IsFeasible(type)) {
                     feasibleTypes.Add(type);
                 }
             }
@@ -326,14 +286,11 @@ namespace E_VCSP.Solver.ColumnGenerators
             return feasibleTypes;
         }
 
-        public int PaidDuration
-        {
-            get
-            {
+        public int PaidDuration {
+            get {
                 if (head == null || tail == null) return 0;
                 int baseDuration = tail.CDE.EndTime - head.CDE.StartTime;
-                if (Type == DutyType.Broken)
-                {
+                if (Type == DutyType.Broken) {
                     var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
 
                     if (longestIdle == null) return baseDuration;
@@ -344,10 +301,8 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
         }
 
-        public double Cost
-        {
-            get
-            {
+        public double Cost {
+            get {
                 double cost = BaseCost;
                 cost += PaidDuration / (60.0 * 60.0) * Config.CR_HOURLY_COST;
                 if (head == null || tail == null) return cost;
@@ -359,10 +314,8 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
         }
 
-        public double BaseCost
-        {
-            get
-            {
+        public double BaseCost {
+            get {
                 double cost = Config.CR_SHIFT_COST;
                 if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;
                 if (Type == DutyType.Broken) cost += Config.CR_BROKEN_SHIFT_COST;
@@ -370,26 +323,22 @@ namespace E_VCSP.Solver.ColumnGenerators
             }
         }
 
-        public CrewDuty? ToCrewDuty()
-        {
+        public CrewDuty? ToCrewDuty() {
             if (!IsFeasible(Type, true)) return null;
 
             List<CrewDutyElement> cdes = [];
             var curr = head;
-            while (curr != null)
-            {
+            while (curr != null) {
                 cdes.Add(curr.CDE);
                 curr = curr.Next;
             }
-            return new CrewDuty(cdes)
-            {
+            return new CrewDuty(cdes) {
                 Type = Type
             };
         }
     }
 
-    internal class CSPLSGlobal : CrewColumnGen
-    {
+    internal class CSPLSGlobal : CrewColumnGen {
         private List<CSPLSDuty> duties = [];
 
         private Random random;
@@ -397,13 +346,11 @@ namespace E_VCSP.Solver.ColumnGenerators
         private double alpha;
         private int Q;
 
-        internal CSPLSGlobal(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull) : base(blocks, model, adj, adjFull)
-        {
+        internal CSPLSGlobal(List<Block> blocks, GRBModel model, List<List<BlockArc>> adj, List<List<BlockArc?>> adjFull) : base(blocks, model, adj, adjFull) {
             this.random = LSShared.random;
         }
 
-        private void reset()
-        {
+        private void reset() {
             duties = [];
 
             // Reset params
@@ -412,15 +359,13 @@ namespace E_VCSP.Solver.ColumnGenerators
             Q = (int)Math.Round(-Config.CSP_LS_G_ITERATIONS / (Math.Log(Config.CSP_LS_G_STARTING_T / Config.CSP_LS_G_ENDING_T) / Math.Log(alpha)));
 
             // Reset duties to unit
-            for (int i = 0; i < blocks.Count; i++)
-            {
+            for (int i = 0; i < blocks.Count; i++) {
                 Block b = blocks[i];
 
                 CrewDutyElement cde = new CDEBlock(b);
                 CSPLSNode head = new CSPLSNode() { CDE = cde };
 
-                duties.Add(new()
-                {
+                duties.Add(new() {
                     head = head,
                     Type = DutyType.Single
                 });
@@ -434,33 +379,28 @@ namespace E_VCSP.Solver.ColumnGenerators
         /// </summary>
         /// <param name="prev">CDE must be block</param>
         /// <param name="next">CDE must be block</param>
-        private (bool feasible, CSPLSNode? link) linkBlocks(CSPLSNode? prev, CSPLSNode? next)
-        {
+        private (bool feasible, CSPLSNode? link) linkBlocks(CSPLSNode? prev, CSPLSNode? next) {
             if (prev == null || next == null) return (true, null);
             BlockArc? arc = adjFull[((CDEBlock)prev.CDE).Block.Index][((CDEBlock)next.CDE).Block.Index];
             if (arc == null) return (false, null);
             if (prev == next) throw new Exception("Dat hoort nie");
 
             CrewDutyElement? cde = null;
-            if (arc.BreakTime > 0)
-            {
+            if (arc.BreakTime > 0) {
                 cde = new CDEBreak(prev.CDE.EndTime, next.CDE.StartTime, prev.CDE.EndLocation, next.CDE.StartLocation);
             }
-            else
-            {
+            else {
                 cde = new CDEIdle(prev.CDE.EndTime, next.CDE.StartTime, prev.CDE.EndLocation, next.CDE.StartLocation);
             }
 
-            return (true, new CSPLSNode()
-            {
+            return (true, new CSPLSNode() {
                 CDE = cde,
                 Prev = prev,
                 Next = next,
             });
         }
 
-        private LSOpResult moveRange(int maxRangeSize = 10000000)
-        {
+        private LSOpResult moveRange(int maxRangeSize = 10000000) {
             // Select two random duties, select a range from the second to insert into the first
             // At most <c>maxRangeSize</c> elements are moved
 
@@ -474,10 +414,8 @@ namespace E_VCSP.Solver.ColumnGenerators
             List<CSPLSNode> blocksIn2 = [];
             CSPLSNode? curr = duty2.head;
 
-            while (curr != null)
-            {
-                if (curr.CDE.Type == CrewDutyElementType.Block)
-                {
+            while (curr != null) {
+                if (curr.CDE.Type == CrewDutyElementType.Block) {
                     blocksIn2.Add(curr);
                 }
                 curr = curr.Next;
@@ -494,13 +432,10 @@ namespace E_VCSP.Solver.ColumnGenerators
             // In the meantime, check if a blo in duty1 overlaps with the selected range in duty2
             CSPLSNode? prevIn1 = null, nextIn1 = null;
             curr = duty1.head;
-            while (curr != null)
-            {
-                if (curr.CDE.Type == CrewDutyElementType.Block)
-                {
+            while (curr != null) {
+                if (curr.CDE.Type == CrewDutyElementType.Block) {
                     // Check for overlap
-                    if (curr.CDE.StartTime <= rangeEnd.CDE.EndTime && curr.CDE.EndTime >= rangeStart.CDE.StartTime)
-                    {
+                    if (curr.CDE.StartTime <= rangeEnd.CDE.EndTime && curr.CDE.EndTime >= rangeStart.CDE.StartTime) {
                         // Selected range overlaps with blocks in duty1
                         return LSOpResult.Invalid;
                     }
@@ -525,8 +460,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             (bool feasible1, CSPLSNode? linkPrev1ToRange) = linkBlocks(prevIn1, rangeStart);
             (bool feasible2, CSPLSNode? linkNext1ToRange) = linkBlocks(rangeEnd, nextIn1);
             (bool feasible3, CSPLSNode? linkPrev2ToNext2) = linkBlocks(prevIn2, nextIn2);
-            if (!feasible1 || !feasible2 || !feasible3)
-            {
+            if (!feasible1 || !feasible2 || !feasible3) {
                 // At least one of the arcs does not exist
                 return LSOpResult.Invalid;
             }
@@ -576,8 +510,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
 
             // If infeasible or cost change not acceptable, revert  
-            if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff))
-            {
+            if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
                 // Revert changes
                 if (prevIn1 != null) prevIn1.Next = prevIn1Next;
                 if (nextIn1 != null) nextIn1.Prev = nextIn1Prev;
@@ -600,8 +533,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
         private LSOpResult moveSingle() => moveRange(maxRangeSize: 1);
 
-        private LSOpResult swapTails()
-        {
+        private LSOpResult swapTails() {
             int dutyIndex1 = random.Next(duties.Count);
             int dutyIndex2 = random.Next(duties.Count);
             while (dutyIndex2 == dutyIndex1) dutyIndex2 = random.Next(duties.Count);
@@ -614,26 +546,22 @@ namespace E_VCSP.Solver.ColumnGenerators
             List<(int, int)> startEndTimes = [];
 
             CSPLSNode? curr = duty1.head;
-            while (curr != null)
-            {
+            while (curr != null) {
                 startEndTimes.Add((curr.CDE.StartTime, curr.CDE.EndTime));
                 curr = curr.Next;
             }
             curr = duty2.head;
-            while (curr != null)
-            {
+            while (curr != null) {
                 startEndTimes.Add((curr.CDE.StartTime, curr.CDE.EndTime));
                 curr = curr.Next;
             }
 
             // Filter out times which would cause 2 blocks to overlap when swap occurs
-            for (int i = 0; i < startEndTimes.Count; i++)
-            {
+            for (int i = 0; i < startEndTimes.Count; i++) {
                 (int s, int e) = startEndTimes[i];
                 bool startValid = true;
                 bool endValid = true;
-                for (int j = 0; j < startEndTimes.Count && (startValid || endValid); j++)
-                {
+                for (int j = 0; j < startEndTimes.Count && (startValid || endValid); j++) {
                     (int sb, int eb) = startEndTimes[j];
                     if (sb < s && s < eb) startValid = false;
                     if (sb < e && e < eb) endValid = false;
@@ -654,27 +582,23 @@ namespace E_VCSP.Solver.ColumnGenerators
             // Aka: find block preceding time shift, if it doesn't exist use all
 
             CSPLSNode? lastRemainingBlock1 = duty1.head!.FindLastAfter(x => x.CDE.Type == CrewDutyElementType.Block && x.CDE.EndTime <= time);
-            if (lastRemainingBlock1 == null && duty1.head.CDE.Type == CrewDutyElementType.Block && duty1.head.CDE.EndTime <= time)
-            {
+            if (lastRemainingBlock1 == null && duty1.head.CDE.Type == CrewDutyElementType.Block && duty1.head.CDE.EndTime <= time) {
                 // Check if head can be used; if not, entire duty is shifted
                 lastRemainingBlock1 = duty1.head;
             }
             CSPLSNode? lastRemainingBlock2 = duty2.head!.FindLastAfter(x => x.CDE.Type == CrewDutyElementType.Block && x.CDE.EndTime <= time);
-            if (lastRemainingBlock2 == null && duty2.head.CDE.Type == CrewDutyElementType.Block && duty2.head.CDE.EndTime <= time)
-            {
+            if (lastRemainingBlock2 == null && duty2.head.CDE.Type == CrewDutyElementType.Block && duty2.head.CDE.EndTime <= time) {
                 // Check if head can be used; if not, entire duty is shifted
                 lastRemainingBlock2 = duty2.head;
             }
 
             CSPLSNode? firstBlockInTail1 = duty1.head!.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Block && x.CDE.StartTime >= time);
-            if (duty1.head.CDE.Type == CrewDutyElementType.Block && duty1.head.CDE.StartTime >= time)
-            {
+            if (duty1.head.CDE.Type == CrewDutyElementType.Block && duty1.head.CDE.StartTime >= time) {
                 // Head takes priority as it is always earlier
                 firstBlockInTail1 = duty1.head;
             }
             CSPLSNode? firstBlockInTail2 = duty2.head!.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Block && x.CDE.StartTime >= time);
-            if (duty2.head.CDE.Type == CrewDutyElementType.Block && duty2.head.CDE.StartTime >= time)
-            {
+            if (duty2.head.CDE.Type == CrewDutyElementType.Block && duty2.head.CDE.StartTime >= time) {
                 // Head takes priority as it is always earlier
                 firstBlockInTail2 = duty2.head;
             }
@@ -682,8 +606,7 @@ namespace E_VCSP.Solver.ColumnGenerators
             // Attempt to link the two tails; if null at either end, note that it just means we will be starting from a crewhub there
             (bool link1To2Feasible, CSPLSNode? link1To2) = linkBlocks(lastRemainingBlock1, firstBlockInTail2);
             (bool link2To1Feasible, CSPLSNode? link2To1) = linkBlocks(lastRemainingBlock2, firstBlockInTail1);
-            if (!link1To2Feasible || !link2To1Feasible)
-            {
+            if (!link1To2Feasible || !link2To1Feasible) {
                 // Arc was not feasible, so we cannot swap the tails
                 return LSOpResult.Invalid;
             }
@@ -731,8 +654,7 @@ namespace E_VCSP.Solver.ColumnGenerators
 
 
             // If either of the changes is not feasible or costs are not accepted, revert
-            if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff))
-            {
+            if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
                 if (lastRemainingBlock1 != null) lastRemainingBlock1.Next = lastRemainingBlock1Next;
                 if (lastRemainingBlock2 != null) lastRemainingBlock2.Next = lastRemainingBlock2Next;
                 if (firstBlockInTail1 != null) firstBlockInTail1.Prev = firstBlockInTail1Prev;
@@ -757,14 +679,12 @@ namespace E_VCSP.Solver.ColumnGenerators
             return costDiff >= 0 ? LSOpResult.Accept : LSOpResult.Improvement;
         }
 
-        private bool accept(double deltaScore)
-        {
+        private bool accept(double deltaScore) {
             if (deltaScore < 0) return true;
             return Math.Exp(-deltaScore / T) > random.NextDouble();
         }
 
-        public override List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties()
-        {
+        public override List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties() {
             reset();
 
             List<(Func<LSOpResult> operation, double chance)> operations = [
@@ -778,11 +698,9 @@ namespace E_VCSP.Solver.ColumnGenerators
             int currIts = 0;
 
             List<int> resCounts = Enumerable.Range(0, (int)LSOpResult.Count).Select(x => 0).ToList();
-            while (currIts < Config.CSP_LS_G_ITERATIONS)
-            {
+            while (currIts < Config.CSP_LS_G_ITERATIONS) {
                 currIts++;
-                if (currIts % Q == 0)
-                {
+                if (currIts % Q == 0) {
                     T *= alpha;
                 }
                 double r = random.NextDouble() * sums[^1];

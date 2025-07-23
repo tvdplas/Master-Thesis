@@ -1,11 +1,8 @@
 ﻿using System.Collections;
 
-namespace E_VCSP.Utils
-{
-    public class BitArrayComparer : IEqualityComparer<BitArray>
-    {
-        public bool Equals(BitArray? x, BitArray? y)
-        {
+namespace E_VCSP.Utils {
+    public class BitArrayComparer : IEqualityComparer<BitArray> {
+        public bool Equals(BitArray? x, BitArray? y) {
             if (x == null && y == null) return true;
             if (x == null || y == null) return false;
 
@@ -15,8 +12,7 @@ namespace E_VCSP.Utils
             return true;
         }
 
-        public int GetHashCode(BitArray obj)
-        {
+        public int GetHashCode(BitArray obj) {
             int[] ints = new int[(obj.Length + 31) / 32];
             obj.CopyTo(ints, 0);
             int hash = 17;

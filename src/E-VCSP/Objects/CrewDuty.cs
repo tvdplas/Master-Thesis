@@ -2,18 +2,15 @@
 using System.Collections;
 using System.Text.Json.Serialization;
 
-namespace E_VCSP.Objects
-{
-    public enum CrewDutyElementType
-    {
+namespace E_VCSP.Objects {
+    public enum CrewDutyElementType {
         Block,
         Idle,
         Break,
         Travel,
         SignOnOff,
     }
-    public class CrewDutyElement
-    {
+    public class CrewDutyElement {
         [JsonInclude]
         public CrewDutyElementType Type;
         [JsonInclude]
@@ -26,12 +23,10 @@ namespace E_VCSP.Objects
         public Location EndLocation;
     }
 
-    public class CDEBlock : CrewDutyElement
-    {
+    public class CDEBlock : CrewDutyElement {
         [JsonInclude]
         public Block Block;
-        public CDEBlock(Block b)
-        {
+        public CDEBlock(Block b) {
             Type = CrewDutyElementType.Block;
             StartTime = b.StartTime;
             EndTime = b.EndTime;
@@ -41,10 +36,8 @@ namespace E_VCSP.Objects
         }
     }
 
-    public class CDEIdle : CrewDutyElement
-    {
-        public CDEIdle(int startTime, int endTime, Location startLocation, Location endLocation)
-        {
+    public class CDEIdle : CrewDutyElement {
+        public CDEIdle(int startTime, int endTime, Location startLocation, Location endLocation) {
             Type = CrewDutyElementType.Idle;
             StartTime = startTime;
             EndTime = endTime;
@@ -53,10 +46,8 @@ namespace E_VCSP.Objects
         }
     }
 
-    public class CDEBreak : CrewDutyElement
-    {
-        public CDEBreak(int startTime, int endTime, Location startLocation, Location endLocation)
-        {
+    public class CDEBreak : CrewDutyElement {
+        public CDEBreak(int startTime, int endTime, Location startLocation, Location endLocation) {
             Type = CrewDutyElementType.Break;
             StartTime = startTime;
             EndTime = endTime;
@@ -65,10 +56,8 @@ namespace E_VCSP.Objects
         }
     }
 
-    public class CDETravel : CrewDutyElement
-    {
-        public CDETravel(int startTime, int endTime, Location startLocation, Location endLocation)
-        {
+    public class CDETravel : CrewDutyElement {
+        public CDETravel(int startTime, int endTime, Location startLocation, Location endLocation) {
             Type = CrewDutyElementType.Travel;
             StartTime = startTime;
             EndTime = endTime;
@@ -77,10 +66,8 @@ namespace E_VCSP.Objects
         }
     }
 
-    public class CDESignOnOff : CrewDutyElement
-    {
-        public CDESignOnOff(int startTime, int endTime, Location location)
-        {
+    public class CDESignOnOff : CrewDutyElement {
+        public CDESignOnOff(int startTime, int endTime, Location location) {
             if (!location.CrewHub) throw new InvalidOperationException("Heh");
 
             Type = CrewDutyElementType.SignOnOff;
@@ -91,8 +78,7 @@ namespace E_VCSP.Objects
         }
     }
 
-    public enum DutyType
-    {
+    public enum DutyType {
         Early, // Ends before 16:30
         Day, // Ends between 16:30 and 18:15
         Late, // Begin >= 13:00, end at max 26:30
@@ -103,8 +89,7 @@ namespace E_VCSP.Objects
         Single, // Only a single block; only used for initialization
     }
 
-    public class CrewDuty
-    {
+    public class CrewDuty {
         [JsonInclude]
         public DutyType Type;
         [JsonInclude]
@@ -113,29 +98,24 @@ namespace E_VCSP.Objects
         [JsonInclude]
         public int Index = -1;
 
-        public double Cost
-        {
-            get
-            {
+        public double Cost {
+            get {
                 double cost = Config.CR_SHIFT_COST; // base
                 // Driven time
                 cost += Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST);
                 // Special type
                 if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;
                 // Special type + remove largest idle
-                if (Type == DutyType.Broken)
-                {
+                if (Type == DutyType.Broken) {
                     var largestIdle = Elements
                         .Where(e => e.Type == CrewDutyElementType.Idle)
                         .OrderByDescending(e => e.EndTime - e.StartTime)
                         .FirstOrDefault();
 
-                    if (largestIdle == null)
-                    {
+                    if (largestIdle == null) {
                         //throw new InvalidDataException("Broken shift with no idle");
                     }
-                    else
-                    {
+                    else {
                         cost -= (largestIdle.EndTime - largestIdle.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST; // remove largest idle
                     }
 
@@ -146,24 +126,20 @@ namespace E_VCSP.Objects
             }
         }
 
-        public CrewDuty(List<CrewDutyElement> elements)
-        {
+        public CrewDuty(List<CrewDutyElement> elements) {
             Elements = elements;
             Covers = [.. elements.Where(e => e.Type == CrewDutyElementType.Block).Select(e => ((CDEBlock)e).Block.Index)];
         }
 
-        public BitArray ToBitArray(int blockCount)
-        {
+        public BitArray ToBitArray(int blockCount) {
             BitArray ba = new(blockCount);
             for (int i = 0; i < Covers.Count; i++) ba[Covers[i]] = true;
             return ba;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             string type = "";
-            switch (Type)
-            {
+            switch (Type) {
                 case DutyType.Early: type = "Early"; break;
                 case DutyType.Day: type = "Day"; break;
                 case DutyType.Late: type = "Late"; break;

@@ -1,9 +1,7 @@
 ﻿using E_VCSP.Objects.ParsedData;
 
-namespace E_VCSP.Parsing
-{
-    public abstract class ParserBase<T>
-    {
+namespace E_VCSP.Parsing {
+    public abstract class ParserBase<T> {
         public List<(string, string)>? attributeNameMapping;
         public string? filename;
 
@@ -14,16 +12,13 @@ namespace E_VCSP.Parsing
         /// <returns>Dictionary d such that d[attr_name] = col_index</returns>
         /// <exception cref="ArgumentNullException">No attribute to column name mapping provided</exception>
         /// <exception cref="Exception">Invalid mapping provided</exception>
-        public Dictionary<string, int> GetAttributeIndexMapping(List<string> header)
-        {
-            if (attributeNameMapping == null)
-            {
+        public Dictionary<string, int> GetAttributeIndexMapping(List<string> header) {
+            if (attributeNameMapping == null) {
                 throw new ArgumentNullException("Invalid instantiation of ParserBase.");
             }
 
             Dictionary<string, int> attributeIndexMapping = new Dictionary<string, int>();
-            foreach (var kv in attributeNameMapping)
-            {
+            foreach (var kv in attributeNameMapping) {
                 int index = header.FindIndex(col => col.Contains(kv.Item2));
                 if (index == -1) throw new Exception($"Could not find a column {kv.Item2} to load attribute {kv.Item1}");
                 attributeIndexMapping[kv.Item1] = index;
@@ -38,19 +33,15 @@ namespace E_VCSP.Parsing
         /// <param name="s">Time string</param>
         /// <returns>Amount of seconds representing <paramref name="s"/></returns>
         /// <exception cref="ArgumentException">Input not in any of the listed formats.</exception>
-        public int ParseTime(string s)
-        {
+        public int ParseTime(string s) {
             List<int> units = s.Split(':').Select(int.Parse).ToList();
-            if (units.Count == 1)
-            {
+            if (units.Count == 1) {
                 return units[0];
             }
-            else if (units.Count == 2)
-            {
+            else if (units.Count == 2) {
                 return (units[0] * 60 * 60) + (units[1] * 60);
             }
-            else if (units.Count == 3)
-            {
+            else if (units.Count == 3) {
                 return (units[0] * 60 * 60) + (units[1] * 60) + units[2];
             }
 
@@ -64,15 +55,12 @@ namespace E_VCSP.Parsing
         /// <param name="id">Id of location</param>
         /// <param name="locations">Active list of locations</param>
         /// <returns>Location with id=<paramref name="id"/></returns>
-        public static Location GetOrCreateLocation(string id, List<Location> locations)
-        {
+        public static Location GetOrCreateLocation(string id, List<Location> locations) {
             Location val;
-            if (locations.Find(x => x.Id == id) is Location toLoc)
-            {
+            if (locations.Find(x => x.Id == id) is Location toLoc) {
                 val = toLoc;
             }
-            else
-            {
+            else {
                 val = new Location() { Id = id, Index = locations.Count };
                 locations.Add(val);
             }
@@ -86,10 +74,8 @@ namespace E_VCSP.Parsing
         /// <param name="locations">List of currently known locations; Note that parsing may introduce new locations if the parsed objects contains any that were unknown before.</param>
         /// <returns>List of <typeparamref name="T"/></returns>
         /// <exception cref="ArgumentNullException"></exception>
-        public List<T> Parse(string path, List<Location> locations)
-        {
-            if (filename == null)
-            {
+        public List<T> Parse(string path, List<Location> locations) {
+            if (filename == null) {
                 throw new ArgumentNullException("Invalid instantiation of ParserBase.");
             }
 
@@ -98,8 +84,7 @@ namespace E_VCSP.Parsing
             var attributeIndexMapping = GetAttributeIndexMapping(file[0]);
 
             List<T> res = new();
-            for (int i = 1; i < file.Count; i++)
-            {
+            for (int i = 1; i < file.Count; i++) {
                 res.Add(ParseSingle(
                     i - 1,
                     file[0],

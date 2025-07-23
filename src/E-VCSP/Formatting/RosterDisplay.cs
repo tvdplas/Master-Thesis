@@ -1,23 +1,19 @@
 ﻿using E_VCSP.Formatting;
 using System.Drawing.Drawing2D;
-public class RosterNode
-{
+public class RosterNode {
     public required int StartTime;
     public required int EndTime;
     public required string Content;
     public required Color Color;
 
-    public string DisplayContent
-    {
-        get
-        {
+    public string DisplayContent {
+        get {
             return $"{Content}\n{Time.HHMMSS(StartTime)}-{Time.HHMMSS(EndTime)}";
         }
     }
 }
 
-public class RosterDisplay : Control
-{
+public class RosterDisplay : Control {
     private float _zoom = 1.0f;
     private float _horizontalZoom = 1.0f;
     private float _verticalZoom = 1.0f;
@@ -49,16 +45,14 @@ public class RosterDisplay : Control
 
     private float rx(float x) => x * _horizontalZoom;
 
-    public void ResetView(bool resetPan = true)
-    {
+    public void ResetView(bool resetPan = true) {
         if (rosterNodes.Any() && resetPan)
             _panOffset = new Point(-rosterNodes.Min(x => x.Min(y => y.StartTime)), 0);
 
         this.Invalidate();
     }
 
-    public void UpdateRosterNodes(List<List<RosterNode>> rosterNodes)
-    {
+    public void UpdateRosterNodes(List<List<RosterNode>> rosterNodes) {
         bool resetPan = !this.rosterNodes.Any() && rosterNodes.Any();
         this.rosterNodes = rosterNodes;
 
@@ -66,8 +60,7 @@ public class RosterDisplay : Control
     }
 
 
-    public RosterDisplay()
-    {
+    public RosterDisplay() {
         this.DoubleBuffered = true;
         this.Dock = DockStyle.Fill;
 
@@ -77,8 +70,7 @@ public class RosterDisplay : Control
         this.MouseWheel += RosterDisplay_MouseWheel;
     }
 
-    protected override void OnPaint(PaintEventArgs e)
-    {
+    protected override void OnPaint(PaintEventArgs e) {
         Graphics g = e.Graphics;
         g.SmoothingMode = SmoothingMode.HighSpeed;
         g.CompositingQuality = CompositingQuality.HighSpeed;
@@ -86,8 +78,7 @@ public class RosterDisplay : Control
         g.TranslateTransform(_panOffset.X, _panOffset.Y);
         g.ScaleTransform(_zoom, _zoom);
 
-        if (!rosterNodes.Any())
-        {
+        if (!rosterNodes.Any()) {
             g.DrawString("No data available", clockFont, Brushes.Black, new PointF(10, 10));
             return;
         }
@@ -99,8 +90,7 @@ public class RosterDisplay : Control
         int startHour = minTime / 3600;
         int endHour = maxTime / 3600 + 1; // Klopt niet helemaal maar goed
 
-        for (int i = startHour; i <= endHour; i++)
-        {
+        for (int i = startHour; i <= endHour; i++) {
             int x = i * 3600;
             g.DrawLine(new Pen(Color.DarkGray, 4), rx(x), -100, rx(x), rosterNodes.Count * (RowHeight + RowMargin));
             g.DrawLine(new Pen(Color.LightGray, 4), rx(x + 900), -100, rx(x + 900), rosterNodes.Count * (RowHeight + RowMargin));
@@ -114,10 +104,8 @@ public class RosterDisplay : Control
         Dictionary<Color, List<RectangleF>> bufferedRectangles = new();
         List<(PointF p, string s, Font f)> bufferedText = new();
 
-        for (int row = 0; row < rosterNodes.Count; row++)
-        {
-            foreach (var node in rosterNodes[row])
-            {
+        for (int row = 0; row < rosterNodes.Count; row++) {
+            foreach (var node in rosterNodes[row]) {
                 float width = rx(node.EndTime - node.StartTime);
                 if (width <= 1) continue;
 
@@ -130,8 +118,7 @@ public class RosterDisplay : Control
                 else bufferedRectangles[node.Color] = [rf];
 
                 if (_zoom < 0.5f) continue; // Don't draw text if zoomed out too far
-                for (int i = fontOptions.Count - 1; i >= 0; i--)
-                {
+                for (int i = fontOptions.Count - 1; i >= 0; i--) {
                     var measuredString = g.MeasureString(node.DisplayContent, fontOptions[i]);
                     if (measuredString.Width > rx(node.EndTime - node.StartTime) - borderWidth * 4 ||
                         measuredString.Height > RowHeight - borderWidth * 4) continue;
@@ -146,13 +133,11 @@ public class RosterDisplay : Control
 
             }
 
-            foreach (var kvp in bufferedRectangles)
-            {
+            foreach (var kvp in bufferedRectangles) {
                 g.FillRectangles(new SolidBrush(kvp.Key), kvp.Value.ToArray());
                 g.DrawRectangles(new Pen(Color.Black, borderWidth), kvp.Value.ToArray());
             }
-            foreach (var (p, s, f) in bufferedText)
-            {
+            foreach (var (p, s, f) in bufferedText) {
                 g.DrawString(s, f, Brushes.Black, p);
             }
         }
@@ -160,20 +145,16 @@ public class RosterDisplay : Control
         base.OnPaint(e);
     }
 
-    private void RosterDisplay_MouseDown(object sender, MouseEventArgs e)
-    {
-        if (e.Button == MouseButtons.Left)
-        {
+    private void RosterDisplay_MouseDown(object sender, MouseEventArgs e) {
+        if (e.Button == MouseButtons.Left) {
             _mouseDownPoint = e.Location;
             _panStart = _panOffset;
             this.Cursor = Cursors.Hand;
         }
     }
 
-    private void RosterDisplay_MouseMove(object sender, MouseEventArgs e)
-    {
-        if (e.Button == MouseButtons.Left)
-        {
+    private void RosterDisplay_MouseMove(object sender, MouseEventArgs e) {
+        if (e.Button == MouseButtons.Left) {
             int dx = e.X - _mouseDownPoint.X;
             int dy = e.Y - _mouseDownPoint.Y;
             _panOffset = new Point(_panStart.X + dx, _panStart.Y + dy);
@@ -181,18 +162,14 @@ public class RosterDisplay : Control
         }
     }
 
-    private void RosterDisplay_MouseUp(object sender, MouseEventArgs e)
-    {
-        if (e.Button == MouseButtons.Left)
-        {
+    private void RosterDisplay_MouseUp(object sender, MouseEventArgs e) {
+        if (e.Button == MouseButtons.Left) {
             this.Cursor = Cursors.Default;
         }
     }
 
-    private void RosterDisplay_MouseWheel(object sender, MouseEventArgs e)
-    {
-        if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
-        {
+    private void RosterDisplay_MouseWheel(object sender, MouseEventArgs e) {
+        if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift) {
             float oldHorizontalZoom = _horizontalZoom;
             if (e.Delta > 0) _horizontalZoom *= ZoomFactor;
             else _horizontalZoom /= ZoomFactor;
@@ -203,8 +180,7 @@ public class RosterDisplay : Control
                 _panOffset.Y
             );
         }
-        else if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
-        {
+        else if ((Control.ModifierKeys & Keys.Control) == Keys.Control) {
             float oldVerticalZoom = _verticalZoom;
             if (e.Delta > 0) _verticalZoom *= ZoomFactor;
             else _verticalZoom /= ZoomFactor;
@@ -215,8 +191,7 @@ public class RosterDisplay : Control
                 (int)(_panOffset.Y * _verticalZoom / oldVerticalZoom)
             );
         }
-        else
-        {
+        else {
             float oldZoom = _zoom;
             if (e.Delta > 0)
                 _zoom *= ZoomFactor;
