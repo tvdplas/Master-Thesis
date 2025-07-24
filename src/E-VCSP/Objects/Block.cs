@@ -80,7 +80,6 @@ namespace E_VCSP.Objects {
         public required DeadheadTemplate DeadheadTemplate;
     }
 
-
     /// <summary>
     /// Part of a vehicle task / crew schedule
     /// </summary>

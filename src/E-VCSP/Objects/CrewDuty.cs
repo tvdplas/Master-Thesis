@@ -152,7 +152,7 @@ namespace E_VCSP.Objects {
             return $"[{Index}] {type} duty";
         }
 
-        public int Duration => Elements[^1].EndTime - Elements[^1].StartTime;
+        public int Duration => Elements[^1].EndTime - Elements[0].StartTime;
     }
 }
 

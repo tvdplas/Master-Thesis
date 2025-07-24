@@ -35,7 +35,7 @@
         public static int MIN_CHARGE_TIME = 300;
         public static int MAX_VEHICLES = 5; // Maximum number of vehicles that can be used in the solution.
         public static double VH_M_COST = 0.00005; // verified at qbuzz
-        public static double VH_OVER_MAX_COST = 100000; // Cost per vehicle of going over. only used as penalty
+        public static double VH_OVER_MAX_COST = 1000000; // Cost per vehicle of going over. only used as penalty
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double VH_IDLE_COST = 0; // Cost per unit of time for being idle.
         public static int MAX_STEERING_TIME = 60 * 60 * 4; // conitnous driving time
@@ -43,7 +43,7 @@
         public static double CR_SHIFT_COST = 2000; // Minimum price to pay a crew member
         public static double CR_HOURLY_COST = 65; // hourly cost of employee. based on qbuzz data
         public static double CR_BROKEN_SHIFT_COST = 20; // additional surcharge for broken shift. based on qbuzz data
-        public static double CR_SINGLE_SHIFT_COST = 1_000_000; // penalty for use of initial shifts
+        public static double CR_SINGLE_SHIFT_COST = 1_000; // penalty for use of initial shifts
         public static double CR_MAX_BROKEN_SHIFTS = 0.3;
         public static double CR_MAX_BETWEEN_SHIFTS = 0.1;
         public static double CR_MAX_OVER_LONG_SHIFT = 0.15;
@@ -63,7 +63,7 @@
         public static int VSP_SOLVER_TIMEOUT_SEC = 60;
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static bool VSP_ALLOW_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
-        public static int VSP_PRE_DIRECT_TIME = 1800;
+        public static int VSP_PRE_DIRECT_TIME = 0;
 
         public static Header VSP_CG = new();
         public static int VSP_INSTANCES_PER_IT = 1;
@@ -117,6 +117,7 @@
 
         public static Header CSP_LABELING = new();
         public static double CSP_LABELING_WEIGHT = 0;
+        public static int CSP_LB_MAX_LABELS_IN_END = 1_000_000;
         public static int CSP_LB_MAX_COLS = 50;
         public static bool CSP_LB_ATTEMPT_DISJOINT = true; // try to find disjoint paths; if none can be found, return any arbitrary path
         public static double CSP_LB_SEC_COL_COUNT = 0; // Number of primary columns to generate secondary columns for 
@@ -134,6 +135,11 @@
         public static double CSP_LS_G_CREWHUB_PENALTY = 10_000;
 
         public static Header VCSP = new();
-        public static int VCSP_SOLVER_TIMEOUT_SEC = 300;
+        public static int VCSP_SOLVER_TIMEOUT_SEC = 60;
+        public static int VCSP_ROUNDS = 5;
+        public static int VCSP_VH_ITS_INIT = 10;
+        public static int VCSP_VH_ITS_ROUND = 5;
+        public static int VCSP_CR_ITS_INIT = 10;
+        public static int VCSP_CR_ITS_ROUND = 5;
     }
 }

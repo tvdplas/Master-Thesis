@@ -117,7 +117,7 @@ namespace E_VCSP.Solver {
 
                 // Switch between set partition and cover
                 char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, "cover_trip_" + t.Id);
+                model.AddConstr(expr, sense, 1, "cover_trip_" + t.Index);
             }
 
             // Finalize max vehicle constraint with slack

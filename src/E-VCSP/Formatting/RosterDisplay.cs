@@ -47,7 +47,7 @@ public class RosterDisplay : Control {
 
     public void ResetView(bool resetPan = true) {
         if (rosterNodes.Any() && resetPan)
-            _panOffset = new PointF(-rosterNodes.Min(x => x.Min(y => rx(y.StartTime))), 0);
+            _panOffset = new PointF(-rosterNodes.Min(x => x.Min(y => y.StartTime * _zoom * _horizontalZoom)), 0);
 
         this.Invalidate();
     }

@@ -6,9 +6,17 @@ namespace E_VCSP.Utils {
             if (x == null && y == null) return true;
             if (x == null || y == null) return false;
 
-            if (x.Length != y.Length) return false;
-            for (int i = 0; i < x.Length; i++)
+            for (int i = 0; i < Math.Min(x.Length, y.Length); i++)
                 if (x[i] != y[i]) return false;
+
+            // Two bitarrays are considered the same if the length is different but the bits inside 
+            // are the same
+            if (x.Length != y.Length) {
+                for (int i = Math.Min(x.Length, y.Length); i < Math.Max(x.Length, y.Length); i++) {
+                    if (i < x.Length && x[i]) return false;
+                    if (i < y.Length && y[i]) return false;
+                }
+            }
             return true;
         }
 

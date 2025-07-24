@@ -23,8 +23,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
         public int LastHubTime = 0; // Time since a stop with hub capibility was visited
         public required ChargeTime ChargeTime; // Was charge at start / end of deadhead
         public BitArray CoveredTrips;
-        public double CurrSoC; // SoC at start of node
-        public double CurrCosts;  // Costs incurred at start of node
+        public double CurrSoC; // SoC at the end of trip
+
+        public double CurrCosts;  // Actual costs incurred at the end of trip
+        public double MinCost; // Min costs that can be made based on block reduced cost
+        public double MaxCost; // Max costs that can be made based on block reduced cost
 
         public VSPLabel() {
             this.Id = ID_COUNTER++;
@@ -100,7 +103,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
     public class VSPLabeling : VehicleColumnGen {
         private List<List<VSPLabel>> allLabels = [];
         private List<VSPFront> activeLabels = [];
+
         private List<double> reducedCosts = [];
+
         private List<bool> blockedNodes = [];
 
         public VSPLabeling(GRBModel model, VehicleSolutionState vss) : base(model, vss) { }
@@ -121,9 +126,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 blockedNodes.Add(false);
             }
 
-            GRBConstr[] constrs = model.GetConstrs();
             for (int i = 0; i < vss.Instance.Trips.Count; i++) {
-                reducedCosts.Add(constrs[i].Pi);
+                reducedCosts.Add(model.GetConstrByName("cover_trip_" + i).Pi);
             }
         }
 
@@ -151,7 +155,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 }
                 if (expandingLabel == null) throw new InvalidDataException("Could not find active label to expand");
 
-                // Try expand label
+                // Check if we can directly use a block
+                //for (int targetNodeIndex = 0; targetNodeIndex < BlockAdj[expandingLabelIndex].Count; targetNodeIndex++) {
+                //    Block? block = BlockAdj[expandingLabelIndex][targetNodeIndex];
+                //    //if (block.a)
+                //}
+
+                // Expand label via normal Adj matrix
                 for (int i = 0; i < vss.Adj[expandingLabelIndex].Count; i++) {
                     VSPArc arc = vss.Adj[expandingLabelIndex][i];
 

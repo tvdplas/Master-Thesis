@@ -38,6 +38,8 @@ namespace E_VCSP.Solver.SolutionState {
         public Dictionary<string, CrewDuty> VarnameDutyMapping = [];
         public Dictionary<BitArray, CrewDuty> CoverDutyMapping = new(new Utils.BitArrayComparer());
 
+        public int ActiveBlockCount => BlockActive.Count(b => b);
+
         public CrewSolutionState(Instance instance, List<Block> initialBlocks) {
             this.Instance = instance;
 
@@ -90,17 +92,18 @@ namespace E_VCSP.Solver.SolutionState {
             return arc;
         }
 
-        public void AddBlock(Block b) {
+        public CrewDuty AddBlock(Block b) {
             int newBlockIndex = Blocks.Count;
             b.Index = newBlockIndex;
             Blocks.Add(b);
             BlockActive.Add(false);
 
             // Create a unit duty in order to process the block
-            Duties.Add(new CrewDuty([new CDEBlock(b)]) {
+            var duty = new CrewDuty([new CDEBlock(b)]) {
                 Index = Duties.Count,
                 Type = DutyType.Single
-            });
+            };
+            Duties.Add(duty);
 
             // Process the block in the adjacency matrixes
             AdjFull.Insert(newBlockIndex, []);
@@ -123,7 +126,6 @@ namespace E_VCSP.Solver.SolutionState {
 
             // Self reference
             AdjFull[newBlockIndex].Add(null);
-
 
             // Add depot arcs if signon / signoff is allowed
             BlockArc? start = b.StartLocation.CrewHub ? new BlockArc() {
@@ -149,6 +151,9 @@ namespace E_VCSP.Solver.SolutionState {
             if (end != null) Adj[newBlockIndex].Add(end);
             AdjFull[newBlockIndex].Add(end);
             AdjFull[^1].Add(null);
+
+            // Return the unit duty used to cover the new block
+            return duty;
         }
     }
 }

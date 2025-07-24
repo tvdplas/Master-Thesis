@@ -161,15 +161,19 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private void reset() {
             var constrs = model.GetConstrs();
             rcBlocks = Enumerable.Range(0, css.Blocks.Count).Select(_ => 0.0).ToList();
-            blockedBlock = Enumerable.Range(0, css.Blocks.Count + 2).Select(_ => false).ToList();
+            blockedBlock = [.. css.BlockActive.Select(x => !x), false, false]; // Only use blocks which are active
             allLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
             activeLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
 
             if (model.Status != GRB.Status.INFEASIBLE) {
-                for (int i = 0; i < css.Blocks.Count; i++) rcBlocks[i] = constrs[i].Pi;
-                rcMaxBroken = model.GetConstrByName("max_broken").Pi;
-                rcMaxBetween = model.GetConstrByName("max_between").Pi;
-                rcMaxAvg = model.GetConstrByName("limited_average_length").Pi;
+                for (int i = 0; i < css.Blocks.Count; i++) {
+                    if (!css.BlockActive[i]) continue; // RC dont matter, save time querying
+                    rcBlocks[i] = model.GetConstrByName("cover_block_" + css.Blocks[i].Descriptor).Pi;
+                    if (rcBlocks[i] < 0) rcBlocks[i] = -rcBlocks[i]; // Flip for alternate formulation
+                }
+                rcMaxBroken = model.GetConstrByName("cr_overall_max_broken").Pi;
+                rcMaxBetween = model.GetConstrByName("cr_overall_max_between").Pi;
+                rcMaxAvg = model.GetConstrByName("cr_overall_limited_average_length").Pi;
             }
         }
 
@@ -189,38 +193,39 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 baseCost -= rcMaxBetween * (Config.CR_MAX_BETWEEN_SHIFTS - rho_between);
 
                 // Start by setting out all possible duty types from the depot start
-                for (int targetBlockId = 0; targetBlockId < css.Blocks.Count; targetBlockId++) {
-                    BlockArc? arc = css.AdjFull[^2][targetBlockId];
-                    if (arc == null) continue;
+                for (int targetBlockIndex = 0; targetBlockIndex < css.Blocks.Count; targetBlockIndex++) {
+                    BlockArc? arc = css.AdjFull[^2][targetBlockIndex];
+                    if (arc == null || blockedBlock[targetBlockIndex]) continue;
                     CSPLabel l = new() {
-                        StartTime = css.Blocks[targetBlockId].StartTime - arc.TravelTime, // signon
+                        StartTime = css.Blocks[targetBlockIndex].StartTime - arc.TravelTime, // signon
                         CoveredBlockIds = new BitArray(css.Blocks.Count, false),
                         PrevLabelId = -1,
                         PrevBlockId = -1,
                         Type = dt,
-                        Cost = baseCost - rcBlocks[targetBlockId],
+                        Cost = baseCost - rcBlocks[targetBlockIndex],
                         Breaks = [],
                     };
 
-                    l.CoveredBlockIds.Set(targetBlockId, true);
+                    l.CoveredBlockIds.Set(targetBlockIndex, true);
 
                     if (l.isFeasible(css.Blocks[i].EndTime, false))
                         addLabel(l, arc.ToBlock!.Index);
                 }
             }
 
-            while (activeLabels.Where((x, i) => i <= css.Blocks.Count).Sum(x => x.Count) > 0) {
+            while (
+                allLabels[^1].Count < Config.CSP_LB_MAX_LABELS_IN_END
+                && activeLabels.Where((x, i) => i <= css.Blocks.Count).Sum(x => x.Count) > 0
+            ) {
                 // Find node with active label
-                CSPLabel? currentLabel = null;
-                int currentNodeIndex = -1;
-                for (int i = 0; i < activeLabels.Count - 1; i++) {
-                    if (activeLabels[i].Count > 0) {
-                        currentLabel = activeLabels[i][^1];
-                        activeLabels[i].RemoveAt(activeLabels[i].Count - 1);
-                        currentNodeIndex = i;
-                        break;
-                    }
-                }
+                List<int> nodesWithActiveLabels = Enumerable.Range(0, activeLabels.Count - 1)
+                    .Where(i => activeLabels[i].Count > 0)
+                    .ToList();
+                int currentNodeIndex = nodesWithActiveLabels[LSShared.random.Next(0, nodesWithActiveLabels.Count)];
+                List<CSPLabel> targetLabels = activeLabels[currentNodeIndex];
+                CSPLabel currentLabel = targetLabels[^1];
+                targetLabels.RemoveAt(targetLabels.Count - 1);
+
                 if (currentLabel == null) throw new InvalidOperationException("heh");
 
                 // Expand node if possible 
