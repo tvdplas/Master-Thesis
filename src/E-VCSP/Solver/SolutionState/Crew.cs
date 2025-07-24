@@ -25,115 +25,130 @@ namespace E_VCSP.Solver.SolutionState {
     }
 
     public class CrewSolutionState {
-        public Instance instance;
-        public List<List<BlockArc>> adj = [];
-        public List<List<BlockArc?>> adjFull = [];
+        public Instance Instance;
+        // Invariant: adj/adjfull last two entries are day start/day end
+        public List<List<BlockArc>> Adj = [[], []];
+        public List<List<BlockArc?>> AdjFull = [[null, null], [null, null]];
 
-        public List<CrewDuty> duties = [];
-        public Dictionary<string, CrewDuty> varnameDutyMapping = [];
-        public Dictionary<BitArray, CrewDuty> coverDutyMapping = new(new Utils.BitArrayComparer());
+        public List<Block> Blocks = [];
+        public List<bool> BlockActive = [];
 
-        public CrewSolutionState(Instance instance) {
-            this.instance = instance;
+        public List<CrewDuty> SelectedDuties = [];
+        public List<CrewDuty> Duties = [];
+        public Dictionary<string, CrewDuty> VarnameDutyMapping = [];
+        public Dictionary<BitArray, CrewDuty> CoverDutyMapping = new(new Utils.BitArrayComparer());
 
-            generateInitialDuties();
-            generateArcs();
-        }
+        public CrewSolutionState(Instance instance, List<Block> initialBlocks) {
+            this.Instance = instance;
 
-        private void generateInitialDuties() {
-            // For each block, generate a unit duty
-            for (int i = 0; i < instance.Blocks.Count; i++) {
-                duties.Add(new CrewDuty([new CDEBlock(instance.Blocks[i])]) { Index = i, Type = DutyType.Single });
+            foreach (Block b in initialBlocks) {
+                AddBlock(b);
             }
         }
 
-        private void generateArcs() {
-            adjFull = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc?>()).ToList();
-            adj = Enumerable.Range(0, instance.Blocks.Count + 2).Select(x => new List<BlockArc>()).ToList();
+        private BlockArc? LinkBlocks(Block from, Block to) {
+            if (from.EndTime > to.StartTime || from.EndLocation != to.StartLocation) return null;
 
-            for (int blockIndex1 = 0; blockIndex1 < instance.Blocks.Count; blockIndex1++) {
-                Block block1 = instance.Blocks[blockIndex1];
-                for (int blockIndex2 = 0; blockIndex2 < instance.Blocks.Count; blockIndex2++) {
-                    Block block2 = instance.Blocks[blockIndex2];
+            Location idleLocation = from.EndLocation;
+            BlockArc? arc = null;
+            BlockArcType blockArcType = BlockArcType.Invalid;
+            int idleTime = to.StartTime - from.EndTime;
+            int breakTime = 0;
+            int bruttoNettoTime = 0;
+            int travelTime = 0;
+            int nettoBreakTime = idleLocation.BreakAllowed
+                ? idleTime - idleLocation.BrutoNetto
+                : 0;
 
-                    // Determine whether or not it is feasible to string to arcs together
-                    // If so: what actually happens during this time. 
-
-                    // For now; only allow transfer if already at same location
-                    // Based on times, determine whether its idle / break / whatever. 
-                    BlockArc? arc = null;
-
-                    if (block1.EndTime <= block2.StartTime && block1.EndLocation == block2.StartLocation) {
-                        // Arc might be formed; start with base time layout, check for validity
-                        BlockArcType blockArcType = BlockArcType.Invalid;
-                        int idleTime = block2.StartTime - block1.EndTime;
-                        int breakTime = 0;
-                        int bruttoNettoTime = 0;
-                        int travelTime = 0;
-                        int nettoBreakTime = block1.EndLocation.BreakAllowed
-                            ? idleTime - block1.EndLocation.BrutoNetto
-                            : 0;
-
-                        if (nettoBreakTime >= Config.CR_MIN_BREAK_TIME && nettoBreakTime <= Config.CR_MAX_BREAK_TIME) {
-                            breakTime = idleTime - block1.EndLocation.BrutoNetto;
-                            bruttoNettoTime = block1.EndLocation.BrutoNetto;
-                            idleTime = 0;
-                            blockArcType = BlockArcType.Break;
-                        }
-
-                        // Short idle; can happen anywhere (driver remains in bus)
-                        else if (Config.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_SHORT_IDLE_TIME)
-                            blockArcType = BlockArcType.ShortIdle;
-
-                        // Long idle used for split shifts
-                        else if (block1.EndLocation.CrewHub && Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
-                            blockArcType = BlockArcType.LongIdle;
-
-                        if (blockArcType != BlockArcType.Invalid) {
-                            arc = new() {
-                                FromBlock = block1,
-                                ToBlock = block2,
-                                IdleTime = idleTime,
-                                BreakTime = breakTime,
-                                BruttoNettoTime = bruttoNettoTime,
-                                TravelTime = travelTime,
-                                Type = blockArcType
-                            };
-                        }
-                    }
-
-                    if (arc != null) adj[blockIndex1].Add(arc);
-                    adjFull[blockIndex1].Add(arc);
-                }
+            if (nettoBreakTime >= Config.CR_MIN_BREAK_TIME && nettoBreakTime <= Config.CR_MAX_BREAK_TIME) {
+                breakTime = idleTime - idleLocation.BrutoNetto;
+                bruttoNettoTime = idleLocation.BrutoNetto;
+                idleTime = 0;
+                blockArcType = BlockArcType.Break;
             }
+
+            // Short idle; can happen anywhere (driver remains in bus)
+            else if (Config.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_SHORT_IDLE_TIME)
+                blockArcType = BlockArcType.ShortIdle;
+
+            // Long idle used for split shifts
+            else if (idleLocation.CrewHub && Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
+                blockArcType = BlockArcType.LongIdle;
+
+            if (blockArcType != BlockArcType.Invalid) {
+                arc = new() {
+                    FromBlock = from,
+                    ToBlock = to,
+                    IdleTime = idleTime,
+                    BreakTime = breakTime,
+                    BruttoNettoTime = bruttoNettoTime,
+                    TravelTime = travelTime,
+                    Type = blockArcType
+                };
+            }
+
+            return arc;
+        }
+
+        public void AddBlock(Block b) {
+            int newBlockIndex = Blocks.Count;
+            b.Index = newBlockIndex;
+            Blocks.Add(b);
+            BlockActive.Add(false);
+
+            // Create a unit duty in order to process the block
+            Duties.Add(new CrewDuty([new CDEBlock(b)]) {
+                Index = Duties.Count,
+                Type = DutyType.Single
+            });
+
+            // Process the block in the adjacency matrixes
+            AdjFull.Insert(newBlockIndex, []);
+            Adj.Insert(newBlockIndex, []);
+
+            // Connect new block to other blocks
+            for (int bPrimeIndex = 0; bPrimeIndex < Blocks.Count - 1; bPrimeIndex++) {
+                Block bPrime = Blocks[bPrimeIndex];
+
+                // b -> b'
+                BlockArc? bToBPrime = LinkBlocks(b, bPrime);
+                AdjFull[newBlockIndex].Add(bToBPrime);
+                if (bToBPrime != null) Adj[newBlockIndex].Add(bToBPrime);
+
+                // b' -> b
+                BlockArc? bPrimeToB = LinkBlocks(bPrime, b);
+                AdjFull[bPrimeIndex].Insert(newBlockIndex, bPrimeToB);
+                if (bPrimeToB != null) Adj[bPrimeIndex].Add(bPrimeToB);
+            }
+
+            // Self reference
+            AdjFull[newBlockIndex].Add(null);
+
 
             // Add depot arcs if signon / signoff is allowed
-            for (int blockIndex = 0; blockIndex < instance.Blocks.Count; blockIndex++) {
-                Block block = instance.Blocks[blockIndex];
-                BlockArc? start = block.StartLocation.CrewHub ? new BlockArc() {
-                    ToBlock = block,
-                    IdleTime = 0,
-                    BreakTime = 0,
-                    BruttoNettoTime = 0,
-                    TravelTime = block.StartLocation.SignOnTime,
-                    Type = BlockArcType.SignOnOff
-                } : null;
-                if (start != null) adj[^2].Add(start);
-                adjFull[^2].Add(start);
-                adjFull[blockIndex].Add(null);
+            BlockArc? start = b.StartLocation.CrewHub ? new BlockArc() {
+                ToBlock = b,
+                IdleTime = 0,
+                BreakTime = 0,
+                BruttoNettoTime = 0,
+                TravelTime = b.StartLocation.SignOnTime,
+                Type = BlockArcType.SignOnOff
+            } : null;
+            if (start != null) Adj[^2].Add(start);
+            AdjFull[^2].Insert(newBlockIndex, start);
+            AdjFull[newBlockIndex].Add(null);
 
-                BlockArc? end = block.EndLocation.CrewHub ? new BlockArc() {
-                    FromBlock = block,
-                    IdleTime = 0,
-                    BreakTime = 0,
-                    BruttoNettoTime = 0,
-                    TravelTime = block.StartLocation.SignOffTime,
-                    Type = BlockArcType.SignOnOff
-                } : null;
-                if (end != null)
-                    adj[block.Index].Add(end);
-                adjFull[block.Index].Add(end);
-            }
+            BlockArc? end = b.EndLocation.CrewHub ? new BlockArc() {
+                FromBlock = b,
+                IdleTime = 0,
+                BreakTime = 0,
+                BruttoNettoTime = 0,
+                TravelTime = b.StartLocation.SignOffTime,
+                Type = BlockArcType.SignOnOff
+            } : null;
+            if (end != null) Adj[newBlockIndex].Add(end);
+            AdjFull[newBlockIndex].Add(end);
+            AdjFull[^1].Add(null);
         }
     }
 }

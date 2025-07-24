@@ -12,8 +12,8 @@ namespace E_VCSP.Solver {
         private GRBModel? model;
         public VehicleSolutionState vss;
 
-        public EVSPCG(Instance instance) {
-            vss = new(instance, instance.VehicleTypes[0]);
+        public EVSPCG(VehicleSolutionState vss) {
+            this.vss = vss;
         }
 
         private List<VehicleTask> getSelectedTasks(bool console) {
@@ -29,7 +29,7 @@ namespace E_VCSP.Solver {
 
                 VehicleTask vt = vss.VarnameTaskMapping[v.VarName];
                 selectedTasks.Add(vt);
-                foreach (int i in vt.Covers) {
+                foreach (int i in vt.TripCover) {
                     coveredBy[i].Add(selectedTasks.Count - 1);
                 }
             }
@@ -84,7 +84,6 @@ namespace E_VCSP.Solver {
             GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.VSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 3; // upper bound
-
             model.SetCallback(new CustomGRBCallback());
             ct.Register(() => {
                 Console.WriteLine("Cancellation requested. Terminating Gurobi model...");
@@ -111,14 +110,14 @@ namespace E_VCSP.Solver {
             foreach (Trip t in vss.Instance.Trips) {
                 GRBLinExpr expr = new();
                 for (int i = 0; i < vss.Tasks.Count; i++) {
-                    if (vss.Tasks[i].Covers.Contains(t.Index)) {
+                    if (vss.Tasks[i].TripCover.Contains(t.Index)) {
                         expr.AddTerm(1, taskVars[i]);
                     }
                 }
 
                 // Switch between set partition and cover
                 char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, "cover_" + t.Id);
+                model.AddConstr(expr, sense, 1, "cover_trip_" + t.Id);
             }
 
             // Finalize max vehicle constraint with slack
@@ -267,7 +266,7 @@ namespace E_VCSP.Solver {
                                 // Create new column to add to model
                                 var modelConstrs = model.GetConstrs();
                                 GRBConstr[] constrs = [.. modelConstrs.Where(
-                                    (_, i) => newTask.Covers.Contains(i)    // Covers trip
+                                    (_, i) => newTask.TripCover.Contains(i)    // Covers trip
                                     || i == modelConstrs.Length - 1        // Add to used vehicles
                                 )];
                                 GRBColumn col = new();
@@ -332,8 +331,7 @@ namespace E_VCSP.Solver {
             }
 
             (var selectedTasks, var blocks) = finalizeResults(true);
-            vss.Instance.SelectedTasks = selectedTasks;
-            vss.Instance.Blocks = blocks;
+            vss.SelectedTasks = selectedTasks;
             if (Config.DUMP_VSP) {
                 File.WriteAllText(Config.RUN_LOG_FOLDER + "evspcg-res.json", JsonSerializer.Serialize(new VehicleSolutionStateDump() {
                     selectedTasks = selectedTasks,

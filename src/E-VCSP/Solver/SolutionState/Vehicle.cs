@@ -37,6 +37,7 @@ namespace E_VCSP.Solver.SolutionState {
 
         public VehicleType VehicleType;
 
+        public List<VehicleTask> SelectedTasks = [];
         public List<VehicleTask> Tasks = [];
         public Dictionary<BitArray, VehicleTask> CoverTaskMapping = new(new Utils.BitArrayComparer());
         public Dictionary<string, VehicleTask> VarnameTaskMapping = [];
@@ -82,11 +83,8 @@ namespace E_VCSP.Solver.SolutionState {
                 }).ToList();
                 return t;
             }).ToList();
-            Instance.SelectedTasks = dump.selectedTasks;
-            Instance.Blocks = dump.selectedTasks
-                .SelectMany(t => Block.FromVehicleTask(t))
-                .Select((b, i) => { b.Index = i; return b; })
-                .ToList();
+
+            SelectedTasks = dump.selectedTasks;
             Tasks = dump.selectedTasks;
         }
 
@@ -115,11 +113,10 @@ namespace E_VCSP.Solver.SolutionState {
             // Determine overcoverage
             List<List<int>> coveredBy = Enumerable.Range(0, Instance.Trips.Count).Select(x => new List<int>()).ToList();
             for (int i = 0; i < vehicleTasks.Count; i++) {
-                foreach (int j in vehicleTasks[i].Covers) {
+                foreach (int j in vehicleTasks[i].TripCover) {
                     coveredBy[j].Add(i);
                 }
             }
-
 
             // Two phase approach: 
             // Phase 1: replace all trips with dummy idle blocks with current from/to and currSoCs
@@ -370,7 +367,6 @@ namespace E_VCSP.Solver.SolutionState {
             }
 
             double avgOutgoingAfterSimplify = Adj.Where((x, i) => i < Instance.Trips.Count).Sum(x => x.Count) / ((double)Adj.Count - 2);
-
 
             Console.WriteLine($"Simplified the arcs of {totalSimplified} trips");
             Console.WriteLine($"Avg outgoing arcs before simplification: {avgOutgoingBeforeSimplify}");

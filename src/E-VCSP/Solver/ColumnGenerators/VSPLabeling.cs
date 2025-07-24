@@ -131,7 +131,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             int activeLabelCount = addLabel(new VSPLabel() {
                 PrevId = -1,
                 PrevNodeIndex = vss.Nodes.Count - 2,
-                CurrCosts = 0,
+                CurrCosts = Config.VH_PULLOUT_COST,
                 CurrSoC = vss.VehicleType.StartSoC,
                 ChargeTime = ChargeTime.None,
                 CoveredTrips = new BitArray(vss.Instance.Trips.Count)
@@ -324,6 +324,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         }, arc.To.Index);
                     }
                 }
+            }
+
+            // Perform cost correction for charge at end
+            foreach (var finalLabel in allLabels[^1]) {
+                finalLabel.CurrCosts += Math.Max(0, vss.VehicleType.StartSoC - finalLabel.CurrSoC)
+                    * vss.VehicleType.Capacity / 100 * Config.KWH_COST;
             }
         }
 
@@ -527,8 +533,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 for (int j = 1; j < (Config.VSP_LB_SEC_COL_ATTEMPTS + 1); j++) {
                     reset();
-                    for (int k = 0; k < (int)((double)j * baseTask.vehicleTask.Covers.Count / (Config.VSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
-                        blockedNodes[baseTask.vehicleTask.Covers[k]] = true;
+                    for (int k = 0; k < (int)((double)j * baseTask.vehicleTask.TripCover.Count / (Config.VSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
+                        blockedNodes[baseTask.vehicleTask.TripCover[k]] = true;
                     }
                     runLabeling();
                     var newExtracted = extractTasks("secondary", alreadyFound);

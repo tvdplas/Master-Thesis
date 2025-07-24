@@ -37,9 +37,9 @@ public class RosterDisplay : Control {
 
     private Font clockFont = new Font("Arial", 24);
 
-    private Point _panOffset = Point.Empty;
-    private Point _mouseDownPoint;
-    private Point _panStart;
+    private PointF _panOffset = PointF.Empty;
+    private PointF _mouseDownPoint;
+    private PointF _panStart;
 
     private List<List<RosterNode>> rosterNodes = [];
 
@@ -47,7 +47,7 @@ public class RosterDisplay : Control {
 
     public void ResetView(bool resetPan = true) {
         if (rosterNodes.Any() && resetPan)
-            _panOffset = new Point(-rosterNodes.Min(x => x.Min(y => y.StartTime)), 0);
+            _panOffset = new PointF(-rosterNodes.Min(x => x.Min(y => rx(y.StartTime))), 0);
 
         this.Invalidate();
     }
@@ -146,6 +146,8 @@ public class RosterDisplay : Control {
     }
 
     private void RosterDisplay_MouseDown(object sender, MouseEventArgs e) {
+        if (e.Button == MouseButtons.Middle) ResetView(true);
+
         if (e.Button == MouseButtons.Left) {
             _mouseDownPoint = e.Location;
             _panStart = _panOffset;
@@ -155,9 +157,9 @@ public class RosterDisplay : Control {
 
     private void RosterDisplay_MouseMove(object sender, MouseEventArgs e) {
         if (e.Button == MouseButtons.Left) {
-            int dx = e.X - _mouseDownPoint.X;
-            int dy = e.Y - _mouseDownPoint.Y;
-            _panOffset = new Point(_panStart.X + dx, _panStart.Y + dy);
+            float dx = e.X - _mouseDownPoint.X;
+            float dy = e.Y - _mouseDownPoint.Y;
+            _panOffset = new PointF(_panStart.X + dx, _panStart.Y + dy);
             this.Invalidate();
         }
     }
@@ -175,7 +177,7 @@ public class RosterDisplay : Control {
             else _horizontalZoom /= ZoomFactor;
 
             // Rescale pan offset to maintain position
-            _panOffset = new Point(
+            _panOffset = new PointF(
                 (int)(_panOffset.X * _horizontalZoom / oldHorizontalZoom),
                 _panOffset.Y
             );
@@ -186,7 +188,7 @@ public class RosterDisplay : Control {
             else _verticalZoom /= ZoomFactor;
 
             // Rescale pan offset to maintain position
-            _panOffset = new Point(
+            _panOffset = new PointF(
                 _panOffset.X,
                 (int)(_panOffset.Y * _verticalZoom / oldVerticalZoom)
             );

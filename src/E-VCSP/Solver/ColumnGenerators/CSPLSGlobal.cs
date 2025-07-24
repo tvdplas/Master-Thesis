@@ -355,8 +355,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
             Q = (int)Math.Round(-Config.CSP_LS_G_ITERATIONS / (Math.Log(Config.CSP_LS_G_STARTING_T / Config.CSP_LS_G_ENDING_T) / Math.Log(alpha)));
 
             // Reset duties to unit
-            for (int i = 0; i < css.instance.Blocks.Count; i++) {
-                Block b = css.instance.Blocks[i];
+            for (int i = 0; i < css.Blocks.Count; i++) {
+                Block b = css.Blocks[i];
 
                 CrewDutyElement cde = new CDEBlock(b);
                 CSPLSNode head = new CSPLSNode() { CDE = cde };
@@ -377,7 +377,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         /// <param name="next">CDE must be block</param>
         private (bool feasible, CSPLSNode? link) linkBlocks(CSPLSNode? prev, CSPLSNode? next) {
             if (prev == null || next == null) return (true, null);
-            BlockArc? arc = css.adjFull[((CDEBlock)prev.CDE).Block.Index][((CDEBlock)next.CDE).Block.Index];
+            BlockArc? arc = css.AdjFull[((CDEBlock)prev.CDE).Block.Index][((CDEBlock)next.CDE).Block.Index];
             if (arc == null) return (false, null);
             if (prev == next) throw new Exception("Dat hoort nie");
 
@@ -475,7 +475,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             costDiff -= duty1.Cost;
             costDiff -= duty2.Cost;
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
+            if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
 
             // Change links, reevaluate heads
             if (prevIn1 != null) prevIn1.Next = linkPrev1ToRange;
@@ -500,7 +500,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // If the second duty is now empty, remove it
             if (duty2.head == null) costDiff -= duty2.BaseCost;
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
+            if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
 
             // If infeasible or cost change not acceptable, revert  
             if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
@@ -514,7 +514,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
 
-                if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
+                if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
 
                 return (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0) ? LSOpResult.Invalid : LSOpResult.Decline;
             }
@@ -642,7 +642,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (duty1.head == null) costDiff -= duty1.BaseCost;
             if (duty2.head == null) costDiff -= duty2.BaseCost;
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
+            if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
 
             // If either of the changes is not feasible or costs are not accepted, revert
             if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
@@ -653,7 +653,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
 
-                if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
+                if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
 
                 return LSOpResult.Invalid;
             }
@@ -662,7 +662,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             duty1.Type = feasibleTypes1[0];
             duty2.Type = feasibleTypes2[0];
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != css.instance.Blocks.Count) throw new Exception();
+            if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
 
             if (duty1.head == null) duties.Remove(duty1);
             if (duty2.head == null) duties.Remove(duty2);

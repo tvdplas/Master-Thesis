@@ -22,8 +22,6 @@ namespace E_VCSP.Objects {
         Charge
     }
 
-
-
     /// <summary>
     /// Vehicle element which has not yet been finalized
     /// </summary>
@@ -285,7 +283,9 @@ namespace E_VCSP.Objects {
         [JsonInclude]
         public required VehicleType vehicleType;
         [JsonInclude]
-        public List<int> Covers;
+        public List<int> TripCover;
+        [JsonInclude]
+        public List<int> BlockCover;
         [JsonInclude]
         public List<VehicleElement> Elements;
         [JsonInclude]
@@ -296,7 +296,7 @@ namespace E_VCSP.Objects {
                 double cost = Elements.Sum(e => e.Cost);
 
                 // Costs of overnight recharge
-                cost += Math.Min(0, vehicleType.StartSoC - (double)Elements[^1]!.EndSoCInTask!) * vehicleType.Capacity / 100 * Config.KWH_COST;
+                cost += Math.Max(0, vehicleType.StartSoC - (double)Elements[^1]!.EndSoCInTask!) * vehicleType.Capacity / 100 * Config.KWH_COST;
 
                 // Cost of just using vehicle
                 cost += Config.VH_PULLOUT_COST;
@@ -307,18 +307,19 @@ namespace E_VCSP.Objects {
 
         public BitArray ToBitArray(int tripCount) {
             BitArray ba = new(tripCount);
-            for (int i = 0; i < Covers.Count; i++) ba[Covers[i]] = true;
+            for (int i = 0; i < TripCover.Count; i++) ba[TripCover[i]] = true;
             return ba;
         }
 
         public VehicleTask(List<VehicleElement> elements) {
             Elements = elements;
-            Covers = [];
+            TripCover = [];
+            BlockCover = [];
             RecalculateCovers();
         }
 
         public void RecalculateCovers() {
-            Covers = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
+            TripCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
         }
     }
 }

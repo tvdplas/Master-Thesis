@@ -14,10 +14,6 @@ namespace E_VCSP.Objects.ParsedData {
         public List<DeadheadTemplate> DeadheadTemplates;
         public List<DeadheadTemplate> ExtendedTemplates;
 
-        public List<VehicleTask> SelectedTasks = [];
-        public List<Block> Blocks = [];
-        public List<CrewDuty> SelectedDuties = [];
-
         public Instance(string path) {
             Path = path;
 

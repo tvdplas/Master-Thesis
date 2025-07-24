@@ -112,6 +112,12 @@ namespace E_VCSP.Objects {
             }
         }
 
+        public string Descriptor {
+            get {
+                return $"{StartLocation.Index}#{StartTime}#{EndLocation.Index}#{EndTime}";
+            }
+        }
+
         public static List<Block> FromVehicleTask(VehicleTask vt) {
             // Transform into list of block elements
             List<BlockElement> elements = vt.Elements.SelectMany(e => BlockElement.FromVE(e)).ToList();

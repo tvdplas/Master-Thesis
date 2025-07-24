@@ -14,9 +14,13 @@ namespace E_VCSP {
         public string activeFolder = "No folder selected";
 
         Instance? instance;
+        VehicleSolutionState? vss;
+        CrewSolutionState? css;
 
         EVSPCG? vspSolver;
-        Solver.Solver? cspSolver;
+        CSPCG? cspSolver;
+        EVCSPCG? integratedSolver;
+
         RosterDisplay rd = new();
 
         bool working = false;
@@ -40,8 +44,8 @@ namespace E_VCSP {
             Panel scrollablePanel = new() {
                 AutoScroll = true,
                 BorderStyle = BorderStyle.FixedSingle,
-                Location = new System.Drawing.Point(10, 105),
-                Size = new System.Drawing.Size(280, 435),
+                Location = new System.Drawing.Point(10, 135),
+                Size = new System.Drawing.Size(280, 405),
                 Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom,
                 Padding = new Padding(0, 0, 0, 100),
             };
@@ -131,9 +135,9 @@ namespace E_VCSP {
         }
 
         private void stopButtonClick(object sender, EventArgs e) {
-            if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested) {
+            if (ctSource != null && !ctSource.IsCancellationRequested) {
                 Console.WriteLine("Stopping");
-                cancellationTokenSource.Cancel();
+                ctSource.Cancel();
                 stopButton.Enabled = false; // Disable stop button immediately
             }
         }
@@ -145,8 +149,8 @@ namespace E_VCSP {
             working = true;
             solveVSPButton.Enabled = false;
             stopButton.Enabled = true;
-            cancellationTokenSource = new CancellationTokenSource();
-            var token = cancellationTokenSource.Token;
+            ctSource = new();
+            var token = ctSource.Token;
 
             bool success = false;
             try {
@@ -154,7 +158,7 @@ namespace E_VCSP {
 
                 if (success) {
                     view = 0;
-                    rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(instance.SelectedTasks));
+                    rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(vss!.SelectedTasks));
                     viewToggleButton.Enabled = true;
                     solveCSPButton.Enabled = true;
                     Console.WriteLine("Solver finished successfully.");
@@ -170,8 +174,45 @@ namespace E_VCSP {
                 working = false;
                 solveVSPButton.Enabled = true;
                 stopButton.Enabled = false;
-                cancellationTokenSource?.Dispose(); // Dispose the source
-                cancellationTokenSource = null;
+                ctSource?.Dispose(); // Dispose the source
+                ctSource = null;
+            }
+        }
+
+        private async void solveEVCSPClick(object sender, EventArgs e) {
+            reload(); // Ensure instance and solver are ready
+            if (integratedSolver == null) return;
+
+            working = true;
+            solveEVCSPButton.Enabled = false;
+            stopButton.Enabled = true;
+            ctSource = new CancellationTokenSource();
+            var token = ctSource.Token;
+
+            bool success = false;
+            try {
+                success = await Task.Run(() => integratedSolver.Solve(token), token);
+
+                if (success) {
+                    view = 0;
+                    rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(integratedSolver.vss.SelectedTasks));
+                    viewToggleButton.Enabled = true;
+                    solveCSPButton.Enabled = true;
+                    Console.WriteLine("Solver finished successfully.");
+                }
+                else {
+                    Console.WriteLine("Solver did not find a solution or was cancelled.");
+                }
+            }
+            catch (OperationCanceledException) {
+                Console.WriteLine("Solver operation was cancelled.");
+            }
+            finally {
+                working = false;
+                solveEVCSPButton.Enabled = true;
+                stopButton.Enabled = false;
+                ctSource?.Dispose(); // Dispose the source
+                ctSource = null;
             }
         }
 
@@ -179,12 +220,17 @@ namespace E_VCSP {
             if (activeFolder == "No folder selected") return;
 
             solveVSPButton.Enabled = true;
+            solveEVCSPButton.Enabled = true;
             stopButton.Enabled = false;
             viewToggleButton.Enabled = false;
             solveCSPButton.Enabled = false;
 
             instance = new(activeFolder);
-            vspSolver = new EVSPCG(instance);
+            vss = new(instance, instance.VehicleTypes[0]);
+            css = new(instance, []);
+
+            vspSolver = new EVSPCG(vss);
+            integratedSolver = new EVCSPCG(vss, css);
 
             string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
             Config.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
@@ -204,44 +250,49 @@ namespace E_VCSP {
             view = (view + 1) % 3;
 
             List<List<RosterNode>> newNodes = [];
-            if (view == 0 && instance.SelectedTasks.Count > 0)
-                newNodes = SolutionGraph.GenerateVehicleTaskGraph(instance.SelectedTasks);
-            else if (view == 1 && instance.Blocks.Count > 0)
-                newNodes = SolutionGraph.GenerateBlockGraph(instance.SelectedTasks.Select(x => Block.FromVehicleTask(x)).ToList());
-            else if (view == 2 && instance.SelectedTasks.Count > 0)
-                newNodes = SolutionGraph.GenerateCrewDutyGraph(instance.SelectedDuties);
+            if (view == 0 && vss != null && vss.SelectedTasks.Count > 0)
+                newNodes = SolutionGraph.GenerateVehicleTaskGraph(vss.SelectedTasks);
+            else if (view == 1 && vss != null && vss.SelectedTasks.Count > 0)
+                newNodes = SolutionGraph.GenerateBlockGraph(vss.SelectedTasks.Select(x => Block.FromVehicleTask(x)).ToList());
+            else if (view == 2 && css != null && css.SelectedDuties.Count > 0)
+                newNodes = SolutionGraph.GenerateCrewDutyGraph(css.SelectedDuties);
 
             rd.UpdateRosterNodes(newNodes);
         }
 
         private async void solveCSPClick(object sender, EventArgs e) {
-            if (instance == null || instance.Blocks.Count == 0) return;
+            if (instance == null || vss == null || vss.SelectedTasks.Count == 0) return;
 
-            cspSolver = new CSPCG(instance);
+            css = new(instance, vss.SelectedTasks.SelectMany(t => Block.FromVehicleTask(t)).ToList());
+            cspSolver = new CSPCG(css);
 
             working = true;
             solveCSPButton.Enabled = false;
             stopButton.Enabled = true;
-            cancellationTokenSource = new CancellationTokenSource();
-            var token = cancellationTokenSource.Token;
+            ctSource = new CancellationTokenSource();
+            var token = ctSource.Token;
 
             bool success = false;
             try {
                 success = await Task.Run(() => cspSolver.Solve(token), token);
 
-                if (success) Console.WriteLine("CSP Solver finished successfully.");
+                if (success) {
+                    Console.WriteLine("CSP Solver finished successfully.");
+                    view = 2;
+                    rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(css.SelectedDuties));
+                }
                 else Console.WriteLine("No solution/cancelled.");
             }
             catch (OperationCanceledException) {
                 Console.WriteLine("Solver operation was cancelled.");
             }
             finally {
-                view = 2;
+
                 working = false;
                 solveCSPButton.Enabled = true;
                 stopButton.Enabled = false;
-                cancellationTokenSource?.Dispose(); // Dispose the source
-                cancellationTokenSource = null;
+                ctSource?.Dispose(); // Dispose the source
+                ctSource = null;
             }
         }
 
@@ -255,9 +306,12 @@ namespace E_VCSP {
                 activeFolder = dump.path;
                 reload();
 
+                vss = new(instance!, instance!.VehicleTypes[0]);
+                vss.LoadFromDump(dump);
+
                 vspSolver!.vss.LoadFromDump(dump);
                 view = 0;
-                rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(instance!.SelectedTasks));
+                rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(vss!.SelectedTasks));
                 viewToggleButton.Enabled = true;
                 solveCSPButton.Enabled = true;
                 Console.WriteLine("Loaded " + openFileDialog1.FileName);

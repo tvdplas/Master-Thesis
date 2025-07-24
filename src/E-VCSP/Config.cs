@@ -43,7 +43,7 @@
         public static double CR_SHIFT_COST = 2000; // Minimum price to pay a crew member
         public static double CR_HOURLY_COST = 65; // hourly cost of employee. based on qbuzz data
         public static double CR_BROKEN_SHIFT_COST = 20; // additional surcharge for broken shift. based on qbuzz data
-        public static double CR_SINGLE_SHIFT_COST = 100_000_000; // penalty for use of initial shifts
+        public static double CR_SINGLE_SHIFT_COST = 1_000_000; // penalty for use of initial shifts
         public static double CR_MAX_BROKEN_SHIFTS = 0.3;
         public static double CR_MAX_BETWEEN_SHIFTS = 0.1;
         public static double CR_MAX_OVER_LONG_SHIFT = 0.15;
@@ -133,5 +133,7 @@
         public static double CSP_LS_G_MOVE_SINGLE = 5;
         public static double CSP_LS_G_CREWHUB_PENALTY = 10_000;
 
+        public static Header VCSP = new();
+        public static int VCSP_SOLVER_TIMEOUT_SEC = 300;
     }
 }

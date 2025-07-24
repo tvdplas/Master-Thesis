@@ -17,13 +17,14 @@ namespace E_VCSP
 
         #region Windows Form Designer generated code
 
-        private void InitializeComponent()
-        {
+        private void InitializeComponent() {
             loadButton = new Button();
             loadFolderBrowser = new FolderBrowserDialog();
             activeFolderLabel = new Label();
             consoleView = new TextBox();
             configPanel = new Panel();
+            loadEVCSPButton = new Button();
+            solveEVCSPButton = new Button();
             loadCSPResultButton = new Button();
             loadEVSPResultButton = new Button();
             solveCSPButton = new Button();
@@ -76,8 +77,10 @@ namespace E_VCSP
             consoleView.Size = new Size(408, 558);
             consoleView.TabIndex = 4;
             // 
-            // panel1
+            // configPanel
             // 
+            configPanel.Controls.Add(loadEVCSPButton);
+            configPanel.Controls.Add(solveEVCSPButton);
             configPanel.Controls.Add(loadCSPResultButton);
             configPanel.Controls.Add(loadEVSPResultButton);
             configPanel.Controls.Add(solveCSPButton);
@@ -88,15 +91,36 @@ namespace E_VCSP
             configPanel.Controls.Add(activeFolderLabel);
             configPanel.Dock = DockStyle.Left;
             configPanel.Location = new Point(0, 0);
-            configPanel.Name = "panel1";
+            configPanel.Name = "configPanel";
             configPanel.Size = new Size(304, 558);
             configPanel.TabIndex = 1;
             // 
+            // loadEVCSPButton
+            // 
+            loadEVCSPButton.Enabled = false;
+            loadEVCSPButton.Location = new Point(4, 81);
+            loadEVCSPButton.Name = "loadEVCSPButton";
+            loadEVCSPButton.Size = new Size(136, 23);
+            loadEVCSPButton.TabIndex = 9;
+            loadEVCSPButton.Text = "Load EVCSP result";
+            loadEVCSPButton.UseVisualStyleBackColor = true;
+            // 
+            // solveEVCSPButton
+            // 
+            solveEVCSPButton.Location = new Point(146, 81);
+            solveEVCSPButton.Name = "solveEVCSPButton";
+            solveEVCSPButton.Size = new Size(152, 23);
+            solveEVCSPButton.TabIndex = 8;
+            solveEVCSPButton.Text = "Solve EVCSP";
+            solveEVCSPButton.UseVisualStyleBackColor = true;
+            solveEVCSPButton.Click += solveEVCSPClick;
+            // 
             // loadCSPResultButton
             // 
-            loadCSPResultButton.Location = new Point(146, 29);
+            loadCSPResultButton.Enabled = false;
+            loadCSPResultButton.Location = new Point(4, 55);
             loadCSPResultButton.Name = "loadCSPResultButton";
-            loadCSPResultButton.Size = new Size(152, 23);
+            loadCSPResultButton.Size = new Size(136, 23);
             loadCSPResultButton.TabIndex = 7;
             loadCSPResultButton.Text = "Load CSP result";
             loadCSPResultButton.UseVisualStyleBackColor = true;
@@ -113,7 +137,7 @@ namespace E_VCSP
             // 
             // solveCSPButton
             // 
-            solveCSPButton.Location = new Point(146, 54);
+            solveCSPButton.Location = new Point(146, 55);
             solveCSPButton.Name = "solveCSPButton";
             solveCSPButton.Size = new Size(152, 23);
             solveCSPButton.TabIndex = 5;
@@ -124,9 +148,9 @@ namespace E_VCSP
             // viewToggleButton
             // 
             viewToggleButton.Enabled = false;
-            viewToggleButton.Location = new Point(146, 80);
+            viewToggleButton.Location = new Point(4, 107);
             viewToggleButton.Name = "viewToggleButton";
-            viewToggleButton.Size = new Size(155, 23);
+            viewToggleButton.Size = new Size(136, 23);
             viewToggleButton.TabIndex = 4;
             viewToggleButton.Text = "Toggle Graph View";
             viewToggleButton.UseVisualStyleBackColor = true;
@@ -134,9 +158,9 @@ namespace E_VCSP
             // 
             // solveVSPButton
             // 
-            solveVSPButton.Location = new Point(4, 54);
+            solveVSPButton.Location = new Point(146, 29);
             solveVSPButton.Name = "solveVSPButton";
-            solveVSPButton.Size = new Size(136, 23);
+            solveVSPButton.Size = new Size(152, 23);
             solveVSPButton.TabIndex = 2;
             solveVSPButton.Text = "Solve EVSP";
             solveVSPButton.UseVisualStyleBackColor = true;
@@ -145,11 +169,11 @@ namespace E_VCSP
             // stopButton
             // 
             stopButton.Enabled = false;
-            stopButton.Location = new Point(4, 80);
+            stopButton.Location = new Point(146, 107);
             stopButton.Name = "stopButton";
-            stopButton.Size = new Size(136, 23);
+            stopButton.Size = new Size(152, 23);
             stopButton.TabIndex = 3;
-            stopButton.Text = "Stop";
+            stopButton.Text = "Stop Solving";
             stopButton.UseVisualStyleBackColor = true;
             stopButton.Click += stopButtonClick;
             // 
@@ -198,13 +222,13 @@ namespace E_VCSP
             label1.Size = new Size(0, 15);
             label1.TabIndex = 1;
             // 
-            // splitContainer1
+            // splitContainer
             // 
             splitContainer.Dock = DockStyle.Fill;
             splitContainer.Location = new Point(304, 0);
-            splitContainer.Name = "splitContainer1";
+            splitContainer.Name = "splitContainer";
             // 
-            // splitContainer1.Panel2
+            // splitContainer.Panel2
             // 
             splitContainer.Panel2.Controls.Add(consoleView);
             splitContainer.Size = new Size(860, 558);
@@ -243,7 +267,7 @@ namespace E_VCSP
         private SplitContainer splitContainer; // SplitContainer for the TextBox and GraphViewer
         private Button solveVSPButton;
         private Button stopButton;
-        private CancellationTokenSource cancellationTokenSource;
+        private CancellationTokenSource ctSource;
         private Button viewToggleButton;
         private Button button2;
         private Button button3;
@@ -256,5 +280,7 @@ namespace E_VCSP
         private Button loadESVPButton;
         private Button solveCSPButton;
         private OpenFileDialog openFileDialog1;
+        private Button loadEVCSPButton;
+        private Button solveEVCSPButton;
     }
 }

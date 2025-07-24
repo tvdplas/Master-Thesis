@@ -412,7 +412,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 generatedColumns.AddRange(tasks.Select(taskHead => {
                     VehicleTask vehicleTask = taskHead.ToVehicleTask(vss.VehicleType, "LS Global");
                     double reducedCost = vehicleTask.Cost;
-                    foreach (int coveredTripIndex in vehicleTask.Covers) {
+                    foreach (int coveredTripIndex in vehicleTask.TripCover) {
                         reducedCost -= reducedCostsTrip[coveredTripIndex];
                     }
                     return (reducedCost, vehicleTask);
