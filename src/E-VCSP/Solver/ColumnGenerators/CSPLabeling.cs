@@ -156,7 +156,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
         List<List<CSPLabel>> activeLabels = [];
         List<bool> blockedBlock = [];
 
-        internal CSPLabeling(GRBModel model, CrewSolutionState css) : base(model, css) { }
+        private int dualCostSign;
+
+        internal CSPLabeling(GRBModel model, CrewSolutionState css, int dualCostSign) : base(model, css) {
+            this.dualCostSign = dualCostSign;
+        }
 
         private void reset() {
             var constrs = model.GetConstrs();
@@ -168,8 +172,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (model.Status != GRB.Status.INFEASIBLE) {
                 for (int i = 0; i < css.Blocks.Count; i++) {
                     if (!css.BlockActive[i]) continue; // RC dont matter, save time querying
-                    rcBlocks[i] = model.GetConstrByName("cover_block_" + css.Blocks[i].Descriptor).Pi;
-                    if (rcBlocks[i] < 0) rcBlocks[i] = -rcBlocks[i]; // Flip for alternate formulation
+                    rcBlocks[i] = dualCostSign * model.GetConstrByName("cover_block_" + css.Blocks[i].Descriptor).Pi;
                 }
                 rcMaxBroken = model.GetConstrByName("cr_overall_max_broken").Pi;
                 rcMaxBetween = model.GetConstrByName("cr_overall_max_between").Pi;

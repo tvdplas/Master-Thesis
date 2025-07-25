@@ -135,7 +135,7 @@ namespace E_VCSP.Solver {
 
             // Multithreaded shortestpath searching
             List<List<CrewColumnGen>> instances = [
-                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(model, css))], // Labeling
+                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(model, css, 1))], // Labeling
                 [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLSGlobal(model, css))], // Labeling
             ];
             List<double> operationChances = [Config.CSP_LABELING_WEIGHT, Config.CSP_LS_GLOBAL_WEIGHT];

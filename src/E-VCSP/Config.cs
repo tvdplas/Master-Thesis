@@ -141,5 +141,7 @@
         public static int VCSP_VH_ITS_ROUND = 5;
         public static int VCSP_CR_ITS_INIT = 10;
         public static int VCSP_CR_ITS_ROUND = 5;
+        public static int VCSP_VH_INSTANCES = 5;
+        public static int VCSP_CR_INSTANCES = 5;
     }
 }

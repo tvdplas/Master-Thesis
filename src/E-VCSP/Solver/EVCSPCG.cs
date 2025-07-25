@@ -409,9 +409,13 @@ namespace E_VCSP.Solver {
             }
 
             // Attempt to do column generation for crew
-            CSPLabeling cspLabelingInstance = new(model, css);
+
+            CSPLabeling[] cspLabelingInstances = [.. Enumerable.Range(0, Config.VCSP_CR_INSTANCES).Select(_ => new CSPLabeling(model, css, -1))];
             for (int it = 0; it < maxIts; it++) {
-                var newColumns = cspLabelingInstance.GenerateDuties();
+                List<(double reducedCosts, CrewDuty newDuty)> newColumns = new();
+                Parallel.For(0, cspLabelingInstances.Length, (i) => {
+                    newColumns.AddRange(cspLabelingInstances[i].GenerateDuties());
+                });
 
                 foreach ((var reducedCosts, var newDuty) in newColumns) {
                     processNewDuty(reducedCosts, newDuty);

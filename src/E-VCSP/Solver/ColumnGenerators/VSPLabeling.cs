@@ -25,9 +25,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
         public BitArray CoveredTrips;
         public double CurrSoC; // SoC at the end of trip
 
-        public double CurrCosts;  // Actual costs incurred at the end of trip
-        public double MinCost; // Min costs that can be made based on block reduced cost
-        public double MaxCost; // Max costs that can be made based on block reduced cost
+        public double CurrCosts;  // Actual costs incurred at the end of trip, including blocks already completed
+
+        public string CurrentBlockStart = ""; // Origin block start
+        public double MaxBlockSavings; // Min costs that can be made based on block reduced cost
+        public double MinBlockSavings; // Max costs that can be made based on block reduced cost
 
         public VSPLabel() {
             this.Id = ID_COUNTER++;
@@ -44,6 +46,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         /// <returns>The difference in amount of items currently in the front; min = -#items in front + 1, max = 1</returns>
         public int Insert(VSPLabel label) {
             int l = 0, r = front.Count;
+
             // find first item that is larger than or equal to label CurrSoC
             while (l < r) {
                 int m = (l + r) / 2;
@@ -54,27 +57,32 @@ namespace E_VCSP.Solver.ColumnGenerators {
             List<int> sameCharge = new();
             // Linear scan over remaining items, stop insertion once an item is found which dominates
             for (int i = l; i < front.Count; i++) {
-                // Skip if domination is found
-                if (front.Values[i].CurrCosts <= label.CurrCosts) return 0;
+                // Skip insertion if new label is dominated by an existing one
+                VSPLabel existing = front.Values[i];
+                if (existing.CurrCosts - existing.MinBlockSavings <= label.CurrCosts - label.MaxBlockSavings)
+                    return 0;
 
                 // If domination is not found however we are within epsilon range of the inserted label, 
-                // add it to a seperate list of items we will be removing
+                // add it to a seperate list of items we might remove if the new label dominates it
                 if (Math.Abs(front.Values[i].CurrSoC - label.CurrSoC) < Config.VSP_LB_CHARGE_EPSILON) sameCharge.Add(i);
             }
 
             // Keep track of front size diff
             int diff = 0;
 
-            // Remove all labels in front in epsilon range from the inserted label, as none were dominating
+            // Remove labels within epsilon range if they are dominated by the new label
             for (int i = sameCharge.Count - 1; i >= 0; i--) {
-                front.RemoveAt(sameCharge[i]);
-                diff--;
+                VSPLabel existing = front.Values[sameCharge[i]];
+                if (existing.CurrCosts - existing.MaxBlockSavings >= label.CurrSoC - label.MinBlockSavings) {
+                    front.RemoveAt(sameCharge[i]);
+                    diff--;
+                }
             }
 
             // Remove all items which are strictly dominated
             for (int i = l - 1; i >= 0 && i < front.Count; i--) {
-                var b = front.Values[i];
-                if (label.CurrCosts <= b.CurrCosts) {
+                var existing = front.Values[i];
+                if (existing.CurrCosts - existing.MaxBlockSavings >= label.CurrSoC - label.MinBlockSavings) {
                     front.RemoveAt(i);
                     diff--;
                 }
@@ -104,8 +112,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private List<List<VSPLabel>> allLabels = [];
         private List<VSPFront> activeLabels = [];
 
-        private List<double> reducedCosts = [];
-
+        private List<double> tripDualCosts = [];
+        private Dictionary<string, double> blockDualCosts = [];
+        private Dictionary<string, List<double>> blockDualCostsByStart = [];
         private List<bool> blockedNodes = [];
 
         public VSPLabeling(GRBModel model, VehicleSolutionState vss) : base(model, vss) { }
@@ -117,8 +126,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private void reset() {
             allLabels.Clear();
             activeLabels.Clear();
-            reducedCosts.Clear();
+            tripDualCosts.Clear();
             blockedNodes.Clear();
+            blockDualCosts.Clear();
+            blockDualCostsByStart.Clear();
 
             for (int i = 0; i < vss.Nodes.Count; i++) {
                 allLabels.Add([]);
@@ -127,19 +138,39 @@ namespace E_VCSP.Solver.ColumnGenerators {
             }
 
             for (int i = 0; i < vss.Instance.Trips.Count; i++) {
-                reducedCosts.Add(model.GetConstrByName("cover_trip_" + i).Pi);
+                tripDualCosts.Add(model.GetConstrByName("cover_trip_" + i).Pi);
+            }
+
+            var allConstrs = model.GetConstrs();
+            foreach (var constr in allConstrs) {
+                string name = constr.ConstrName;
+                if (constr.ConstrName.StartsWith("cover_block_")) {
+                    string descriptor = name.Split("_")[^1];
+                    string descriptorStart = String.Join("#", descriptor.Split("#").Take(2));
+                    blockDualCosts[descriptor] = constr.Pi;
+                    if (blockDualCostsByStart.ContainsKey(descriptorStart)) blockDualCostsByStart[descriptorStart].Add(constr.Pi);
+                    else blockDualCostsByStart[descriptorStart] = [constr.Pi];
+                }
             }
         }
 
         private void runLabeling() {
+            bool handoverAllowed(Location l, int idleTime) => l.HandoverAllowed && idleTime >= l.MinHandoverTime;
+
+            // Initial label at start of depot; note: no cost range yet, as 
+            // we cannot be inside of a block yet
             int activeLabelCount = addLabel(new VSPLabel() {
                 PrevId = -1,
                 PrevNodeIndex = vss.Nodes.Count - 2,
                 CurrCosts = Config.VH_PULLOUT_COST,
+                MaxBlockSavings = 0,
+                MinBlockSavings = 0,
                 CurrSoC = vss.VehicleType.StartSoC,
                 ChargeTime = ChargeTime.None,
                 CoveredTrips = new BitArray(vss.Instance.Trips.Count)
             }, vss.Nodes.Count - 2);
+
+            Location depot = vss.Instance.Locations.Find(x => x.IsDepot)!;
 
             while (activeLabelCount > 0) {
                 // Get label to expand
@@ -155,13 +186,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 }
                 if (expandingLabel == null) throw new InvalidDataException("Could not find active label to expand");
 
-                // Check if we can directly use a block
-                //for (int targetNodeIndex = 0; targetNodeIndex < BlockAdj[expandingLabelIndex].Count; targetNodeIndex++) {
-                //    Block? block = BlockAdj[expandingLabelIndex][targetNodeIndex];
-                //    //if (block.a)
-                //}
-
-                // Expand label via normal Adj matrix
                 for (int i = 0; i < vss.Adj[expandingLabelIndex].Count; i++) {
                     VSPArc arc = vss.Adj[expandingLabelIndex][i];
 
@@ -175,7 +199,17 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     if (targetTrip != null) newCover[targetTrip.Index] = true;
 
                     // List of vehicle statstics achievable at start of trip.
-                    List<(double SoC, double cost, int steeringTime, int hubTime, int chargeIndex, ChargeTime chargeTime)> statsAtTrip = [];
+                    List<(
+                        double SoC,
+                        double cost,
+                        int steeringTime,
+                        int hubTime,
+                        int chargeIndex,
+                        ChargeTime chargeTime,
+                        double minBlockSavings,
+                        double maxBlockSavings,
+                        string blockDescriptorStart
+                    )> statsAtTrip = [];
 
                     // Direct trip
                     {
@@ -198,8 +232,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         int steeringTime = expandingLabel.SteeringTime;
                         int hubTime = expandingLabel.LastHubTime;
                         double SoC = expandingLabel.CurrSoC;
+                        double minBlockSavings = expandingLabel.MinBlockSavings;
+                        double maxBlockSavings = expandingLabel.MaxBlockSavings;
+                        string blockDescriptorStart = expandingLabel.CurrentBlockStart;
+
                         double costs = arc.DeadheadTemplate.Distance * Config.VH_M_COST;
-                        if (targetIndex < vss.Instance.Trips.Count) costs -= reducedCosts[targetIndex];
+                        if (targetIndex < vss.Instance.Trips.Count) costs -= tripDualCosts[targetIndex];
 
                         if (canCharge == 0) steeringTime += idleTime;
 
@@ -208,9 +246,28 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             costs += res.Cost;
                             SoC = Math.Min(SoC + res.SoCGained, vss.VehicleType.MaxSoC);
 
-                            if (chargeLocation.HandoverAllowed && idleTime >= Math.Max(chargeLocation.SignOffTime, chargeLocation.SignOnTime)) {
+                            if (handoverAllowed(chargeLocation, idleTime)) {
                                 steeringTime = 0;
+
+                                // Finalize block dual costs by adding to actual costs
+                                int locationIndex = chargeLocation.Index;
+                                int idleStartTime = arc.StartTime;
+                                int idleEndTime = arc.StartTime + idleTime;
+                                string descriptor = blockDescriptorStart + $"#{locationIndex}#{idleStartTime}";
+                                costs -= blockDualCosts.GetValueOrDefault(descriptor);
+
+                                // Initialize new range
+                                blockDescriptorStart = $"{locationIndex}#{idleEndTime}";
+                                minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
+                                maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                             }
+                        }
+
+                        // Initialize block descriptor start
+                        if (depotStart && !depotEnd) {
+                            blockDescriptorStart = $"{depot.Index}#{arc.StartTime}";
+                            minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
+                            maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
 
                         SoC -= arc.DeadheadTemplate.Distance * vss.VehicleType.DriveUsage;
@@ -223,8 +280,20 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             costs += res.Cost;
                             SoC = Math.Min(SoC + res.SoCGained, vss.VehicleType.MaxSoC);
                         }
-                        if (targetTrip != null && targetTrip.From.HandoverAllowed && idleTime >= targetTrip.From.MinHandoverTime) {
+                        if (targetTrip != null && handoverAllowed(targetTrip.From, idleTime)) {
                             steeringTime = 0;
+
+                            // Finalize block dual costs by adding to actual costs
+                            int locationIndex = targetTrip.From.Index;
+                            int idleStartTime = arc.StartTime + arc.DeadheadTemplate.Duration;
+                            int idleEndTime = arc.EndTime;
+                            string descriptor = blockDescriptorStart + $"#{locationIndex}#{idleStartTime}";
+                            costs -= blockDualCosts.GetValueOrDefault(descriptor);
+
+                            // Initialize new range
+                            blockDescriptorStart = $"{locationIndex}#{idleEndTime}";
+                            minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
+                            maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
                         if (targetTrip != null && targetTrip.From.CrewHub && idleTime >= targetTrip.From.MinHandoverTime) {
                             hubTime = 0;
@@ -250,7 +319,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             steeringTime,
                             hubTime,
                             chargeLocation?.Index ?? -1,
-                            cl
+                            cl,
+                            minBlockSavings,
+                            maxBlockSavings,
+                            blockDescriptorStart
                         ));
                     }
                     // Check possible detours to charging locations for which the location is not already visited
@@ -271,13 +343,15 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         int idleTime = (arc.EndTime - arc.StartTime) - (dht1.Duration + dht2.Duration);
                         if (idleTime < Config.MIN_CHARGE_TIME) continue;
 
-
                         // There's time to perform the detour; calculate feasibility. 
                         // Always assume that detour is performed directly after previous label
                         int steeringTime = expandingLabel.SteeringTime;
                         int hubTime = expandingLabel.LastHubTime;
                         double SoC = expandingLabel.CurrSoC;
                         double costs = (dht1.Distance + dht2.Distance) * Config.VH_M_COST;
+                        double minBlockSavings = expandingLabel.MinBlockSavings;
+                        double maxBlockSavings = expandingLabel.MaxBlockSavings;
+                        string blockDescriptorStart = expandingLabel.CurrentBlockStart;
 
                         // Perform first deadhead;
                         steeringTime += dht1.Duration;
@@ -286,8 +360,21 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         if (SoC < vss.VehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME || hubTime >= Config.MAX_NO_HUB_TIME) continue;
 
                         // Check if we can reset steering/hub time now that we are at charging location
-                        if (candidateLocation.HandoverAllowed && idleTime >= candidateLocation.MinHandoverTime)
+                        if (handoverAllowed(candidateLocation, idleTime)) {
                             steeringTime = 0;
+
+                            // Finalize block dual costs by adding to actual costs
+                            int locationIndex = candidateLocation.Index;
+                            int idleStartTime = arc.StartTime + dht1.Duration;
+                            int idleEndTime = arc.StartTime + dht1.Duration + idleTime;
+                            string descriptor = blockDescriptorStart + $"#{locationIndex}#{idleStartTime}";
+                            costs -= blockDualCosts.GetValueOrDefault(descriptor);
+
+                            // Initialize new range
+                            blockDescriptorStart = $"{locationIndex}#{idleEndTime}";
+                            minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
+                            maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
+                        }
                         if (candidateLocation.CrewHub && idleTime >= candidateLocation.MinHandoverTime)
                             hubTime = 0;
 
@@ -308,7 +395,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             steeringTime,
                             hubTime,
                             candidateLocation.Index,
-                            ChargeTime.Detour
+                            ChargeTime.Detour,
+                            minBlockSavings,
+                            maxBlockSavings,
+                            blockDescriptorStart
                         ));
                     }
 
@@ -331,6 +421,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             SteeringTime = stats.steeringTime,
                             LastHubTime = stats.hubTime,
                             CoveredTrips = newCover,
+                            CurrentBlockStart = stats.blockDescriptorStart,
+                            MaxBlockSavings = stats.maxBlockSavings,
+                            MinBlockSavings = stats.minBlockSavings,
                         }, arc.To.Index);
                     }
                 }
