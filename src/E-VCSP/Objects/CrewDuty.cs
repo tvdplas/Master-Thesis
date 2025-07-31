@@ -32,6 +32,24 @@ namespace E_VCSP.Objects {
     public class CDEBlock : CrewDutyElement {
         [JsonInclude]
         public Block Block;
+
+        [JsonConstructor]
+        public CDEBlock(
+            Block Block,
+            CrewDutyElementType Type,
+            int StartTime,
+            int EndTime,
+            Location StartLocation,
+            Location EndLocation
+        ) {
+            this.Block = Block;
+            this.Type = Type;
+            this.StartTime = StartTime;
+            this.EndTime = EndTime;
+            this.StartLocation = StartLocation;
+            this.EndLocation = EndLocation;
+        }
+
         public CDEBlock(Block b) {
             Type = CrewDutyElementType.Block;
             StartTime = b.StartTime;
@@ -43,6 +61,21 @@ namespace E_VCSP.Objects {
     }
 
     public class CDEIdle : CrewDutyElement {
+        [JsonConstructor]
+        public CDEIdle(
+            CrewDutyElementType Type,
+            int StartTime,
+            int EndTime,
+            Location StartLocation,
+            Location EndLocation
+        ) {
+            this.Type = Type;
+            this.StartTime = StartTime;
+            this.EndTime = EndTime;
+            this.StartLocation = StartLocation;
+            this.EndLocation = EndLocation;
+        }
+
         public CDEIdle(int startTime, int endTime, Location startLocation, Location endLocation) {
             Type = CrewDutyElementType.Idle;
             StartTime = startTime;
@@ -53,6 +86,21 @@ namespace E_VCSP.Objects {
     }
 
     public class CDEBreak : CrewDutyElement {
+        [JsonConstructor]
+        public CDEBreak(
+            CrewDutyElementType Type,
+            int StartTime,
+            int EndTime,
+            Location StartLocation,
+            Location EndLocation
+        ) {
+            this.Type = Type;
+            this.StartTime = StartTime;
+            this.EndTime = EndTime;
+            this.StartLocation = StartLocation;
+            this.EndLocation = EndLocation;
+        }
+
         public CDEBreak(int startTime, int endTime, Location startLocation, Location endLocation) {
             Type = CrewDutyElementType.Break;
             StartTime = startTime;
@@ -63,6 +111,21 @@ namespace E_VCSP.Objects {
     }
 
     public class CDETravel : CrewDutyElement {
+        [JsonConstructor]
+        public CDETravel(
+            CrewDutyElementType Type,
+            int StartTime,
+            int EndTime,
+            Location StartLocation,
+            Location EndLocation
+        ) {
+            this.Type = Type;
+            this.StartTime = StartTime;
+            this.EndTime = EndTime;
+            this.StartLocation = StartLocation;
+            this.EndLocation = EndLocation;
+        }
+
         public CDETravel(int startTime, int endTime, Location startLocation, Location endLocation) {
             Type = CrewDutyElementType.Travel;
             StartTime = startTime;
@@ -73,6 +136,21 @@ namespace E_VCSP.Objects {
     }
 
     public class CDESignOnOff : CrewDutyElement {
+        [JsonConstructor]
+        public CDESignOnOff(
+            CrewDutyElementType Type,
+            int StartTime,
+            int EndTime,
+            Location StartLocation,
+            Location EndLocation
+        ) {
+            this.Type = Type;
+            this.StartTime = StartTime;
+            this.EndTime = EndTime;
+            this.StartLocation = StartLocation;
+            this.EndLocation = EndLocation;
+        }
+
         public CDESignOnOff(int startTime, int endTime, Location location) {
             if (!location.CrewBase) throw new InvalidOperationException("Heh");
 

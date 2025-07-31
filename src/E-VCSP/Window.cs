@@ -17,14 +17,24 @@ namespace E_VCSP {
         VehicleSolutionState? vss;
         CrewSolutionState? css;
 
-        EVSPCG? vspSolver;
+        EVSPCGLagrange? vspSolver;
         CSPCG? cspSolver;
         EVCSPCG? integratedSolver;
 
         RosterDisplay rd = new();
 
         bool working = false;
-        int view = 0; // 0 = vt, 1 = blocks, 2 = cd
+        int __view = 0;
+        int view {
+            get {
+                return __view;
+            }
+            set {
+                string v = value == 0 ? "vehicles" : value == 1 ? "blocks" : "duties";
+                Console.WriteLine("View set to " + v);
+                __view = value;
+            }
+        }
 
         public MainView() {
             InitializeComponent();
@@ -228,7 +238,7 @@ namespace E_VCSP {
             vss = new(instance, instance.VehicleTypes[0]);
             css = new(instance, []);
 
-            vspSolver = new EVSPCG(vss);
+            vspSolver = new EVSPCGLagrange(vss);
             integratedSolver = new EVCSPCG(vss, css);
 
             string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
@@ -331,7 +341,7 @@ namespace E_VCSP {
                 reload();
 
                 css = new(instance!, []);
-                //css.LoadFromDump(dump);
+                css.LoadFromDump(dump);
                 view = 2;
                 rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(css!.SelectedDuties));
                 viewToggleButton.Enabled = true;

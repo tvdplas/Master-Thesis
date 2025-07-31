@@ -81,6 +81,29 @@ namespace E_VCSP.Objects {
     }
 
     /// <summary>
+    /// JSON dump form of a block
+    /// </summary>
+    public class BlockDump {
+        [JsonInclude]
+        public required Location StartLocation;
+        [JsonInclude]
+        public required Location EndLocation;
+        [JsonInclude]
+        public int StartTime;
+        [JsonInclude]
+        public int EndTime;
+
+        public static BlockDump FromBlock(Block b) {
+            return new BlockDump() {
+                StartLocation = b.StartLocation,
+                EndLocation = b.EndLocation,
+                StartTime = b.StartTime,
+                EndTime = b.EndTime,
+            };
+        }
+    }
+
+    /// <summary>
     /// Part of a vehicle task / crew schedule
     /// </summary>
     public class Block {

@@ -8,7 +8,7 @@ namespace E_VCSP.Solver.SolutionState {
         [JsonInclude]
         public required string path;
         [JsonInclude]
-        public List<Block> blocks = [];
+        public List<BlockDump> blocks = [];
         [JsonInclude]
         public List<CrewDuty> selectedDuties = [];
     }
@@ -62,12 +62,12 @@ namespace E_VCSP.Solver.SolutionState {
             File.WriteAllText(Path.Join(Config.RUN_LOG_FOLDER, "css-result.json"),
             System.Text.Json.JsonSerializer.Serialize(new CrewSolutionStateDump {
                 path = Instance.Path,
-                blocks = Blocks,
+                blocks = Blocks.Select(b => BlockDump.FromBlock(b)).ToList(),
                 selectedDuties = SelectedDuties
             }));
         }
 
-        public void ReadFromDump(CrewSolutionStateDump dump) {
+        public void LoadFromDump(CrewSolutionStateDump dump) {
             if (dump.path != Instance.Path)
                 throw new InvalidOperationException("Cannot read dump for instance different than one loaded");
 
@@ -84,7 +84,12 @@ namespace E_VCSP.Solver.SolutionState {
                     e.EndLocation = Instance.Locations.Find(l => l.Id == e.EndLocation.Id)!;
 
                     if (e is CDEBlock cdeb) {
-                        int blockIndex = blocks.FindIndex(x => x.Descriptor == cdeb.Block.Descriptor);
+                        int blockIndex = blocks.FindIndex(x => {
+                            return x.EndTime == cdeb.EndTime
+                            && x.StartTime == cdeb.StartTime
+                            && x.StartLocation.Id == cdeb.StartLocation.Id
+                            && x.EndLocation.Id == cdeb.EndLocation.Id;
+                        });
                         cdeb.Block = blocks[blockIndex];
                         d.BlockCover.Add(blockIndex);
                     }
