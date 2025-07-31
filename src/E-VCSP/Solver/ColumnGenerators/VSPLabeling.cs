@@ -295,7 +295,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                             maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
-                        if (targetTrip != null && targetTrip.From.CrewHub && idleTime >= targetTrip.From.MinHandoverTime) {
+                        if (targetTrip != null && targetTrip.From.CrewBase && idleTime >= targetTrip.From.MinHandoverTime) {
                             hubTime = 0;
                         }
 
@@ -375,7 +375,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                             maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
-                        if (candidateLocation.CrewHub && idleTime >= candidateLocation.MinHandoverTime)
+                        if (candidateLocation.CrewBase && idleTime >= candidateLocation.MinHandoverTime)
                             hubTime = 0;
 
                         // Perform charge at charging location  

@@ -10,6 +10,12 @@ namespace E_VCSP.Objects {
         Travel,
         SignOnOff,
     }
+    [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+    [JsonDerivedType(typeof(CDEBlock), "block")]
+    [JsonDerivedType(typeof(CDEIdle), "idle")]
+    [JsonDerivedType(typeof(CDEBreak), "break")]
+    [JsonDerivedType(typeof(CDETravel), "travel")]
+    [JsonDerivedType(typeof(CDESignOnOff), "signonoff")]
     public class CrewDutyElement {
         [JsonInclude]
         public CrewDutyElementType Type;
@@ -68,7 +74,7 @@ namespace E_VCSP.Objects {
 
     public class CDESignOnOff : CrewDutyElement {
         public CDESignOnOff(int startTime, int endTime, Location location) {
-            if (!location.CrewHub) throw new InvalidOperationException("Heh");
+            if (!location.CrewBase) throw new InvalidOperationException("Heh");
 
             Type = CrewDutyElementType.SignOnOff;
             StartTime = startTime;

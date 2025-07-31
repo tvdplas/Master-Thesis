@@ -115,7 +115,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             if (t1AdditionTarget == null || t2AdditionTarget == null) throw new InvalidDataException("Heh");
 
-
             (bool feasible, double costDiff, VSPLSNode? travel) glue(VSPLSNode head, VSPLSNode additionTarget, VSPLSNode firstAffected) {
                 // Attempt to glue the two trip parts together; if this results in infeasibility / , return invalid
                 PVETrip? additionTargetAsTrip = additionTarget.PVE.Type == PVEType.Trip ? ((PVETrip)additionTarget.PVE) : null;
@@ -149,7 +148,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 double costDiff = 0;
 
                 var originalRes = head.validateTail(vss.VehicleType);
-                if (!originalRes.handoversFeasible || !originalRes.chargeFeasible) throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
+                if (Config.VSP_LS_SHR_ALLOW_PENALTY) costDiff -= originalRes.penaltyCost;
+                else {
+                    if (originalRes.penaltyCost != 0) throw new Exception("Original state not valid");
+                }
                 costDiff -= originalRes.chargingCost;
                 costDiff -= originalRes.drivingCost;
 
@@ -159,6 +161,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 var newRes = head.validateTail(vss.VehicleType);
                 // Continue with calculation either way; otherwise revert might be skipped
+                if (Config.VSP_LS_SHR_ALLOW_PENALTY) newRes.penaltyCost += costDiff;
                 costDiff += newRes.chargingCost;
                 costDiff += newRes.drivingCost;
 
@@ -166,7 +169,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 additionTarget.Next = atNext;
                 firstAffected.Prev = faPrev;
 
-                if (!newRes.chargeFeasible || !newRes.handoversFeasible) return (false, double.MinValue, null);
+                if (newRes.penaltyCost != 0) return (false, double.MinValue, null);
                 else return (true, costDiff, travel);
             }
 
@@ -178,7 +181,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 return LSOpResult.Invalid;
             }
 
-
             double overallCostDiff = res1.costDiff + res2.costDiff;
             // Extra savings if amount of used vehicles would be reduced
             if (t1TripsBefore + t2TripsAfter == 0 || t2TripsBefore + t1TripsAfter == 0) {
@@ -186,7 +188,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     ? Config.VH_OVER_MAX_COST + Config.VH_PULLOUT_COST // TODO: check if this cost is correct
                     : Config.VH_PULLOUT_COST;
             }
-
 
             if (!accept(overallCostDiff)) {
                 return LSOpResult.Decline;
@@ -332,11 +333,17 @@ namespace E_VCSP.Solver.ColumnGenerators {
             double costDiff = 0;
             var t1OriginalRes = t1Head.validateTail(vss.VehicleType);
             var t2OriginalRes = t2Head.validateTail(vss.VehicleType);
-            if (!t1OriginalRes.chargeFeasible || !t1OriginalRes.handoversFeasible || !t2OriginalRes.chargeFeasible || !t2OriginalRes.handoversFeasible)
-                throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
+            if (Config.VSP_LS_SHR_ALLOW_PENALTY) {
+                costDiff -= t1OriginalRes.penaltyCost;
+                costDiff -= t2OriginalRes.penaltyCost;
+            }
+            else {
+                if (t1OriginalRes.penaltyCost != 0 || t2OriginalRes.penaltyCost != 0)
+                    throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
+            }
             costDiff -= t1OriginalRes.drivingCost;
-            costDiff -= t1OriginalRes.chargingCost;
             costDiff -= t2OriginalRes.drivingCost;
+            costDiff -= t1OriginalRes.chargingCost;
             costDiff -= t2OriginalRes.chargingCost;
 
             // Perform operation 
@@ -350,6 +357,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Add new costs
             var t1NewRes = t1Head.validateTail(vss.VehicleType);
             var t2NewRes = t2Head.validateTail(vss.VehicleType);
+            if (Config.VSP_LS_SHR_ALLOW_PENALTY) {
+                costDiff += t1NewRes.penaltyCost;
+                costDiff += t2NewRes.penaltyCost;
+            }
+
             costDiff += t1NewRes.drivingCost;
             costDiff += t1NewRes.chargingCost;
             costDiff += t2NewRes.drivingCost;
@@ -363,7 +375,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             }
 
             // Check acceptance
-            if (!t1NewRes.chargeFeasible || !t1NewRes.handoversFeasible || !t2NewRes.chargeFeasible || !t2NewRes.handoversFeasible || !accept(costDiff)) {
+            if ((!Config.VSP_LS_SHR_ALLOW_PENALTY && (t1NewRes.penaltyCost != 0 || t2NewRes.penaltyCost != 0)) || !accept(costDiff)) {
                 // Restore original structue
                 t1Prev.Next = t1PrevTravel;
                 t1Next.Prev = t1NextTravel;
@@ -378,7 +390,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             return (costDiff < 0) ? LSOpResult.Improvement : LSOpResult.Accept;
         }
-
 
         /// <summary>
         /// Accept simulated annealing iteration
@@ -398,9 +409,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 (moveRange, Config.VSP_LS_G_MOVE_RANGE),
                 (ops.addChargeStop, Config.VSP_LS_G_ADD_CHARGE),
                 (ops.removeChargeStop, Config.VSP_LS_G_ADD_CHARGE),
-                (ops.addHandoverStop, Config.VSP_LS_G_ADD_HNDVR),
-                (ops.removeHandoverStop, Config.VSP_LS_G_REMOVE_HNDVR),
-            ];
+        ];
 
             List<double> sums = [operations[0].chance];
             for (int i = 1; i < operations.Count; i++) sums.Add(sums[i - 1] + operations[i].chance);
@@ -409,14 +418,19 @@ namespace E_VCSP.Solver.ColumnGenerators {
             List<(double reducedCosts, VehicleTask vehicleTask)> generatedColumns = [];
 
             void dumpTasks() {
-                generatedColumns.AddRange(tasks.Select(taskHead => {
-                    VehicleTask vehicleTask = taskHead.ToVehicleTask(vss.VehicleType, "LS Global");
-                    double reducedCost = vehicleTask.Cost;
-                    foreach (int coveredTripIndex in vehicleTask.TripCover) {
-                        reducedCost -= reducedCostsTrip[coveredTripIndex];
-                    }
-                    return (reducedCost, vehicleTask);
-                }));
+                generatedColumns.AddRange(tasks
+                    .Select<VSPLSNode, (double reducedCost, VehicleTask vehicleTask)?>(taskHead => {
+                        VehicleTask? vehicleTask = taskHead.ToVehicleTask(vss.VehicleType, "LS Global");
+                        if (vehicleTask == null) return null;
+
+                        double reducedCost = vehicleTask.Cost;
+                        foreach (int coveredTripIndex in vehicleTask.TripCover) {
+                            reducedCost -= reducedCostsTrip[coveredTripIndex];
+                        }
+                        return (reducedCost, vehicleTask);
+                    })
+                   .Where(x => x != null)
+                   .Select(x => x!.Value));
             }
 
             int currIts = 0;

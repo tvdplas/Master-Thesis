@@ -59,15 +59,14 @@ public class RosterDisplay : Control {
         ResetView(resetPan);
     }
 
-
     public RosterDisplay() {
         this.DoubleBuffered = true;
         this.Dock = DockStyle.Fill;
 
-        this.MouseDown += RosterDisplay_MouseDown;
-        this.MouseMove += RosterDisplay_MouseMove;
-        this.MouseUp += RosterDisplay_MouseUp;
-        this.MouseWheel += RosterDisplay_MouseWheel;
+        this.MouseDown += RosterDisplay_MouseDown!;
+        this.MouseMove += RosterDisplay_MouseMove!;
+        this.MouseUp += RosterDisplay_MouseUp!;
+        this.MouseWheel += RosterDisplay_MouseWheel!;
     }
 
     protected override void OnPaint(PaintEventArgs e) {
@@ -98,7 +97,6 @@ public class RosterDisplay : Control {
             g.DrawLine(new Pen(Color.LightGray, 4), rx(x + 2700), -100, rx(x + 2700), rosterNodes.Count * (RowHeight + RowMargin));
             g.DrawString(Time.HHMMSS(x), clockFont, Brushes.Black, new PointF(rx(x + 10), -90));
         }
-
 
         // Sort nodes by color, draw all rectangles in single call, add text afterwards
         Dictionary<Color, List<RectangleF>> bufferedRectangles = new();

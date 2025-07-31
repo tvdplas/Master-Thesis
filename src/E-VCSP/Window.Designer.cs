@@ -118,7 +118,6 @@ namespace E_VCSP
             // 
             // loadCSPResultButton
             // 
-            loadCSPResultButton.Enabled = false;
             loadCSPResultButton.Location = new Point(4, 55);
             loadCSPResultButton.Name = "loadCSPResultButton";
             loadCSPResultButton.Size = new Size(136, 23);
@@ -237,7 +236,7 @@ namespace E_VCSP
             splitContainer.SplitterDistance = 445;
             splitContainer.TabIndex = 0;
             // 
-            // openFileDialog1
+            // loadResultDialog
             // 
             loadResultDialog.FileName = "openFileDialog1";
             // 
@@ -278,8 +277,6 @@ namespace E_VCSP
         private Label label1;
         private Button loadEVSPResultButton;
         private Button loadCSPResultButton;
-        private Button loadCSPButton;
-        private Button loadESVPButton;
         private Button solveCSPButton;
         private OpenFileDialog loadResultDialog;
         private Button loadEVCSPButton;

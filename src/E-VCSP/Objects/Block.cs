@@ -117,6 +117,17 @@ namespace E_VCSP.Objects {
             }
         }
 
+        public static Block FromDescriptor(Location startLocation, int startTime, Location endLocation, int endTime) {
+            Block b = new();
+            b.Elements.Add(new BlockElement() {
+                StartLocation = startLocation,
+                StartTime = startTime,
+                EndLocation = endLocation,
+                EndTime = endTime,
+            });
+            return b;
+        }
+
         public static List<Block> FromVehicleTask(VehicleTask vt) {
             // Transform into list of block elements
             List<BlockElement> elements = vt.Elements.SelectMany(e => BlockElement.FromVE(e)).ToList();

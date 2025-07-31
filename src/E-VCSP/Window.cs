@@ -26,7 +26,6 @@ namespace E_VCSP {
         bool working = false;
         int view = 0; // 0 = vt, 1 = blocks, 2 = cd
 
-
         public MainView() {
             InitializeComponent();
             splitContainer.Panel1.Controls.Add(rd);

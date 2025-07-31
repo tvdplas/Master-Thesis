@@ -163,7 +163,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
         public bool IsFeasible(DutyType dt, bool final = false) {
             if (final) {
-                if (!head!.CDE.StartLocation.CrewHub || !tail!.CDE.EndLocation.CrewHub) return false;
+                if (!head!.CDE.StartLocation.CrewBase || !tail!.CDE.EndLocation.CrewBase) return false;
             }
 
             // Check start / end times
@@ -302,8 +302,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 cost += PaidDuration / (60.0 * 60.0) * Config.CR_HOURLY_COST;
                 if (head == null || tail == null) return cost;
 
-                if (!head.CDE.StartLocation.CrewHub) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
-                if (!tail.CDE.EndLocation.CrewHub) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
+                if (!head.CDE.StartLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
+                if (!tail.CDE.EndLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
 
                 return cost;
             }

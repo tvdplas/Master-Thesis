@@ -125,55 +125,70 @@ namespace E_VCSP.Solver.ColumnGenerators {
         }
         #endregion
 
-
         /// <summary>
         /// Determine charge and handover feasibility
         /// </summary>
         /// <param name="vt"></param>
         /// <returns></returns>
         public (
-            bool handoversFeasible,
-            bool chargeFeasible,
+            double penaltyCost,
             double drivingCost,
             double chargingCost
         ) validateTail(VehicleType vt) {
             if (this.Prev != null) throw new Exception("Not on head");
 
-            bool handoversFeasible = true;
-            bool chargeFeasible = true;
+            List<int> overSteeringTime = [];
+            List<int> overCrewbaseTime = [];
+            List<double> underCharge = [];
+
             double drivingCost = 0;
             double chargingCost = 0;
 
             double currSoC = vt.StartSoC;
-            int drivingSince = ((PVETravel)Next!.PVE).DepartureTime;
 
-            bool SoCInBounds() => currSoC <= vt.MaxSoC && currSoC >= vt.MinSoC;
+            int lastHandoverChance = ((PVETravel)Next!.PVE).DepartureTime;
+            int lastSignOnOffChance = ((PVETravel)Next!.PVE).DepartureTime;
+
             void performCharge(int chargeTime, Location chargeLocation) {
-                // In bounds before charge
-                chargeFeasible &= SoCInBounds();
+                // Check bounds before charge
+                if (currSoC < vt.MinSoC) underCharge.Add(vt.MinSoC - currSoC);
 
                 ChargingCurve cc = chargeLocation.ChargingCurves[vt.Index];
                 ChargeResult cr = cc.MaxChargeGained(currSoC, chargeTime);
                 currSoC += cr.SoCGained;
                 chargingCost += cr.Cost;
 
-                // In bounds after charge
-                chargeFeasible &= SoCInBounds();
+                // Might not be fixed at end, but that will be counted at next stop
             }
 
-            bool handoverValid(int currTime) => currTime - drivingSince <= Config.MAX_STEERING_TIME;
+            void performIdle(Location l, int idleStartTime, int idleEndTime) {
+                // See if handover can be performed
+                bool handoverAllowed = l.HandoverAllowed && idleEndTime - idleStartTime >= l.MinHandoverTime;
+                if (handoverAllowed) {
+                    int overTime = (idleStartTime - lastHandoverChance) - Config.MAX_STEERING_TIME;
+                    if (overTime > 0) overSteeringTime.Add(overTime);
+                    lastHandoverChance = idleEndTime;
+                }
+
+                // See if sign on / off can be performed
+                bool signOnOffAllowed = l.CrewBase && idleEndTime - idleStartTime >= l.MinHandoverTime;
+                if (signOnOffAllowed) {
+                    int overTime = (idleStartTime - lastSignOnOffChance) - Config.MAX_NO_HUB_TIME;
+                    if (overTime > 0) overCrewbaseTime.Add(overTime);
+                    lastSignOnOffChance = idleEndTime;
+                }
+            }
 
             VSPLSNode? curr = this.Next!; // First travel after depot head
 
-            int its = 0;
 
             while (curr.Next != null) // end at depot
             {
-                if (its++ > 10000) {
-                    throw new InvalidOperationException("te veel its");
-                }
-
                 PartialVehicleElement VE = curr.PVE;
+
+                if (VE.EndLocation != curr.Next.PVE.StartLocation || VE.EndTime != curr.Next.PVE.StartTime) {
+                    Console.WriteLine("Hey dit klopt niet");
+                }
 
                 // Only update soc and driving costs; everything interesting is handled elsewhere
                 if (VE.Type == PVEType.Travel) {
@@ -187,29 +202,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     // Start by checking whether we are allowed to hand over at the start;
                     // if so, update the time we are driving
                     if (VE.Type == PVEType.Trip) {
-                        // Handover must happen before / after / both
-
-                        // Handover before
-                        bool handoverPossibleBefore = VE.StartLocation!.HandoverAllowed && VE.StartTime - prevTravel.ArrivalTime >= VE.StartLocation!.MinHandoverTime;
-                        if (handoverPossibleBefore) {
-                            handoversFeasible &= handoverValid(prevTravel.ArrivalTime);
-                            drivingSince = VE.StartTime;
-                        }
-
-                        // Handover after
-                        bool handoverPossibleAfter = VE.EndLocation!.HandoverAllowed && nextTravel.DepartureTime - VE.EndTime >= VE.EndLocation!.MinHandoverTime;
-                        if (handoverPossibleAfter) {
-                            handoversFeasible &= handoverValid(VE.EndTime);
-                            drivingSince = nextTravel.DepartureTime;
-                        }
+                        performIdle(VE.StartLocation, VE.StartTime - prevTravel.ArrivalTime, VE.StartTime);
+                        performIdle(VE.EndLocation, VE.EndTime, nextTravel.DepartureTime);
                     }
                     else {
                         // Check if time allows for handover
-                        bool handoverPossible = VE.StartLocation!.HandoverAllowed && nextTravel.DepartureTime - prevTravel.ArrivalTime >= VE.StartLocation!.MinHandoverTime;
-                        if (handoverPossible) {
-                            handoversFeasible &= handoverValid(prevTravel.ArrivalTime);
-                            drivingSince = nextTravel.DepartureTime;
-                        }
+                        performIdle(VE.StartLocation, prevTravel.ArrivalTime, nextTravel.DepartureTime);
                     }
 
                     // Then, check for charging and update SoC / costs
@@ -227,7 +225,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         && (VE.Type == PVEType.HandoverDetour || VE.Type == PVEType.ChargeDetour) // Remains at same location
                         && VE.StartLocation!.CanCharge; // can actually charge
 
-                    if (onlyCharge) performCharge(chargeTimeBefore + chargeTimeAfter, VE.StartLocation!);
+                    if (onlyCharge) {
+                        performCharge(chargeTimeBefore + chargeTimeAfter, VE.StartLocation!);
+                    }
                     else {
                         // Possible charge before
                         if (chargeTimeBefore >= Config.MIN_CHARGE_TIME) performCharge(chargeTimeBefore, VE.StartLocation!);
@@ -244,21 +244,32 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 curr = curr.Next;
             }
 
-            // Check if arrival at depot was valid
-            handoversFeasible &= handoverValid(((PVETravel)curr.Prev!.PVE).ArrivalTime);
-
-            // Check if SoC was valid
-            chargeFeasible &= SoCInBounds();
-
-            // Add night charging costsP
+            // Add night charging costs
             chargingCost += Math.Min(0, vt.StartSoC - currSoC) * vt.Capacity / 100 * Config.KWH_COST;
 
-            return (handoversFeasible, chargeFeasible, drivingCost, chargingCost);
+            // Finalize all times / charge at the depot
+            int arrivalTime = ((PVETravel)curr.Prev!.PVE).ArrivalTime;
+            int handoverOvertime = (arrivalTime - lastHandoverChance) - Config.MAX_STEERING_TIME;
+            if (handoverOvertime > 0) overSteeringTime.Add(handoverOvertime);
+            int crewbaseOvertime = (arrivalTime - lastSignOnOffChance) - Config.MAX_NO_HUB_TIME;
+            if (crewbaseOvertime > 0) overCrewbaseTime.Add(crewbaseOvertime);
+            double SoCDeficit = vt.MinSoC - currSoC;
+            if (SoCDeficit > 0) underCharge.Add(SoCDeficit);
+
+            double penaltyCost = 0;
+            penaltyCost += overSteeringTime.Count * Config.VSP_LS_SHR_HNDVR_FIX;
+            foreach (var x in overSteeringTime) penaltyCost += x * Config.VSP_LS_SHR_HNDVR_VAR;
+            penaltyCost += overCrewbaseTime.Count * Config.VSP_LS_SHR_SGNOO_FIX;
+            foreach (var x in overCrewbaseTime) penaltyCost += x * Config.VSP_LS_SHR_SGNOO_VAR;
+            penaltyCost += underCharge.Count * Config.VSP_LS_SHR_CHGDF_FIX;
+            foreach (var x in underCharge) penaltyCost += x * Config.VSP_LS_SHR_CHGDF_VAR;
+
+            return (penaltyCost, drivingCost, chargingCost);
         }
 
-        public VehicleTask ToVehicleTask(VehicleType vt, string source) {
+        public VehicleTask? ToVehicleTask(VehicleType vt, string source) {
             if (Prev != null) throw new InvalidOperationException("Not calling on head");
-
+            if (validateTail(vt).penaltyCost > 0) return null; // Cannot create an invalid vehicle task
 
             List<VehicleElement> elements = [];
             if (this.Prev != null) throw new Exception("Not on head");
@@ -271,7 +282,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 elements.Add(new VECharge(chargeLocation, startTime, startTime + chargeTime, cr.SoCGained, cr.Cost) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + cr.SoCGained });
                 currSoC += cr.SoCGained;
             }
-
 
             VSPLSNode? curr = this; // First travel after depot head
             while (curr != null) // end at depot
@@ -338,7 +348,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         currSoC += VE.SoCDiff;
 
                         // Possible charge after
-                        if (chargeAfter) performCharge(nextTravel.DepartureTime, chargeTimeAfter, VE.EndLocation!);
+                        if (chargeAfter) performCharge(VE.EndTime, chargeTimeAfter, VE.EndLocation!);
                         else if (VE.Type == PVEType.Trip) {
                             elements.Add(new VEIdle(VE.EndLocation, VE.EndTime, nextTravel.DepartureTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC });
                         }
@@ -366,7 +376,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
             this.T = T;
             this.type = type;
         }
-
 
         /// <summary>
         /// Adds a stop to the task
@@ -407,9 +416,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 travel2Template = vss.AdjFull[((PVETrip)ve).Trip.Index][((PVETrip)next.PVE).Trip.Index]?.DeadheadTemplate;
             }
             else {
-                travel2Template = vss.LocationDHT[ve.StartLocation!.Index][next.PVE.EndLocation!.Index];
+                travel2Template = vss.LocationDHT[ve.EndLocation!.Index][next.PVE.StartLocation!.Index];
             }
-
 
             // No travel possible
             if (travel1Template == null || travel2Template == null) return LSOpResult.Invalid;
@@ -426,7 +434,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Old charge / driving costs
             var oldRes = head!.validateTail(vss.VehicleType);
-            if (!oldRes.handoversFeasible || !oldRes.chargeFeasible) throw new InvalidOperationException("you fucked up");
+            if (Config.VSP_LS_SHR_ALLOW_PENALTY) {
+                costDiff -= oldRes.penaltyCost;
+            }
+            else {
+                if (oldRes.penaltyCost != 0) throw new InvalidOperationException("Previous state not valid");
+            }
             costDiff -= oldRes.drivingCost;
             costDiff -= oldRes.chargingCost;
 
@@ -442,7 +455,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
             prev.Next = travel1;
             next.Prev = travel2;
             var newRes = head!.validateTail(vss.VehicleType);
-            bool changeFeasible = newRes.handoversFeasible && newRes.chargeFeasible;
+            bool changeFeasible = Config.VSP_LS_SHR_ALLOW_PENALTY || newRes.penaltyCost == 0;
+            costDiff += newRes.penaltyCost;
             costDiff += newRes.drivingCost;
             costDiff += newRes.chargingCost;
 
@@ -492,7 +506,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Old charge / driving costs
             var oldRes = head!.validateTail(vss.VehicleType);
-            if (!oldRes.handoversFeasible || !oldRes.chargeFeasible) throw new InvalidOperationException("you fucked up");
+            if (Config.VSP_LS_SHR_ALLOW_PENALTY) {
+                costDiff -= oldRes.penaltyCost;
+            }
+            else {
+                if (oldRes.penaltyCost != 0) throw new InvalidOperationException("old solution not feasible");
+            }
             costDiff -= oldRes.drivingCost;
             costDiff -= oldRes.chargingCost;
 
@@ -506,7 +525,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
             prev.Next = travel;
             next.Prev = travel;
             var newRes = head!.validateTail(vss.VehicleType);
-            bool changeFeasible = newRes.handoversFeasible && newRes.chargeFeasible;
+            bool changeFeasible = Config.VSP_LS_SHR_ALLOW_PENALTY || newRes.penaltyCost == 0;
+            costDiff += newRes.penaltyCost;
             costDiff += newRes.drivingCost;
             costDiff += newRes.chargingCost;
 
@@ -535,7 +555,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             VSPLSNode? curr = head;
             while (curr != null) {
                 if (curr.PVE.Type == PVEType.Travel) {
-                    if (!curr.Prev.PVE.EndLocation.CanCharge && !curr.Next.PVE.StartLocation.CanCharge) {
+                    if (!curr.Prev!.PVE.EndLocation.CanCharge && !curr.Next!.PVE.StartLocation.CanCharge) {
                         times.Add((curr.PVE.StartTime, curr.PVE.EndTime));
                     }
                 }
@@ -586,7 +606,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             VSPLSNode? curr = head;
             while (curr != null) {
                 if (curr.PVE.Type == PVEType.Travel) {
-                    if (!curr.Prev.PVE.EndLocation.HandoverAllowed && !curr.Next.PVE.StartLocation.HandoverAllowed) {
+                    if (!curr.Prev!.PVE.EndLocation.HandoverAllowed && !curr.Next!.PVE.StartLocation.HandoverAllowed) {
                         times.Add((curr.PVE.StartTime, curr.PVE.EndTime));
                     }
                 }

@@ -67,6 +67,39 @@ namespace E_VCSP.Solver.SolutionState {
             }));
         }
 
+        public void ReadFromDump(CrewSolutionStateDump dump) {
+            if (dump.path != Instance.Path)
+                throw new InvalidOperationException("Cannot read dump for instance different than one loaded");
+
+            List<Block> blocks = dump.blocks.Select(b => {
+                Location startLocation = Instance.Locations.Find(l => l.Id == b.StartLocation.Id)!;
+                Location endLocation = Instance.Locations.Find(l => l.Id == b.EndLocation.Id)!;
+                return Block.FromDescriptor(startLocation, b.StartTime, endLocation, b.EndTime);
+            }).ToList();
+
+            List<CrewDuty> duties = dump.selectedDuties.Select((d, i) => {
+                d.BlockCover = [];
+                d.Elements = d.Elements.Select(e => {
+                    e.StartLocation = Instance.Locations.Find(l => l.Id == e.StartLocation.Id)!;
+                    e.EndLocation = Instance.Locations.Find(l => l.Id == e.EndLocation.Id)!;
+
+                    if (e is CDEBlock cdeb) {
+                        int blockIndex = blocks.FindIndex(x => x.Descriptor == cdeb.Block.Descriptor);
+                        cdeb.Block = blocks[blockIndex];
+                        d.BlockCover.Add(blockIndex);
+                    }
+                    return e;
+                }).ToList();
+                d.Index = i + blocks.Count;
+                return d;
+            }).ToList();
+
+            Blocks = blocks;
+            ResetFromBlocks();
+            Duties.AddRange(duties);
+            SelectedDuties = duties;
+        }
+
         public void ResetFromBlocks() {
             SelectedDuties.Clear();
             Duties.Clear();
@@ -110,7 +143,7 @@ namespace E_VCSP.Solver.SolutionState {
                 blockArcType = BlockArcType.ShortIdle;
 
             // Long idle used for split shifts
-            else if (idleLocation.CrewHub && Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
+            else if (idleLocation.CrewBase && Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
                 blockArcType = BlockArcType.LongIdle;
 
             if (blockArcType != BlockArcType.Invalid) {
@@ -164,7 +197,7 @@ namespace E_VCSP.Solver.SolutionState {
             AdjFull[newBlockIndex].Add(null);
 
             // Add depot arcs if signon / signoff is allowed
-            BlockArc? start = b.StartLocation.CrewHub ? new BlockArc() {
+            BlockArc? start = b.StartLocation.CrewBase ? new BlockArc() {
                 ToBlock = b,
                 IdleTime = 0,
                 BreakTime = 0,
@@ -176,7 +209,7 @@ namespace E_VCSP.Solver.SolutionState {
             AdjFull[^2].Insert(newBlockIndex, start);
             AdjFull[newBlockIndex].Add(null);
 
-            BlockArc? end = b.EndLocation.CrewHub ? new BlockArc() {
+            BlockArc? end = b.EndLocation.CrewBase ? new BlockArc() {
                 FromBlock = b,
                 IdleTime = 0,
                 BreakTime = 0,

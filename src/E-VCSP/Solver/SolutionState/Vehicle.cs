@@ -74,8 +74,8 @@ namespace E_VCSP.Solver.SolutionState {
             dump.selectedTasks = dump.selectedTasks.Select(t => {
                 t.vehicleType = VehicleType;
                 t.Elements = t.Elements.Select(e => {
-                    e.EndLocation = Instance.Locations.Find(l => l.Id == e.EndLocation.Id);
-                    e.StartLocation = Instance.Locations.Find(l => l.Id == e.StartLocation.Id);
+                    e.EndLocation = Instance.Locations.Find(l => l.Id == e.EndLocation!.Id);
+                    e.StartLocation = Instance.Locations.Find(l => l.Id == e.StartLocation!.Id);
                     if (e is VETrip et) {
                         var tripMatch = Instance.Trips.Find(t => t.Id == et.Trip.Id);
                         if (tripMatch == null)

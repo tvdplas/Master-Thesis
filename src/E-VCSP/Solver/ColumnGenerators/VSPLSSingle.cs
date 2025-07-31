@@ -105,10 +105,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
             return res;
         }
 
-
-
-        private (double reducedCost, VehicleTask vehicleTask) finalizeTask() {
-            VehicleTask vehicleTask = head!.ToVehicleTask(vss.VehicleType, "LS Single");
+        private (double reducedCost, VehicleTask vehicleTask)? finalizeTask() {
+            VehicleTask? vehicleTask = head!.ToVehicleTask(vss.VehicleType, "LS Single");
+            if (vehicleTask == null) return null;
             double reducedCost = vehicleTask.Cost;
             foreach (int coveredTripIndex in vehicleTask.TripCover) {
                 reducedCost -= reducedCostsTrips[coveredTripIndex];
@@ -124,12 +123,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 (removeTrip, Config.VSP_LS_S_REM_TRIP),
                 (ops.addChargeStop, Config.VSP_LS_S_ADD_CHARGE),
                 (ops.removeChargeStop, Config.VSP_LS_S_ADD_CHARGE),
-                (ops.addHandoverStop, Config.VSP_LS_S_ADD_HNDVR),
-                (ops.removeHandoverStop, Config.VSP_LS_S_REMOVE_HNDVR),
             ];
             List<double> sums = [operations[0].chance];
             for (int i = 1; i < operations.Count; i++) sums.Add(sums[i - 1] + operations[i].chance);
-
 
             List<(double reducedCost, VehicleTask vehicleTask)> generatedTasks = [];
             int itsPerColumn = (int)Config.VSP_LS_S_ITERATIONS / Config.VSP_LS_S_NUM_COLS;
@@ -141,13 +137,17 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     T *= alpha;
                     ops.T = T;
                 }
-                if (currIts % itsPerColumn == 0) generatedTasks.Add(finalizeTask());
+                if (currIts % itsPerColumn == 0) {
+                    var task = finalizeTask();
+                    if (task != null) generatedTasks.Add(task.Value);
+                }
                 double r = random.NextDouble() * sums[^1];
                 int operationIndex = sums.FindIndex(x => r <= x);
                 var res = operations[operationIndex].operation(head);
             }
 
-            generatedTasks.Add(finalizeTask());
+            var finalTask = finalizeTask();
+            if (finalTask != null) generatedTasks.Add(finalTask.Value);
             return generatedTasks;
         }
     }

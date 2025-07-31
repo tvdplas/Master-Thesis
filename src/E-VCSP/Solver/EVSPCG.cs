@@ -83,6 +83,7 @@ namespace E_VCSP.Solver {
             GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.VSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 3; // upper bound
+            model.Parameters.Presolve = 2; // aggresive presolve
             model.SetCallback(new CustomGRBCallback());
             ct.Register(() => {
                 Console.WriteLine("Cancellation requested. Terminating Gurobi model...");
@@ -153,7 +154,7 @@ namespace E_VCSP.Solver {
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSSingle(model, vss))], // LS_SINGLE
                 [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSGlobal(model, vss))], // LS_GLOBAL
             ];
-            List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_SINGLE_WEIGHT, Config.VSP_LS_GLOBAL_WEIGHT];
+            List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_S_WEIGHT, Config.VSP_LS_G_WEIGHT];
             List<double> sums = [operationChances[0]];
             for (int i = 1; i < operationChances.Count; i++) sums.Add(sums[i - 1] + operationChances[i]);
             List<int> predefinedOperations = Config.VSP_OPERATION_SEQUENCE

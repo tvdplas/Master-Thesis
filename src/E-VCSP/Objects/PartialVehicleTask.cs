@@ -106,7 +106,6 @@ namespace E_VCSP.Objects {
         }
         public int IdleTime => EndTime - StartTime - DeadheadTemplate.Duration;
 
-
         /// <summary>
         /// Time at which vehicle arrives after driving deadhead
         /// </summary>

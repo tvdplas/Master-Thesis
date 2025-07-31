@@ -34,7 +34,7 @@
         public static Header DATA = new();
         public static double KWH_COST = 0.32; // based on national average price
         public static int MIN_CHARGE_TIME = 300;
-        public static int MAX_VEHICLES = 5; // Maximum number of vehicles that can be used in the solution.
+        public static int MAX_VEHICLES = 17; // Maximum number of vehicles that can be used in the solution.
         public static double VH_M_COST = 0.00005; // verified at qbuzz
         public static double VH_OVER_MAX_COST = 1000000; // Cost per vehicle of going over. only used as penalty
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
@@ -72,7 +72,7 @@
         public static int VSP_OPT_IT_THRESHOLD = 1000; // Amount of columns sequentially generated without rc before cg is stopped
         public static string VSP_OPERATION_SEQUENCE = "-"; // Defines an initial operation sequence
 
-        public static Header VSP_CG_LABELING = new();
+        public static Header VSP_LABELING = new();
         public static double VSP_LB_WEIGHT = 1;
         public static int VSP_LB_MAX_COLS = 50;
         public static bool VSP_LB_ATTEMPT_DISJOINT = true;
@@ -80,8 +80,17 @@
         public static double VSP_LB_SEC_COL_COUNT = 1; // Number of primary columns to generate secondary columns for 
         public static double VSP_LB_SEC_COL_ATTEMPTS = 4; // Number of attempts per secondary column
 
-        public static Header VSP_CG_LS_SINGLE = new();
-        public static double VSP_LS_SINGLE_WEIGHT = 0;
+        public static Header VSP_LS_SHARED_PENALTIES = new();
+        public static bool VSP_LS_SHR_ALLOW_PENALTY = true;
+        public static double VSP_LS_SHR_HNDVR_FIX = 5000;
+        public static double VSP_LS_SHR_HNDVR_VAR = 10;
+        public static double VSP_LS_SHR_SGNOO_FIX = 5000;
+        public static double VSP_LS_SHR_SGNOO_VAR = 10;
+        public static double VSP_LS_SHR_CHGDF_FIX = 5000;
+        public static double VSP_LS_SHR_CHGDF_VAR = 100;
+
+        public static Header VSP_LS_SINGLE = new();
+        public static double VSP_LS_S_WEIGHT = 0;
         public static double VSP_LS_S_STARTING_T = 50;
         public static double VSP_LS_S_ENDING_T = 0.01;
         public static double VSP_LS_S_COOLING_RATE = 0.95;
@@ -91,11 +100,9 @@
         public static double VSP_LS_S_REM_TRIP = 2;
         public static double VSP_LS_S_ADD_CHARGE = 10;
         public static double VSP_LS_S_REMOVE_CHARGE = 1;
-        public static double VSP_LS_S_ADD_HNDVR = 5;
-        public static double VSP_LS_S_REMOVE_HNDVR = 0.5;
 
         public static Header VSP_CG_LS_GLOBAL = new();
-        public static double VSP_LS_GLOBAL_WEIGHT = 0;
+        public static double VSP_LS_G_WEIGHT = 0;
         public static double VSP_LS_G_STARTING_T = 50;
         public static double VSP_LS_G_ENDING_T = 0.01;
         public static double VSP_LS_G_COOLING_RATE = 0.98;
@@ -105,8 +112,6 @@
         public static double VSP_LS_G_MOVE_RANGE = 20;
         public static double VSP_LS_G_ADD_CHARGE = 5;
         public static double VSP_LS_G_REMOVE_CHARGE = 1;
-        public static double VSP_LS_G_ADD_HNDVR = 1;
-        public static double VSP_LS_G_REMOVE_HNDVR = 0.2;
 
         public static Header CSP = new();
         public static bool CSP_DETERMINE_IIS = false;
