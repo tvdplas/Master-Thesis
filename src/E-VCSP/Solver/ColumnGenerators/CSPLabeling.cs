@@ -1,14 +1,13 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.SolutionState;
-using Gurobi;
 using System.Collections;
 
 namespace E_VCSP.Solver.ColumnGenerators {
-    internal class CSPLabel {
+    internal struct CSPLabel {
         private static int ID_COUNTER = 0;
         internal readonly int Id = -1;
-        internal CSPLabel() {
+        public CSPLabel() {
             Id = ID_COUNTER++;
         }
 
@@ -53,8 +52,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     // Two parts: before break and after idle
                     int beforeDuration = Idle.startTime - StartTime;
                     int afterDuration = currEndTime - (Idle.startTime + Idle.longIdleTime);
-                    var beforeBreaks = Breaks.Where(x => x.startTime + x.breakTime < StartTime + beforeDuration).ToList();
-                    var afterBreaks = Breaks.Where(x => x.startTime + x.breakTime > Idle.startTime + Idle.longIdleTime).ToList();
+                    List<(int startTime, int breakTime)> beforeBreaks = [], afterBreaks = [];
+                    foreach (var br in Breaks) {
+                        if (br.startTime + br.breakTime < StartTime + beforeDuration) beforeBreaks.Add(br);
+                        if (br.startTime + br.breakTime > Idle.startTime + Idle.longIdleTime) afterBreaks.Add(br);
+                    }
 
                     if (beforeDuration > 4 * 60 * 60 && beforeDuration <= 5.5 * 60 * 60) {
                         if (beforeBreaks.Count() == 0) return false;
@@ -147,41 +149,30 @@ namespace E_VCSP.Solver.ColumnGenerators {
     }
 
     internal class CSPLabeling : CrewColumnGen {
-        List<double> rcBlocks = [];
-        double rcMaxBroken;
-        double rcMaxBetween;
-        double rcMaxAvg;
-
         List<List<CSPLabel>> allLabels = [];
         List<List<CSPLabel>> activeLabels = [];
         List<bool> blockedBlock = [];
 
-        private int dualCostSign;
 
-        internal CSPLabeling(GRBModel model, CrewSolutionState css, int dualCostSign) : base(model, css) {
-            this.dualCostSign = dualCostSign;
-        }
+        internal CSPLabeling(CrewSolutionState css) : base(css) { }
 
         private void reset() {
-            var constrs = model.GetConstrs();
-            rcBlocks = Enumerable.Range(0, css.Blocks.Count).Select(_ => 0.0).ToList();
             blockedBlock = [.. css.BlockActive.Select(x => !x), false, false]; // Only use blocks which are active
             allLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
             activeLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
-
-            if (model.Status != GRB.Status.INFEASIBLE) {
-                for (int i = 0; i < css.Blocks.Count; i++) {
-                    if (!css.BlockActive[i]) continue; // RC dont matter, save time querying
-                    rcBlocks[i] = dualCostSign * model.GetConstrByName("cover_block_" + css.Blocks[i].Descriptor).Pi;
-                }
-                rcMaxBroken = model.GetConstrByName("cr_overall_max_broken").Pi;
-                rcMaxBetween = model.GetConstrByName("cr_overall_max_between").Pi;
-                rcMaxAvg = model.GetConstrByName("cr_overall_limited_average_length").Pi;
-            }
         }
 
         private void runLabeling() {
+            List<(List<CSPLabel>, int nodeIndex)> activeLabelsWithContent = [];
+            List<int> indexInWithContent = Enumerable.Range(0, css.Blocks.Count + 2).Select(x => -1).ToList();
+
             void addLabel(CSPLabel l, int index) {
+                if (index <= css.Blocks.Count && indexInWithContent[index] == -1) {
+                    // add it to with content
+                    indexInWithContent[index] = activeLabelsWithContent.Count;
+                    activeLabelsWithContent.Add((activeLabels[index], index));
+                }
+
                 allLabels[index].Add(l);
                 activeLabels[index].Add(l);
             }
@@ -192,8 +183,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 int rho_between = dt == DutyType.Between ? 1 : 0;
 
                 double baseCost = Config.CR_SHIFT_COST + rho_broken * Config.CR_BROKEN_SHIFT_COST;
-                baseCost -= rcMaxBroken * (Config.CR_MAX_BROKEN_SHIFTS - rho_broken);
-                baseCost -= rcMaxBetween * (Config.CR_MAX_BETWEEN_SHIFTS - rho_between);
+                baseCost -= maxBrokenDualCost * (Config.CR_MAX_BROKEN_SHIFTS - rho_broken);
+                baseCost -= maxBetweenDualCost * (Config.CR_MAX_BETWEEN_SHIFTS - rho_between);
 
                 // Start by setting out all possible duty types from the depot start
                 for (int targetBlockIndex = 0; targetBlockIndex < css.Blocks.Count; targetBlockIndex++) {
@@ -205,7 +196,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         PrevLabelId = -1,
                         PrevBlockId = -1,
                         Type = dt,
-                        Cost = baseCost - rcBlocks[targetBlockIndex],
+                        Cost = baseCost - blockDualCosts[targetBlockIndex],
                         Breaks = [],
                     };
 
@@ -216,20 +207,23 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 }
             }
 
-            while (
-                allLabels[^1].Count < Config.CSP_LB_MAX_LABELS_IN_END
-                && activeLabels.Where((x, i) => i <= css.Blocks.Count).Sum(x => x.Count) > 0
-            ) {
+            while (allLabels[^1].Count < Config.CSP_LB_MAX_LABELS_IN_END && activeLabelsWithContent.Count > 0) {
                 // Find node with active label
-                List<int> nodesWithActiveLabels = Enumerable.Range(0, activeLabels.Count - 1)
-                    .Where(i => activeLabels[i].Count > 0)
-                    .ToList();
-                int currentNodeIndex = nodesWithActiveLabels[LSShared.random.Next(0, nodesWithActiveLabels.Count)];
-                List<CSPLabel> targetLabels = activeLabels[currentNodeIndex];
+                int xxx = LSShared.random.Next(0, activeLabelsWithContent.Count);
+                (List<CSPLabel> targetLabels, int currentNodeIndex) = activeLabelsWithContent[xxx];
                 CSPLabel currentLabel = targetLabels[^1];
                 targetLabels.RemoveAt(targetLabels.Count - 1);
 
-                if (currentLabel == null) throw new InvalidOperationException("heh");
+                if (targetLabels.Count == 0) {
+                    // Move last item in activeLabels to position which is now empty
+                    activeLabelsWithContent[xxx] = activeLabelsWithContent[^1];
+                    indexInWithContent[activeLabelsWithContent[xxx].nodeIndex] = xxx;
+
+                    // Reset the now empty label collection, remove it 
+                    indexInWithContent[currentNodeIndex] = -1;
+                    activeLabelsWithContent.RemoveAt(activeLabelsWithContent.Count - 1);
+                }
+
 
                 // Expand node if possible 
                 for (int targetBlockIndex = 0; targetBlockIndex < css.Blocks.Count + 2; targetBlockIndex++) {
@@ -254,7 +248,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     int addedTime = arc.Type != BlockArcType.LongIdle ? timeDiff : timeDiff - arc.IdleTime;
 
                     double costFromTime = addedTime / (60.0 * 60.0) * Config.CR_HOURLY_COST;
-                    double costFromRc = targetBlockIndex < css.Blocks.Count ? -rcBlocks[targetBlockIndex] : 0;
+                    double costFromRc = targetBlockIndex < css.Blocks.Count ? -blockDualCosts[targetBlockIndex] : 0;
 
                     CSPLabel newLabel = new() {
                         CoveredBlockIds = newCoverage,
@@ -277,7 +271,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Adjust costs to include finalized duration
             for (int i = 0; i < allLabels[^1].Count; i++) {
                 CSPLabel l = allLabels[^1][i];
-                l.Cost -= rcMaxAvg * ((css.Blocks[l.PrevBlockId].EndTime - l.StartTime) / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
+                int duration = css.Blocks[l.PrevBlockId].EndTime - l.StartTime;
+                if (l.Type == DutyType.Broken && l.Idle.startTime != -1) duration -= l.Idle.longIdleTime;
+
+                l.Cost -= maxAvgDurationDualCost * ((duration / (double)Config.CR_TARGET_SHIFT_LENGTH) - 1);
+                l.Cost -= maxLongDualCost * (Config.CR_MAX_OVER_LONG_SHIFT - (duration > Config.CR_TARGET_SHIFT_LENGTH ? 1 : 0));
             }
         }
 
@@ -368,9 +366,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
         public override List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties() {
             reset();
-
-            if (model == null || model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
-                throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
 
             runLabeling();
             List<(double reducedCost, CrewDuty crewDuty)> primaryTasks = extractDuties("primary");

@@ -5,7 +5,6 @@ using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
 using Gurobi;
 using System.Collections;
-using System.Text.Json;
 
 namespace E_VCSP.Solver {
     public class EVSPCG : Solver {
@@ -332,12 +331,9 @@ namespace E_VCSP.Solver {
 
             (var selectedTasks, var blocks) = finalizeResults(true);
             vss.SelectedTasks = selectedTasks;
+
             if (Config.DUMP_VSP) {
-                File.WriteAllText(Config.RUN_LOG_FOLDER + "evspcg-res.json", JsonSerializer.Serialize(new VehicleSolutionStateDump() {
-                    selectedTasks = selectedTasks,
-                    vehicleType = vss.VehicleType,
-                    path = vss.Instance.Path,
-                }));
+                vss.Dump();
             }
 
             Config.CONSOLE_GUROBI = configState;

@@ -1,6 +1,7 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using System.Collections;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace E_VCSP.Solver.SolutionState {
@@ -57,6 +58,14 @@ namespace E_VCSP.Solver.SolutionState {
 
             Depot = instance.Locations.Find(x => x.IsDepot) ?? throw new InvalidDataException("No depot found");
             Reset();
+        }
+
+        public void Dump() {
+            File.WriteAllText(Config.RUN_LOG_FOLDER + "vss-result.json", JsonSerializer.Serialize(new VehicleSolutionStateDump() {
+                selectedTasks = SelectedTasks,
+                vehicleType = VehicleType,
+                path = Instance.Path,
+            }));
         }
 
         public void LoadFromDump(VehicleSolutionStateDump dump) {

@@ -135,8 +135,8 @@ namespace E_VCSP.Solver {
 
             // Multithreaded shortestpath searching
             List<List<CrewColumnGen>> instances = [
-                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(model, css, 1))], // Labeling
-                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLSGlobal(model, css))], // Labeling
+                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLabeling(css))], // Labeling
+                [.. Enumerable.Range(0, Config.CSP_INSTANCES_PER_IT).Select(_ => new CSPLSGlobal(css))], // Labeling
             ];
             List<double> operationChances = [Config.CSP_LABELING_WEIGHT, Config.CSP_LS_GLOBAL_WEIGHT];
             List<double> sums = [operationChances[0]];
@@ -211,7 +211,10 @@ namespace E_VCSP.Solver {
                 double r = rnd.NextDouble() * sums[^1];
                 int selectedMethodÍndex = sums.FindIndex(x => r <= x);
                 List<CrewColumnGen> selectedMethod = instances[selectedMethodÍndex];
-                Parallel.For(0, Config.CSP_INSTANCES_PER_IT, (i) => generatedDuties[i] = selectedMethod[i].GenerateDuties());
+                Parallel.For(0, Config.CSP_INSTANCES_PER_IT, (i) => {
+                    selectedMethod[i].UpdateDualCosts(model.GetConstrs().ToDictionary(c => c.ConstrName, c => c), 1);
+                    generatedDuties[i] = selectedMethod[i].GenerateDuties();
+                });
 
                 // Update generated totals
                 totalGenerated += generatedDuties.Length;
@@ -274,6 +277,8 @@ namespace E_VCSP.Solver {
 
             Config.CONSOLE_GUROBI = configState;
             css.SelectedDuties = getSelectedDuties();
+
+            if (Config.DUMP_CSP) css.Dump();
             return succes;
         }
     }

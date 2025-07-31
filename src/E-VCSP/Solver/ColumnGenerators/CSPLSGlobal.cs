@@ -1,6 +1,5 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Solver.SolutionState;
-using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators {
     public class CSPLSNode {
@@ -342,7 +341,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private double alpha;
         private int Q;
 
-        internal CSPLSGlobal(GRBModel model, CrewSolutionState css) : base(model, css) {
+        internal CSPLSGlobal(CrewSolutionState css) : base(css) {
             this.random = LSShared.random;
         }
 

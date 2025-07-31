@@ -1,8 +1,18 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using System.Collections;
+using System.Text.Json.Serialization;
 
 namespace E_VCSP.Solver.SolutionState {
+    public class CrewSolutionStateDump {
+        [JsonInclude]
+        public required string path;
+        [JsonInclude]
+        public List<Block> blocks = [];
+        [JsonInclude]
+        public List<CrewDuty> selectedDuties = [];
+    }
+
     public enum BlockArcType {
         Break,
         LongIdle,
@@ -44,6 +54,32 @@ namespace E_VCSP.Solver.SolutionState {
             this.Instance = instance;
 
             foreach (Block b in initialBlocks) {
+                AddBlock(b);
+            }
+        }
+
+        public void Dump() {
+            File.WriteAllText(Path.Join(Config.RUN_LOG_FOLDER, "css-result.json"),
+            System.Text.Json.JsonSerializer.Serialize(new CrewSolutionStateDump {
+                path = Instance.Path,
+                blocks = Blocks,
+                selectedDuties = SelectedDuties
+            }));
+        }
+
+        public void ResetFromBlocks() {
+            SelectedDuties.Clear();
+            Duties.Clear();
+            VarnameDutyMapping.Clear();
+            CoverDutyMapping.Clear();
+            Adj = [[], []];
+            AdjFull = [[null, null], [null, null]];
+
+            List<Block> temp = [.. Blocks];
+            Blocks.Clear();
+            BlockActive.Clear();
+
+            foreach (Block b in temp) {
                 AddBlock(b);
             }
         }

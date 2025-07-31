@@ -45,6 +45,8 @@ namespace E_VCSP.Solver {
         private List<BlockWrapper> knownBlocks = [];
         private List<GRBVar> taskVars = [];
         private List<GRBVar> dutyVars = [];
+        private Dictionary<string, GRBConstr> vehicleConstrs = [];
+        private Dictionary<string, GRBConstr> crewConstrs = [];
 
         public EVCSPCG(VehicleSolutionState vss, CrewSolutionState css) {
             this.vss = vss;
@@ -52,7 +54,7 @@ namespace E_VCSP.Solver {
 
             // Dump blocks from vss initial solution, add to crew solution
             for (int i = 0; i < vss.Tasks.Count; i++) {
-                processVTBlockCover(vss.Tasks[i]);
+                processVTBlockCover(vss.Tasks[i], false);
             }
         }
 
@@ -95,7 +97,7 @@ namespace E_VCSP.Solver {
                     Console.WriteLine("(!) Not all trips covered");
             }
 
-            if (!postprocessingRequired) return selectedTasks;
+            if (!postprocessingRequired || true) return selectedTasks;
 
             vss.RemoveOvercoverageFromTasks(selectedTasks);
             return selectedTasks;
@@ -139,7 +141,7 @@ namespace E_VCSP.Solver {
 
         #endregion
 
-        private void processVTBlockCover(VehicleTask vt, bool addNewConstrs = false) {
+        private void processVTBlockCover(VehicleTask vt, bool addNewConstrs) {
             List<Block> blocks = Block.FromVehicleTask(vt);
             List<int> BlockCover = [];
 
@@ -150,9 +152,6 @@ namespace E_VCSP.Solver {
 
                 if (descriptorToKnownBlockIndex.ContainsKey(descriptor)) {
                     knownBlockIndex = descriptorToKnownBlockIndex[descriptor];
-                    knownBlocks[knownBlockIndex].CoveredCount++;
-
-                    // Add the vehicle task to the 
                 }
                 else {
                     knownBlockIndex = knownBlocks.Count;
@@ -174,7 +173,8 @@ namespace E_VCSP.Solver {
 
                         GRBLinExpr expr = new();
                         expr -= unitDutyVar;
-                        model!.AddConstr(expr <= 0, $"cover_block_{descriptor}");
+                        string blockCoverName = $"cover_block_{descriptor}";
+                        crewConstrs[blockCoverName] = model.AddConstr(expr <= 0, blockCoverName);
                     }
                 }
 
@@ -196,6 +196,7 @@ namespace E_VCSP.Solver {
             GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.VCSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 3; // upper bound
+            model.Parameters.Presolve = 2; // aggresive presolve
             model.SetCallback(new CustomGRBCallback());
             ct.Register(() => {
                 Console.WriteLine("Cancellation requested.");
@@ -237,7 +238,9 @@ namespace E_VCSP.Solver {
                     }
                 }
                 char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, "cover_trip_" + t.Index);
+                string name = "cover_trip_" + t.Index;
+                GRBConstr constr = model.AddConstr(expr, sense, 1, name);
+                vehicleConstrs[name] = constr;
             }
 
             // Block cover of selected tasks by duties
@@ -254,7 +257,8 @@ namespace E_VCSP.Solver {
                         expr -= dutyVars[cdIndex];
                 }
 
-                model.AddConstr(expr <= 0, $"cover_block_{knownBlocks[blockIndex].Block.Descriptor}");
+                string name = "cover_block_" + knownBlocks[blockIndex].Block.Descriptor;
+                crewConstrs[name] = model.AddConstr(expr <= 0, name);
             }
 
             // Duty type / avg duration
@@ -262,7 +266,6 @@ namespace E_VCSP.Solver {
             GRBLinExpr limitedAverageLength = new(); // avg 8 hours
             GRBLinExpr maxBroken = new(); // max 30% broken
             GRBLinExpr maxBetween = new(); // max 10% between
-            GRBLinExpr maxSingle = new(); // Use singles at a cost
 
             GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "noExcessiveLengthSlack");
             GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "limitedAverageLengthSlack");
@@ -280,10 +283,15 @@ namespace E_VCSP.Solver {
                 maxBetween += v * Config.CR_MAX_BETWEEN_SHIFTS - (duty.Type == DutyType.Between ? v : 0);
             }
 
-            model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, "cr_overall_no_excessive_length");
-            model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, "cr_overall_limited_average_length");
-            model.AddConstr(maxBroken + maxBrokenSlack >= 0, "cr_overall_max_broken");
-            model.AddConstr(maxBetween + maxBetweenSlack >= 0, "cr_overall_max_between");
+
+            crewConstrs["cr_overall_no_excessive_length"] =
+                model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, "cr_overall_no_excessive_length");
+            crewConstrs["cr_overall_limited_average_length"] =
+                model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, "cr_overall_limited_average_length");
+            crewConstrs["cr_overall_max_broken"] =
+                model.AddConstr(maxBroken + maxBrokenSlack >= 0, "cr_overall_max_broken");
+            crewConstrs["cr_overall_max_between"] =
+                model.AddConstr(maxBetween + maxBetweenSlack >= 0, "cr_overall_max_between");
 
             this.model = model;
             return model;
@@ -410,11 +418,13 @@ namespace E_VCSP.Solver {
 
             // Attempt to do column generation for crew
 
-            CSPLabeling[] cspLabelingInstances = [.. Enumerable.Range(0, Config.VCSP_CR_INSTANCES).Select(_ => new CSPLabeling(model, css, -1))];
+            CSPLabeling[] cspLabelingInstances = [.. Enumerable.Range(0, Config.VCSP_CR_INSTANCES).Select(_ => new CSPLabeling(css))];
             for (int it = 0; it < maxIts; it++) {
                 List<(double reducedCosts, CrewDuty newDuty)> newColumns = new();
                 Parallel.For(0, cspLabelingInstances.Length, (i) => {
-                    newColumns.AddRange(cspLabelingInstances[i].GenerateDuties());
+                    cspLabelingInstances[i].UpdateDualCosts(crewConstrs, -1);
+                    var res = cspLabelingInstances[i].GenerateDuties();
+                    foreach (var resCol in res) newColumns.Add(resCol);
                 });
 
                 foreach ((var reducedCosts, var newDuty) in newColumns) {
@@ -422,6 +432,64 @@ namespace E_VCSP.Solver {
                 }
                 model.Optimize();
             }
+        }
+
+        private (double vtCount, double gap) swapVehicleObjective(bool makeBinary, bool optimize = true) {
+            if (model == null) throw new Exception("Cant switch vehicle objective if no model is found");
+
+            foreach (GRBVar var in taskVars) {
+                var.Set(GRB.CharAttr.VType, makeBinary ? GRB.BINARY : GRB.CONTINUOUS);
+            }
+
+            model.GetEnv().TimeLimit = makeBinary ? 60 : Config.VCSP_SOLVER_TIMEOUT_SEC;
+            model.Update();
+            if (optimize) model.Optimize();
+
+            return (makeBinary && optimize ? taskVars.Sum(x => x.X) : -1, makeBinary && optimize ? model.MIPGap : -1);
+        }
+
+
+
+        private void swapCrewObjective(bool makeBinary, bool optimize = true) {
+            if (model == null) throw new Exception("Cant switch vehicle objective if no model is found");
+
+            foreach (GRBVar var in dutyVars) {
+                var.Set(GRB.CharAttr.VType, makeBinary ? GRB.BINARY : GRB.CONTINUOUS);
+            }
+
+            Config.CONSOLE_GUROBI = makeBinary;
+            model.GetEnv().TimeLimit = makeBinary ? 60 : Config.VCSP_SOLVER_TIMEOUT_SEC;
+            model.Update();
+            if (optimize) model.Optimize();
+        }
+
+        /// <summary>
+        /// Show current model state; should be called on relaxed model
+        /// </summary>
+        private void PrintModelState(double ilpVH, double ilpVHGap, int round) {
+            if (model == null) throw new InvalidOperationException("Cannot dump model state without model instance");
+            string r = round == -1 ? "I" : round.ToString();
+            string objVal = model.ObjVal.ToString("0.##");
+            string lpVH = taskVars.Sum(x => x.X).ToString("0.##");
+            string lpCD = dutyVars.Sum(x => x.X).ToString("0.##");
+            string ilpVHGapStr = ilpVHGap.ToString("0.##");
+            string numBlocks = css.ActiveBlockCount.ToString();
+
+            Dictionary<string, string> entries = new Dictionary<string, string> {
+                { "R", r },
+                { "MV\t", objVal },
+                { "ILP-GAP", ilpVHGapStr },
+                { "#VT-ILP", ilpVH.ToString() },
+                { "#VT-LP", lpVH },
+                { "#BL-ILP", numBlocks },
+                { "#CD-LP", lpCD },
+            };
+
+            if (round == -1) {
+                Console.WriteLine(string.Join('\t', entries.Keys));
+            }
+
+            Console.WriteLine(string.Join('\t', entries.Values));
         }
 
         public override bool Solve(CancellationToken ct) {
@@ -433,42 +501,37 @@ namespace E_VCSP.Solver {
 
             // Properly initialize model
             runVehicleIts(true);
+            (double initVHCount, double initGap) = swapVehicleObjective(true);
             updateBlockCover();
-            Console.WriteLine($"Vehicle solution found with {taskVars.Sum(x => x.X):0.##} vehicles, {css.ActiveBlockCount} blocks");
+            swapVehicleObjective(false);
             runCrewIts(true);
-            Console.WriteLine($"Corresponding crew solution found with {dutyVars.Sum(x => x.X):0.##} members");
-
-            Console.WriteLine($"Solution initialized.");
-            Console.WriteLine("R\tMV\t#VT\tVHS\t#CD");
-            Console.WriteLine($"I\t{model.ObjVal:0.##}\t{taskVars.Sum(x => x.X):0.##}\t{model.GetVarByName("vehicle_slack").X:0.##}\t{dutyVars.Sum(x => x.X):0.##}");
+            PrintModelState(initVHCount, initGap, -1);
 
             // Continue running using initial good covering
             for (int round = 0; round < Config.VCSP_ROUNDS; round++) {
                 runVehicleIts(false);
+                (double vhCount, double gap) = swapVehicleObjective(true);
                 updateBlockCover();
+                swapVehicleObjective(false);
                 runCrewIts(false);
-                Console.WriteLine($"{round}\t{model.ObjVal:0.##}\t{taskVars.Sum(x => x.X):0.##}\t{model.GetVarByName("vehicle_slack").X:0.##}\t{dutyVars.Sum(x => x.X):0.##}");
+                PrintModelState(vhCount, gap, round);
             }
 
-            // Make binary
-            foreach (GRBVar var in taskVars) {
-                var.Set(GRB.CharAttr.VType, GRB.BINARY);
-            }
-            foreach (GRBVar var in dutyVars) {
-                var.Set(GRB.CharAttr.VType, GRB.BINARY);
-            }
-
-            updateBlockCover();
-            model.Update();
+            // Make binary in two phases: first duty, then vehicle ofzo
             bool configState = Config.CONSOLE_GUROBI;
             Config.CONSOLE_GUROBI = true;
+
+            swapVehicleObjective(true, false);
+            swapCrewObjective(true, false);
+            model.Update();
             model.Optimize();
             Config.CONSOLE_GUROBI = configState;
 
-            (var selectedTasks, _, var selectedDuties) = finalizeResults(true);
+            (var selectedTasks, var selectedBlocks, var selectedDuties) = finalizeResults(true);
             vss.SelectedTasks = selectedTasks;
             css.SelectedDuties = selectedDuties;
 
+            Console.WriteLine($"Final solution has {selectedTasks.Count} tasks, {selectedBlocks.Count} blocks, {selectedDuties.Count} duties.");
             return true;
         }
     }

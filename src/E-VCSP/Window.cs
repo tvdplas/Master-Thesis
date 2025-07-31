@@ -263,7 +263,12 @@ namespace E_VCSP {
         private async void solveCSPClick(object sender, EventArgs e) {
             if (instance == null || vss == null || vss.SelectedTasks.Count == 0) return;
 
-            css = new(instance, vss.SelectedTasks.SelectMany(t => Block.FromVehicleTask(t)).ToList());
+            if (css == null || css.Blocks.Count == 0) {
+                css = new(instance, vss.SelectedTasks.SelectMany(t => Block.FromVehicleTask(t)).ToList());
+            }
+            else {
+                css.ResetFromBlocks();
+            }
             cspSolver = new CSPCG(css);
 
             working = true;
@@ -297,10 +302,10 @@ namespace E_VCSP {
         }
 
         private void loadEVSPResultClick(object sender, EventArgs e) {
-            var res = openFileDialog1.ShowDialog();
+            var res = loadResultDialog.ShowDialog();
             if (res == DialogResult.OK) {
-                Console.WriteLine("Starting load of " + openFileDialog1.FileName);
-                var dump = JsonSerializer.Deserialize<VehicleSolutionStateDump>(File.ReadAllText(openFileDialog1.FileName), new JsonSerializerOptions());
+                Console.WriteLine("Starting load of " + loadResultDialog.FileName);
+                var dump = JsonSerializer.Deserialize<VehicleSolutionStateDump>(File.ReadAllText(loadResultDialog.FileName), new JsonSerializerOptions());
                 if (dump == null) throw new InvalidDataException("Dump not valid");
 
                 activeFolder = dump.path;
@@ -308,14 +313,36 @@ namespace E_VCSP {
 
                 vss = new(instance!, instance!.VehicleTypes[0]);
                 vss.LoadFromDump(dump);
-
-                vspSolver!.vss.LoadFromDump(dump);
                 view = 0;
                 rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(vss!.SelectedTasks));
                 viewToggleButton.Enabled = true;
                 solveCSPButton.Enabled = true;
-                Console.WriteLine("Loaded " + openFileDialog1.FileName);
+                Console.WriteLine("Loaded " + loadResultDialog.FileName);
             }
+        }
+
+        private void loadCSPResultButton_Click(object sender, EventArgs e) {
+            var res = loadResultDialog.ShowDialog();
+            if (res == DialogResult.OK) {
+                Console.WriteLine("Starting load of " + loadResultDialog.FileName);
+                var dump = JsonSerializer.Deserialize<CrewSolutionStateDump>(File.ReadAllText(loadResultDialog.FileName), new JsonSerializerOptions());
+                if (dump == null) throw new InvalidDataException("Dump not valid");
+
+                activeFolder = dump.path;
+                reload();
+
+                css = new(instance!, []);
+                //css.LoadFromDump(dump);
+                view = 2;
+                rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(css!.SelectedDuties));
+                viewToggleButton.Enabled = true;
+                solveCSPButton.Enabled = true;
+                Console.WriteLine("Loaded " + loadResultDialog.FileName);
+            }
+        }
+
+        private void loadEVCSPButton_Click(object sender, EventArgs e) {
+            Console.WriteLine("Use the other two buttons, only here for symmetry");
         }
     }
 }

@@ -37,7 +37,7 @@ namespace E_VCSP
             button5 = new Button();
             label1 = new Label();
             splitContainer = new SplitContainer();
-            openFileDialog1 = new OpenFileDialog();
+            loadResultDialog = new OpenFileDialog();
             configPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
             splitContainer.Panel2.SuspendLayout();
@@ -104,6 +104,7 @@ namespace E_VCSP
             loadEVCSPButton.TabIndex = 9;
             loadEVCSPButton.Text = "Load EVCSP result";
             loadEVCSPButton.UseVisualStyleBackColor = true;
+            loadEVCSPButton.Click += loadEVCSPButton_Click;
             // 
             // solveEVCSPButton
             // 
@@ -124,6 +125,7 @@ namespace E_VCSP
             loadCSPResultButton.TabIndex = 7;
             loadCSPResultButton.Text = "Load CSP result";
             loadCSPResultButton.UseVisualStyleBackColor = true;
+            loadCSPResultButton.Click += loadCSPResultButton_Click;
             // 
             // loadEVSPResultButton
             // 
@@ -237,7 +239,7 @@ namespace E_VCSP
             // 
             // openFileDialog1
             // 
-            openFileDialog1.FileName = "openFileDialog1";
+            loadResultDialog.FileName = "openFileDialog1";
             // 
             // MainView
             // 
@@ -279,7 +281,7 @@ namespace E_VCSP
         private Button loadCSPButton;
         private Button loadESVPButton;
         private Button solveCSPButton;
-        private OpenFileDialog openFileDialog1;
+        private OpenFileDialog loadResultDialog;
         private Button loadEVCSPButton;
         private Button solveEVCSPButton;
     }

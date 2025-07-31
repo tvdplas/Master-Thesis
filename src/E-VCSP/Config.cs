@@ -23,6 +23,7 @@
         public static Header DEBUG = new();
         public static bool CONSOLE_GUROBI = false;
         public static bool DUMP_VSP = false;
+        public static bool DUMP_CSP = false;
 
         // Nodes
         public static Header NODES = new();
@@ -73,10 +74,10 @@
 
         public static Header VSP_CG_LABELING = new();
         public static double VSP_LB_WEIGHT = 1;
-        public static int VSP_LB_MAX_COLS = 250;
+        public static int VSP_LB_MAX_COLS = 50;
         public static bool VSP_LB_ATTEMPT_DISJOINT = true;
         public static double VSP_LB_CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same
-        public static double VSP_LB_SEC_COL_COUNT = 2; // Number of primary columns to generate secondary columns for 
+        public static double VSP_LB_SEC_COL_COUNT = 1; // Number of primary columns to generate secondary columns for 
         public static double VSP_LB_SEC_COL_ATTEMPTS = 4; // Number of attempts per secondary column
 
         public static Header VSP_CG_LS_SINGLE = new();
@@ -117,7 +118,7 @@
 
         public static Header CSP_LABELING = new();
         public static double CSP_LABELING_WEIGHT = 0;
-        public static int CSP_LB_MAX_LABELS_IN_END = 1_000_000;
+        public static int CSP_LB_MAX_LABELS_IN_END = 100_000;
         public static int CSP_LB_MAX_COLS = 50;
         public static bool CSP_LB_ATTEMPT_DISJOINT = true; // try to find disjoint paths; if none can be found, return any arbitrary path
         public static double CSP_LB_SEC_COL_COUNT = 0; // Number of primary columns to generate secondary columns for 
@@ -135,13 +136,13 @@
         public static double CSP_LS_G_CREWHUB_PENALTY = 10_000;
 
         public static Header VCSP = new();
-        public static int VCSP_SOLVER_TIMEOUT_SEC = 60;
-        public static int VCSP_ROUNDS = 5;
-        public static int VCSP_VH_ITS_INIT = 10;
-        public static int VCSP_VH_ITS_ROUND = 5;
-        public static int VCSP_CR_ITS_INIT = 10;
-        public static int VCSP_CR_ITS_ROUND = 5;
-        public static int VCSP_VH_INSTANCES = 5;
+        public static int VCSP_SOLVER_TIMEOUT_SEC = 300;
+        public static int VCSP_ROUNDS = 10;
+        public static int VCSP_VH_ITS_INIT = 20;
+        public static int VCSP_VH_ITS_ROUND = 10;
+        public static int VCSP_CR_ITS_INIT = 3;
+        public static int VCSP_CR_ITS_ROUND = 3;
+        public static int VCSP_VH_INSTANCES = 1;
         public static int VCSP_CR_INSTANCES = 5;
     }
 }
