@@ -315,8 +315,32 @@ namespace E_VCSP.Solver {
 
         private void runVehicleIts(bool initial) {
             if (model == null) throw new InvalidOperationException();
-
             int maxIts = initial ? Config.VCSP_VH_ITS_INIT : Config.VCSP_VH_ITS_ROUND;
+            VSPLabeling vspLabelingInstance = new(vss);
+
+            void updateDualCosts() {
+                List<double> tripDualCosts = [];
+                Dictionary<string, double> blockDualCosts = new();
+                Dictionary<string, List<double>> blockDualCostsByStart = new();
+
+                foreach (var constr in vehicleConstrs.Values) {
+                    string name = constr.ConstrName;
+                    if (constr.ConstrName.StartsWith("cover_trip")) {
+                        tripDualCosts.Add(constr.Pi);
+                    }
+
+                    if (constr.ConstrName.StartsWith("cover_block_")) {
+                        string descriptor = name.Split("_")[^1];
+                        string descriptorStart = String.Join("#", descriptor.Split("#").Take(2));
+                        blockDualCosts[descriptor] = constr.Pi;
+                        if (blockDualCostsByStart.ContainsKey(descriptorStart)) blockDualCostsByStart[descriptorStart].Add(constr.Pi);
+                        else blockDualCostsByStart[descriptorStart] = [constr.Pi];
+                    }
+                }
+
+                vspLabelingInstance.updateDualCosts(tripDualCosts, blockDualCosts, blockDualCostsByStart);
+            }
+
 
             void processNewTask(double reducedCosts, VehicleTask newTask) {
                 // Determine the block coverage of the new column
@@ -358,8 +382,9 @@ namespace E_VCSP.Solver {
                 vss.CoverTaskMapping[newTask.ToBitArray(vss.Instance.Trips.Count)] = newTask;
             }
 
-            VSPLabeling vspLabelingInstance = new(model, vss);
+
             for (int currIt = 0; currIt < maxIts; currIt++) {
+                updateDualCosts();
                 var newColumns = vspLabelingInstance.GenerateVehicleTasks();
 
                 foreach ((var reducedCosts, var newTask) in newColumns) {

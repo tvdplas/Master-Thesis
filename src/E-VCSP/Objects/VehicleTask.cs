@@ -307,7 +307,7 @@ namespace E_VCSP.Objects {
 
         public BitArray ToBitArray(int tripCount) {
             BitArray ba = new(tripCount);
-            for (int i = 0; i < TripCover.Count; i++) ba[TripCover[i]] = true;
+            foreach (int i in TripCover) ba[i] = true;
             return ba;
         }
 

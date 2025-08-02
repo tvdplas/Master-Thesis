@@ -1,13 +1,11 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.SolutionState;
-using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators {
-    public class VSPLSGlobal(GRBModel model, VehicleSolutionState vss) : VehicleColumnGen(model, vss) {
+    public class VSPLSGlobal(VehicleSolutionState vss) : VehicleColumnGen(vss) {
         private LSOperations ops = new(vss, Config.VSP_LS_G_STARTING_T, "LS Global");
         private List<VSPLSNode> tasks = new();
-        private List<double> reducedCostsTrip = new();
         private List<List<DeadheadTemplate?>> locationDHT = [];
         private Random rnd = new();
 
@@ -22,12 +20,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
             ops = new(vss, T, "LS Global");
 
             tasks.Clear();
-            reducedCostsTrip.Clear();
-
-            GRBConstr[] constrs = model.GetConstrs();
-            for (int i = 0; i < vss.Instance.Trips.Count; i++) {
-                reducedCostsTrip.Add(constrs[i].Pi);
-            }
 
             // Generate initial set of routes
             for (int i = 0; i < vss.Instance.Trips.Count; i++) {
@@ -161,7 +153,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 var newRes = head.validateTail(vss.VehicleType);
                 // Continue with calculation either way; otherwise revert might be skipped
-                if (Config.VSP_LS_SHR_ALLOW_PENALTY) newRes.penaltyCost += costDiff;
+                if (Config.VSP_LS_SHR_ALLOW_PENALTY) costDiff += newRes.penaltyCost;
                 costDiff += newRes.chargingCost;
                 costDiff += newRes.drivingCost;
 
@@ -169,7 +161,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 additionTarget.Next = atNext;
                 firstAffected.Prev = faPrev;
 
-                if (newRes.penaltyCost != 0) return (false, double.MinValue, null);
+                if (!Config.VSP_LS_SHR_ALLOW_PENALTY && newRes.penaltyCost != 0) return (false, double.MinValue, null);
                 else return (true, costDiff, travel);
             }
 
@@ -374,8 +366,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     : Config.VH_PULLOUT_COST;
             }
 
+            bool acceptPenalty = Config.VSP_LS_SHR_ALLOW_PENALTY || (t1NewRes.penaltyCost == 0 && t2NewRes.penaltyCost == 0);
+
             // Check acceptance
-            if ((!Config.VSP_LS_SHR_ALLOW_PENALTY && (t1NewRes.penaltyCost != 0 || t2NewRes.penaltyCost != 0)) || !accept(costDiff)) {
+            if (!acceptPenalty || !accept(costDiff)) {
                 // Restore original structue
                 t1Prev.Next = t1PrevTravel;
                 t1Next.Prev = t1NextTravel;
@@ -425,7 +419,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                         double reducedCost = vehicleTask.Cost;
                         foreach (int coveredTripIndex in vehicleTask.TripCover) {
-                            reducedCost -= reducedCostsTrip[coveredTripIndex];
+                            reducedCost -= tripDualCosts[coveredTripIndex];
                         }
                         return (reducedCost, vehicleTask);
                     })

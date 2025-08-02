@@ -1,12 +1,9 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.SolutionState;
-using Gurobi;
 
 namespace E_VCSP.Solver.ColumnGenerators {
-    public class VSPLSSingle(GRBModel model, VehicleSolutionState vss) : VehicleColumnGen(model, vss) {
-        private List<double> reducedCostsTrips = [];
-
+    public class VSPLSSingle(VehicleSolutionState vss) : VehicleColumnGen(vss) {
         private double T;
         private double alpha;
         private int Q;
@@ -27,12 +24,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
             ops = new(vss, T, "LS Single");
             activeTrips = [];
             inactiveTrips = [.. vss.Instance.Trips.Select(x => x.Index)];
-            reducedCostsTrips = [];
-
-            GRBConstr[] constrs = model.GetConstrs();
-            for (int i = 0; i < vss.Instance.Trips.Count; i++) {
-                reducedCostsTrips.Add(constrs[i].Pi);
-            }
 
             InitVehicleTask();
         }
@@ -65,7 +56,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             inactiveTrips[^1] = selectedTrip; // Order doesn't matter, simply preparing for removal
             Trip trip = vss.Instance.Trips[selectedTrip];
 
-            LSOpResult res = ops.addStop(head, new PVETrip(trip, vss.VehicleType), -reducedCostsTrips[trip.Index]);
+            LSOpResult res = ops.addStop(head, new PVETrip(trip, vss.VehicleType), -tripDualCosts[trip.Index]);
 
             if (res == LSOpResult.Decline || res == LSOpResult.Invalid) return res;
 
@@ -95,7 +86,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             }
             if (curr == null) throw new InvalidOperationException("Could not find selected trip for removal");
 
-            LSOpResult res = ops.removeStop(head, curr, reducedCostsTrips[t.Index]);
+            LSOpResult res = ops.removeStop(head, curr, tripDualCosts[t.Index]);
 
             if (res == LSOpResult.Decline || res == LSOpResult.Invalid) return res;
 
@@ -110,7 +101,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (vehicleTask == null) return null;
             double reducedCost = vehicleTask.Cost;
             foreach (int coveredTripIndex in vehicleTask.TripCover) {
-                reducedCost -= reducedCostsTrips[coveredTripIndex];
+                reducedCost -= tripDualCosts[coveredTripIndex];
             }
             return (reducedCost, vehicleTask);
         }

@@ -149,5 +149,8 @@
         public static int VCSP_CR_ITS_ROUND = 3;
         public static int VCSP_VH_INSTANCES = 1;
         public static int VCSP_CR_INSTANCES = 5;
+
+        public static Header LAGRANGE = new();
+        public static double LAGRANGE_VSP_PI = 1; // (0, 2]
     }
 }

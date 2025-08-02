@@ -2,7 +2,6 @@
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.SolutionState;
 using E_VCSP.Utils;
-using Gurobi;
 using System.Collections;
 
 namespace E_VCSP.Solver.ColumnGenerators {
@@ -112,12 +111,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private List<List<VSPLabel>> allLabels = [];
         private List<VSPFront> activeLabels = [];
 
-        private List<double> tripDualCosts = [];
-        private Dictionary<string, double> blockDualCosts = [];
-        private Dictionary<string, List<double>> blockDualCostsByStart = [];
         private List<bool> blockedNodes = [];
 
-        public VSPLabeling(GRBModel model, VehicleSolutionState vss) : base(model, vss) { }
+        public VSPLabeling(VehicleSolutionState vss) : base(vss) { }
         private int addLabel(VSPLabel spl, int index) {
             allLabels[index].Add(spl);
             return activeLabels[index].Insert(spl);
@@ -126,31 +122,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private void reset() {
             allLabels.Clear();
             activeLabels.Clear();
-            tripDualCosts.Clear();
             blockedNodes.Clear();
-            blockDualCosts.Clear();
-            blockDualCostsByStart.Clear();
 
             for (int i = 0; i < vss.Nodes.Count; i++) {
                 allLabels.Add([]);
                 activeLabels.Add(new());
                 blockedNodes.Add(false);
-            }
-
-            for (int i = 0; i < vss.Instance.Trips.Count; i++) {
-                tripDualCosts.Add(model.GetConstrByName("cover_trip_" + i).Pi);
-            }
-
-            var allConstrs = model.GetConstrs();
-            foreach (var constr in allConstrs) {
-                string name = constr.ConstrName;
-                if (constr.ConstrName.StartsWith("cover_block_")) {
-                    string descriptor = name.Split("_")[^1];
-                    string descriptorStart = String.Join("#", descriptor.Split("#").Take(2));
-                    blockDualCosts[descriptor] = constr.Pi;
-                    if (blockDualCostsByStart.ContainsKey(descriptorStart)) blockDualCostsByStart[descriptorStart].Add(constr.Pi);
-                    else blockDualCostsByStart[descriptorStart] = [constr.Pi];
-                }
             }
         }
 
@@ -621,9 +598,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
         public override List<(double reducedCost, VehicleTask vehicleTask)> GenerateVehicleTasks() {
             reset();
 
-            if (model == null || model.Status == GRB.Status.LOADED || model.Status == GRB.Status.INFEASIBLE)
-                throw new InvalidOperationException("Can't find shortest path if model is in infeasible state");
-
             runLabeling();
             List<(double reducedCost, VehicleTask vehicleTask)> primaryTasks = extractTasks("primary", new());
             List<(double reducedCost, VehicleTask vehicleTask)> secondaryTasks = [];
@@ -636,6 +610,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 for (int j = 1; j < (Config.VSP_LB_SEC_COL_ATTEMPTS + 1); j++) {
                     reset();
+
                     for (int k = 0; k < (int)((double)j * baseTask.vehicleTask.TripCover.Count / (Config.VSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
                         blockedNodes[baseTask.vehicleTask.TripCover[k]] = true;
                     }

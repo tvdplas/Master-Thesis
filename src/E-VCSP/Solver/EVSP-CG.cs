@@ -150,9 +150,9 @@ namespace E_VCSP.Solver {
 
             // Multithreaded shortestpath searching
             List<List<VehicleColumnGen>> instances = [
-                [new VSPLabeling(model, vss)], // Labeling
-                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSSingle(model, vss))], // LS_SINGLE
-                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSGlobal(model, vss))], // LS_GLOBAL
+                [new VSPLabeling(vss)], // Labeling
+                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSSingle(vss))], // LS_SINGLE
+                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSGlobal(vss))], // LS_GLOBAL
             ];
             List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_S_WEIGHT, Config.VSP_LS_G_WEIGHT];
             List<double> sums = [operationChances[0]];
@@ -188,13 +188,15 @@ namespace E_VCSP.Solver {
                 }
 
                 List<VehicleColumnGen> selectedMethod = instances[selectedMethodIndex];
-
+                List<double> tripDualCosts = model.GetConstrs().Select(x => x.Pi).ToList();
                 if (selectedMethod.Count > 1) {
                     Parallel.For(0, selectedMethod.Count, (i) => {
+                        selectedMethod[i].updateDualCosts(tripDualCosts, [], []);
                         generatedTasks.Add(selectedMethod[i].GenerateVehicleTasks());
                     });
                 }
                 else {
+                    selectedMethod[0].updateDualCosts(tripDualCosts, [], []);
                     generatedTasks.Add(selectedMethod[0].GenerateVehicleTasks());
                 }
 

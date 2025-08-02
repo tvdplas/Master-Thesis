@@ -1,15 +1,17 @@
 ﻿using E_VCSP.Formatting;
 using E_VCSP.Objects;
-using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
 using Gurobi;
-using System.Collections;
 
 namespace E_VCSP.Solver {
     public class EVSPCGLagrange : Solver {
         private GRBModel? model;
         public VehicleSolutionState vss;
+        List<GRBVar> taskVars = [];
+        List<double> lambdaTrips = [];
+
+        double upperBoundValue = double.MaxValue;
 
         public EVSPCGLagrange(VehicleSolutionState vss) {
             this.vss = vss;
@@ -22,14 +24,13 @@ namespace E_VCSP.Solver {
 
             // trip index -> [selected vehicle task index]
             List<List<int>> coveredBy = Enumerable.Range(0, vss.Instance.Trips.Count).Select(x => new List<int>()).ToList();
-            List<VehicleTask> tasks = [];
-            foreach (GRBVar v in model.GetVars()) {
-                if (!v.VarName.StartsWith("vt_") || v.X != 1) continue;
+            for (int i = 0; i < taskVars.Count; i++) {
+                GRBVar v = taskVars[i];
+                if (v.X != 1) continue;
 
-                VehicleTask vt = vss.VarnameTaskMapping[v.VarName];
-                selectedTasks.Add(vt);
-                foreach (int i in vt.TripCover) {
-                    coveredBy[i].Add(selectedTasks.Count - 1);
+                selectedTasks.Add(vss.Tasks[i]);
+                foreach (int j in vss.Tasks[i].TripCover) {
+                    coveredBy[j].Add(selectedTasks.Count - 1);
                 }
             }
 
@@ -52,9 +53,6 @@ namespace E_VCSP.Solver {
                     Console.WriteLine("(!) Not all trips covered");
             }
 
-            if (!postprocessingRequired) return selectedTasks;
-
-            vss.RemoveOvercoverageFromTasks(selectedTasks);
             return selectedTasks;
         }
 
@@ -72,7 +70,7 @@ namespace E_VCSP.Solver {
         /// </summary>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Model where first <c>n</c> constraints correspond to the <c>n</c> trips, and a list of initial vehicle task vars</returns>
-        private (GRBModel model, List<GRBVar> taskVars) InitModel(CancellationToken ct) {
+        private GRBModel InitModel(CancellationToken ct) {
             // Env
             GRBEnv env = new() {
                 LogToConsole = 1,
@@ -92,11 +90,12 @@ namespace E_VCSP.Solver {
 
 
             // Add variable for each task/column; add to maxVehicle constraint
+            taskVars = [];
+
             GRBLinExpr maxVehicles = new();
-            List<GRBVar> taskVars = [];
             for (int i = 0; i < vss.Tasks.Count; i++) {
                 string name = $"vt_{i}";
-                GRBVar v = model.AddVar(0, GRB.INFINITY, vss.Tasks[i].Cost, GRB.CONTINUOUS, name);
+                GRBVar v = model.AddVar(0, 1, vss.Tasks[i].Cost, GRB.BINARY, name);
                 maxVehicles += v;
 
                 // Bookkeeping to find variable based on name / cover easily
@@ -105,33 +104,79 @@ namespace E_VCSP.Solver {
                 vss.CoverTaskMapping.Add(vss.Tasks[i].ToBitArray(vss.Instance.Trips.Count), vss.Tasks[i]);
             }
 
-            // Add cover constraint for each of the trips
-            // Note: index of constraint corresponds directly to index of trip 
-            foreach (Trip t in vss.Instance.Trips) {
-                GRBLinExpr expr = new();
-                for (int i = 0; i < vss.Tasks.Count; i++) {
-                    if (vss.Tasks[i].TripCover.Contains(t.Index)) {
-                        expr.AddTerm(1, taskVars[i]);
-                    }
-                }
+            for (int i = 0; i < vss.Instance.Trips.Count; i++) lambdaTrips.Add(1);
 
-                // Switch between set partition and cover
-                char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, "cover_trip_" + t.Index);
-            }
-
-            // Finalize max vehicle constraint with slack
-            // Note: added after trips so trips have easier indexing. 
-            GRBVar vehicleCountSlack = model.AddVar(0, vss.Instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
-            model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
+            //GRBVar vehicleCountSlack = model.AddVar(0, vss.Instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
+            //model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
 
             this.model = model;
-            return (model, taskVars);
+
+            // Determine upper bound for use in gradient descent
+            VSPLSGlobal global = new(vss);
+            global.updateDualCosts(vss.Instance.Trips.Select(_ => 0.0).ToList(), [], []);
+            bool initialPenaltyState = Config.VSP_LS_SHR_ALLOW_PENALTY;
+            Config.VSP_LS_SHR_ALLOW_PENALTY = false;
+            var initialTasks = global.GenerateVehicleTasks();
+            Config.VSP_LS_SHR_ALLOW_PENALTY = initialPenaltyState;
+
+            upperBoundValue = initialTasks.Sum(x => x.vehicleTask.Cost);
+            //+ Math.Max(0, initialTasks.Count - Config.MAX_VEHICLES) * Config.VH_OVER_MAX_COST;
+
+            Console.WriteLine($"Upper bound found using global local search with {initialTasks.Count} vehicles, total cost {upperBoundValue}");
+
+            return model;
+        }
+
+        public void updateTaskCosts() {
+            for (int taskIndex = 0; taskIndex < taskVars.Count; taskIndex++) {
+                VehicleTask vt = vss.Tasks[taskIndex];
+                double newModelCost = vt.Cost;
+
+                foreach (int tripIndex in vt.TripCover) {
+                    newModelCost -= lambdaTrips[tripIndex];
+                }
+
+                taskVars[taskIndex].Obj = newModelCost;
+            }
+        }
+
+        public void gradientDescent() {
+            // based on https://people.brunel.ac.uk/~mastjjb/jeb/natcor_ip_rest.pdf
+            List<(double C_i, int i)> costsByTaskIndex = vss.Tasks.Select((x, i) => (x.Cost, i)).ToList();
+            for (int i = 0; i < 10; i++) ;
+
+            for (int x = 0; x < 10; x++) {
+                updateTaskCosts();
+                model.Optimize();
+                Console.WriteLine("Model value: " + model.ObjVal);
+
+                List<double> G = [];
+
+                for (int i = 0; i < lambdaTrips.Count; i++) {
+                    double G_i = 1; // b
+
+                    for (int j = 0; j < taskVars.Count; j++) {
+                        if (vss.Tasks[j].TripCover.Contains(i)) {
+                            G_i -= taskVars[j].X;
+                        }
+                    }
+
+                    G.Add(G_i);
+                }
+
+                double GSquaredSum = 0;
+                foreach (var g in G) GSquaredSum += g * g;
+                double T = Config.LAGRANGE_VSP_PI * (upperBoundValue - model.ObjVal) / GSquaredSum;
+
+                for (int i = 0; i < lambdaTrips.Count; i++) {
+                    lambdaTrips[i] = Math.Max(0, lambdaTrips[i] + T * G[i]);
+                }
+            }
         }
 
         public override bool Solve(CancellationToken ct) {
-            (GRBModel model, List<GRBVar> taskVars) = InitModel(ct);
-            model.Optimize();
+            model = InitModel(ct);
+            gradientDescent();
 
             // Tracking generated columns
             int maxColumns = Config.VSP_INSTANCES_PER_IT * Config.VSP_MAX_COL_GEN_ITS,
@@ -144,148 +189,66 @@ namespace E_VCSP.Solver {
                 seqWithoutRC = 0,           // Number of sequential columns without reduced cost found
                 totWithoutRC = 0,           // Total columns generated with no RC
                 addedNew = 0,               // Total columns added to model (not initial)
-                notFound = 0,               // Number of columns that could not be generated
                 discardedNewColumns = 0,    // Number of columns discarded due to better one in model
                 discardedOldColumns = 0;    // Number of columns in model discarded due to better one found
 
             // Multithreaded shortestpath searching
-            List<List<VehicleColumnGen>> instances = [
-                [new VSPLabeling(model, vss)], // Labeling
-                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSSingle(model, vss))], // LS_SINGLE
-                [.. Enumerable.Range(0, Config.VSP_INSTANCES_PER_IT).Select(_ => new VSPLSGlobal(model, vss))], // LS_GLOBAL
-            ];
-            List<double> operationChances = [Config.VSP_LB_WEIGHT, Config.VSP_LS_S_WEIGHT, Config.VSP_LS_G_WEIGHT];
-            List<double> sums = [operationChances[0]];
-            for (int i = 1; i < operationChances.Count; i++) sums.Add(sums[i - 1] + operationChances[i]);
-            List<int> predefinedOperations = Config.VSP_OPERATION_SEQUENCE
-                .Where(x => '0' <= x && x <= '9')
-                .Select(x => int.Parse(x.ToString())).Reverse().ToList();
-
+            VSPLabeling colgenInstance = new VSPLabeling(vss);
             Console.WriteLine("Column generation started");
             Console.WriteLine("%\tT\tLB\tLSS\tLSG\tAN\tNF\tDN\tDO\tWRC\tMV");
 
-            Random rnd = new();
-
-            // Continue until max number of columns is found, model isn't feasible during solve or break
-            // due to RC constraint. 
-            while (currIts < Config.VSP_MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE) {
+            while (currIts < Config.VSP_MAX_COL_GEN_ITS) {
                 // Terminate column generation if cancelled
                 if (ct.IsCancellationRequested) return false;
 
-                var reducedCosts = model.GetConstrs().Select(x => x.Pi);
-
-                // Generate batch of new tasks using pricing information from previous solve
-                List<List<(double, VehicleTask)>> generatedTasks = [];
-
-                int selectedMethodIndex = -1;
-                if (predefinedOperations.Count > 0) {
-                    selectedMethodIndex = predefinedOperations[^1];
-                    predefinedOperations.RemoveAt(predefinedOperations.Count - 1);
-                }
-                else {
-                    double r = rnd.NextDouble() * sums[^1];
-                    selectedMethodIndex = sums.FindIndex(x => r <= x);
-                }
-
-                List<VehicleColumnGen> selectedMethod = instances[selectedMethodIndex];
-
-                if (selectedMethod.Count > 1) {
-                    Parallel.For(0, selectedMethod.Count, (i) => {
-                        generatedTasks.Add(selectedMethod[i].GenerateVehicleTasks());
-                    });
-                }
-                else {
-                    generatedTasks.Add(selectedMethod[0].GenerateVehicleTasks());
-                }
+                colgenInstance.updateDualCosts(lambdaTrips, [], []);
+                List<(double, VehicleTask)> generatedTasks = colgenInstance.GenerateVehicleTasks();
 
                 totalGenerated += generatedTasks.Count;
-                int colsGenerated = generatedTasks.Sum(t => t.Count);
-                switch (selectedMethodIndex) {
-                    case 0: lbGenerated += colsGenerated; break;
-                    case 1: singleGenerated += colsGenerated; break;
-                    case 2: globalGenerated += colsGenerated; break;
-                    default: throw new InvalidOperationException("You forgot to add a case");
-                }
+                lbGenerated += generatedTasks.Count;
 
                 int percent = (int)((totalGenerated / (double)maxColumns) * 100);
                 if (percent >= lastReportedPercent + 10) {
                     lastReportedPercent = percent - (percent % 10);
-                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{model.ObjVal}");
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{model.ObjVal}");
                 }
 
-                foreach (var taskSet in generatedTasks) {
-                    if (taskSet.Count == 0) {
-                        notFound++;
-                        continue;
+                foreach (var task in generatedTasks) {
+                    (double reducedCost, VehicleTask newTask) = task;
+
+                    // Do not add column to model
+                    if (reducedCost > 0) {
+                        seqWithoutRC++;
+                        totWithoutRC++;
                     }
+                    else {
+                        // Reset non-reduced costs iterations
+                        seqWithoutRC = 0;
 
-                    foreach (var task in taskSet) {
-                        (double reducedCost, VehicleTask newTask) = ((double, VehicleTask))task;
+                        // Create new column for task, add it to model.
+                        int index = vss.Tasks.Count;
+                        string name = $"vt_{index}";
+                        vss.Tasks.Add(newTask);
+                        newTask.Index = index;
 
-                        // Check if task is already in model 
-                        BitArray ba = newTask.ToBitArray(vss.Instance.Trips.Count);
-                        bool coverExists = vss.CoverTaskMapping.ContainsKey(ba);
+                        // Create new column to add to model
+                        var modelConstrs = model.GetConstrs();
+                        GRBConstr[] constrs = [.. modelConstrs.Where((x) => x.ConstrName == "max_vehicles")];
+                        GRBColumn col = new();
+                        col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
 
-                        // Cover already exists and is cheaper -> skip
-                        if (coverExists && vss.CoverTaskMapping[ba].Cost <= newTask.Cost) {
-                            discardedNewColumns++;
-                            continue;
-                        }
-
-                        // Do not add column to model
-                        if (reducedCost > 0) {
-                            seqWithoutRC++;
-                            totWithoutRC++;
-                        }
-                        else {
-                            // Reset non-reduced costs iterations
-                            seqWithoutRC = 0;
-
-                            // Replace existing column with this task, as it has lower costs
-                            if (coverExists) {
-                                VehicleTask toBeReplaced = vss.CoverTaskMapping[ba];
-                                int index = toBeReplaced.Index;
-                                newTask.Index = index;
-
-                                // Bookkeeping; replace task in public datastructures
-                                vss.Tasks[index] = newTask;
-                                vss.VarnameTaskMapping[$"vt_{index}"] = newTask;
-                                vss.CoverTaskMapping[ba] = newTask;
-
-                                // Adjust costs in model
-                                taskVars[index].Obj = newTask.Cost;
-                                discardedOldColumns++;
-                            }
-                            // Create new column for task, add it to model.
-                            else {
-                                int index = vss.Tasks.Count;
-                                string name = $"vt_{index}";
-                                vss.Tasks.Add(newTask);
-                                newTask.Index = index;
-
-                                // Create new column to add to model
-                                var modelConstrs = model.GetConstrs();
-                                GRBConstr[] constrs = [.. modelConstrs.Where(
-                                    (_, i) => newTask.TripCover.Contains(i)    // Covers trip
-                                    || i == modelConstrs.Length - 1        // Add to used vehicles
-                                )];
-                                GRBColumn col = new();
-                                col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
-
-                                // Add column to model
-                                taskVars.Add(model.AddVar(0, GRB.INFINITY, newTask.Cost, GRB.CONTINUOUS, col, name));
-                                vss.VarnameTaskMapping[name] = vss.Tasks[^1];
-                                vss.CoverTaskMapping[ba] = vss.Tasks[^1];
-                                addedNew++;
-                            }
-                        }
+                        // Add column to model
+                        taskVars.Add(model.AddVar(0, 1, newTask.Cost, GRB.BINARY, col, name));
+                        vss.VarnameTaskMapping[name] = vss.Tasks[^1];
+                        vss.CoverTaskMapping[newTask.ToBitArray(vss.Instance.Trips.Count)] = vss.Tasks[^1];
+                        addedNew++;
                     }
                 }
-
 
                 // Continue.......
+                updateTaskCosts();
                 model.Update();
-                model.Optimize();
+                gradientDescent();
                 currIts++;
 
                 if (seqWithoutRC >= Config.VSP_OPT_IT_THRESHOLD) {
@@ -294,41 +257,12 @@ namespace E_VCSP.Solver {
                 }
             }
 
-            Console.WriteLine($"Value of relaxation: {model.ObjVal}");
-
-            // Make model binary again
-            foreach (GRBVar var in taskVars) {
-                if (var.VarName.StartsWith("vt_"))
-                    var.Set(GRB.CharAttr.VType, GRB.BINARY);
-            }
-
-            if (!Config.VSP_ALLOW_SLACK_FINAL_SOLVE) {
-                // Remove ability to go over vehicle bounds -> hopefully speeds up solving at end.
-                model.GetVarByName("vehicle_count_slack").UB = 0;
-            }
-
-            Console.WriteLine($"Total generation attempts: ${totalGenerated}");
-            Console.WriteLine($"LS failed to generate charge-feasible trip {notFound} times during generation");
-            Console.WriteLine($"Discarded {discardedOldColumns} old, {discardedNewColumns} new columns during generation");
-            Console.WriteLine($"{totWithoutRC} columns were not added due to positive reduced costs.");
-            Console.WriteLine($"Solving non-relaxed model with total of {vss.Tasks.Count} columns");
             model.Update();
             bool configState = Config.CONSOLE_GUROBI;
             Config.CONSOLE_GUROBI = true; // Force enable console at end as this solve takes a long time
             model.Optimize();
 
-            Console.WriteLine($"Costs: {model.ObjVal}, vehicle slack: {model.GetVarByName("vehicle_count_slack").X}");
-
-            if (model.Status == GRB.Status.INFEASIBLE || model.Status == GRB.Status.INTERRUPTED) {
-                Console.WriteLine("Model infeasible / canceled");
-                if (Config.VSP_DETERMINE_IIS) {
-                    model.ComputeIIS();
-                    model.Write("infeasible_CG.ilp");
-                }
-
-                Config.CONSOLE_GUROBI = configState;
-                return false;
-            }
+            Console.WriteLine($"Costs: {model.ObjVal}");
 
             (var selectedTasks, var blocks) = finalizeResults(true);
             vss.SelectedTasks = selectedTasks;
@@ -336,7 +270,6 @@ namespace E_VCSP.Solver {
             if (Config.DUMP_VSP) {
                 vss.Dump();
             }
-
             Config.CONSOLE_GUROBI = configState;
             return true;
         }

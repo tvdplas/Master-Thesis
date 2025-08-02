@@ -99,6 +99,14 @@ namespace E_VCSP.Objects {
         /// </summary>
         public bool IdleAtStart {
             get {
+                // Prioritize time at depot
+                bool fromDepot = DeadheadTemplate.From.IsDepot;
+                if (fromDepot) return true;
+
+                bool toDepot = DeadheadTemplate.To.IsDepot;
+                if (toDepot) return false;
+
+                // Then prioritize time at handover
                 bool fromHandover = DeadheadTemplate.From.HandoverAllowed;
                 bool toHandover = DeadheadTemplate.To.HandoverAllowed;
                 return fromHandover || !fromHandover && !toHandover;
