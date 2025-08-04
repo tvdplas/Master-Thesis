@@ -20,7 +20,7 @@ namespace E_VCSP.Solver {
             blockDualCosts = css.Blocks.Select(_ => 0.0).ToList();
 
             for (int i = 0; i < css.Blocks.Count; i++) {
-                if (!css.BlockActive[i]) continue; // RC dont matter, save time querying
+                if (css.BlockCount[i] == 0) continue; // RC dont matter, save time querying
                 var constr = crewConstrs["cover_block_" + css.Blocks[i].Descriptor];
                 blockDualCosts[i] = blockSign * constr.Pi;
             }

@@ -153,11 +153,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
         List<List<CSPLabel>> activeLabels = [];
         List<bool> blockedBlock = [];
 
-
         internal CSPLabeling(CrewSolutionState css) : base(css) { }
 
         private void reset() {
-            blockedBlock = [.. css.BlockActive.Select(x => !x), false, false]; // Only use blocks which are active
+            blockedBlock = [.. css.BlockCount.Select(x => x == 0), false, false]; // Only use blocks which are active
             allLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
             activeLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
         }

@@ -44,8 +44,9 @@ namespace E_VCSP.Solver {
             }
 
             // Add cover constraint for each of the trips
-            // Note: index of constraint corresponds directly to index of trip 
-            foreach (Block b in css.Blocks) {
+            for (int blockIndex = 0; blockIndex < css.Blocks.Count; blockIndex++) {
+                Block b = css.Blocks[blockIndex];
+                int count = css.BlockCount[blockIndex];
                 GRBLinExpr expr = new();
                 for (int i = 0; i < css.Duties.Count; i++) {
                     if (css.Duties[i].BlockCover.Contains(b.Index)) expr.AddTerm(1, dutyVars[i]);
@@ -53,7 +54,7 @@ namespace E_VCSP.Solver {
 
                 // Switch between set partition and cover
                 char sense = Config.CSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, "cover_block_" + b.Descriptor);
+                model.AddConstr(expr, sense, count, "cover_block_" + b.Descriptor);
             }
 
             // Shift type/time limit constraints
@@ -120,7 +121,7 @@ namespace E_VCSP.Solver {
             model.Optimize();
 
             // Assume all blocks are active
-            css.BlockActive = css.Blocks.Select(_ => true).ToList();
+            css.BlockCount = css.Blocks.Select(_ => 1).ToList();
 
             // Tracking generated columns
             int maxColumns = Config.CSP_INSTANCES_PER_IT * Config.CSP_MAX_COL_GEN_ITS,

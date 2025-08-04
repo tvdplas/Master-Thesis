@@ -6,12 +6,7 @@ using E_VCSP.Solver.SolutionState;
 using Gurobi;
 
 namespace E_VCSP.Solver {
-    public class BlockWrapper {
-        public required Block Block;
-        public double CoveredCount;
-    }
-
-    internal class EVCSPCG : Solver {
+    internal class EVCSPCGLagrange : Solver {
 
         #region DEBUG
         private void DEBUG_printDualCostsTripCovers(GRBModel model) {
@@ -48,7 +43,7 @@ namespace E_VCSP.Solver {
         private Dictionary<string, GRBConstr> vehicleConstrs = [];
         private Dictionary<string, GRBConstr> crewConstrs = [];
 
-        public EVCSPCG(VehicleSolutionState vss, CrewSolutionState css) {
+        public EVCSPCGLagrange(VehicleSolutionState vss, CrewSolutionState css) {
             this.vss = vss;
             this.css = css;
 

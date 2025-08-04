@@ -152,5 +152,8 @@
 
         public static Header LAGRANGE = new();
         public static double LAGRANGE_VSP_PI = 1; // (0, 2]
+        public static double LANGRANGE_THRS = 0.01; // % diff between two sequential solutions to be considered "done"
+        public static int LANGRANGE_THRS_SEQ = 5; // number of sequential rounds within threshold to be considered done
+        public static int LANGRANGE_MAX_ROUNDS = 200; // number of sequential rounds within threshold to be considered done
     }
 }

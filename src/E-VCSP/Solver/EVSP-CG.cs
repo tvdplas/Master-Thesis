@@ -58,13 +58,24 @@ namespace E_VCSP.Solver {
             return selectedTasks;
         }
 
-        private (List<VehicleTask>, List<Block>) finalizeResults(bool console) {
+        private (List<VehicleTask>, List<(int count, Block block)>) finalizeResults(bool console) {
             var selectedTasks = getSelectedTasks(console);
 
-            return (selectedTasks, selectedTasks
-                .SelectMany(t => Block.FromVehicleTask(t))
+            List<Block> selectedBlocks = selectedTasks.SelectMany(t => Block.FromVehicleTask(t))
                 .Select((b, i) => { b.Index = i; return b; })
-                .ToList());
+                .ToList();
+            Dictionary<string, (int count, Block firstRef)> blockCounts = new();
+            foreach (Block block in selectedBlocks) {
+                string descriptor = block.Descriptor;
+                if (!blockCounts.ContainsKey(descriptor)) blockCounts[descriptor] = (1, block);
+                else {
+                    (int count, Block firstRef) = blockCounts[descriptor];
+                    blockCounts[descriptor] = (count + 1, firstRef);
+                }
+            }
+            var selectedBlocksWithCount = blockCounts.Values.ToList();
+
+            return (selectedTasks, selectedBlocksWithCount);
         }
 
         /// <summary>

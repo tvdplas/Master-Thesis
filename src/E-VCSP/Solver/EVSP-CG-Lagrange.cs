@@ -1,5 +1,6 @@
 ﻿using E_VCSP.Formatting;
 using E_VCSP.Objects;
+using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
 using Gurobi;
@@ -56,13 +57,24 @@ namespace E_VCSP.Solver {
             return selectedTasks;
         }
 
-        private (List<VehicleTask>, List<Block>) finalizeResults(bool console) {
+        private (List<VehicleTask>, List<(int count, Block block)>) finalizeResults(bool console) {
             var selectedTasks = getSelectedTasks(console);
 
-            return (selectedTasks, selectedTasks
-                .SelectMany(t => Block.FromVehicleTask(t))
+            List<Block> selectedBlocks = selectedTasks.SelectMany(t => Block.FromVehicleTask(t))
                 .Select((b, i) => { b.Index = i; return b; })
-                .ToList());
+                .ToList();
+            Dictionary<string, (int count, Block firstRef)> blockCounts = new();
+            foreach (Block block in selectedBlocks) {
+                string descriptor = block.Descriptor;
+                if (!blockCounts.ContainsKey(descriptor)) blockCounts[descriptor] = (1, block);
+                else {
+                    (int count, Block firstRef) = blockCounts[descriptor];
+                    blockCounts[descriptor] = (count + 1, firstRef);
+                }
+            }
+            var selectedBlocksWithCount = blockCounts.Values.ToList();
+
+            return (selectedTasks, selectedBlocksWithCount);
         }
 
         /// <summary>
@@ -106,10 +118,21 @@ namespace E_VCSP.Solver {
 
             for (int i = 0; i < vss.Instance.Trips.Count; i++) lambdaTrips.Add(1);
 
-            //GRBVar vehicleCountSlack = model.AddVar(0, vss.Instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
-            //model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
+            foreach (Trip t in vss.Instance.Trips) {
+                GRBLinExpr expr = new();
+                for (int i = 0; i < vss.Tasks.Count; i++) {
+                    if (vss.Tasks[i].TripCover.Contains(t.Index)) {
+                        expr.AddTerm(1, taskVars[i]);
+                    }
+                }
 
-            this.model = model;
+                // Switch between set partition and cover
+                char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
+                model.AddConstr(expr, sense, 1, "cover_trip_" + t.Index);
+            }
+            GRBVar vehicleCountSlack = model.AddVar(0, vss.Instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
+            model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
+
 
             // Determine upper bound for use in gradient descent
             VSPLSGlobal global = new(vss);
@@ -124,10 +147,12 @@ namespace E_VCSP.Solver {
 
             Console.WriteLine($"Upper bound found using global local search with {initialTasks.Count} vehicles, total cost {upperBoundValue}");
 
+            model.Update();
+            this.model = model;
             return model;
         }
 
-        public void updateTaskCosts() {
+        public void updateCostsInModel() {
             for (int taskIndex = 0; taskIndex < taskVars.Count; taskIndex++) {
                 VehicleTask vt = vss.Tasks[taskIndex];
                 double newModelCost = vt.Cost;
@@ -140,43 +165,90 @@ namespace E_VCSP.Solver {
             }
         }
 
-        public void gradientDescent() {
+        public (double objVal, List<bool> X) gradientDescent() {
             // based on https://people.brunel.ac.uk/~mastjjb/jeb/natcor_ip_rest.pdf
-            List<(double C_i, int i)> costsByTaskIndex = vss.Tasks.Select((x, i) => (x.Cost, i)).ToList();
-            for (int i = 0; i < 10; i++) ;
 
-            for (int x = 0; x < 10; x++) {
-                updateTaskCosts();
-                model.Optimize();
-                Console.WriteLine("Model value: " + model.ObjVal);
+            // Reset the current multiplier set in order to get quicker convergence (i hope)
+            for (int i = 0; i < lambdaTrips.Count; i++) lambdaTrips[i] = 1;
 
-                List<double> G = [];
+            // Initialize costs of each task based on current lagrangean multiplier set
+            List<(double C_i, int taskIndex)> costsByTaskIndex = vss.Tasks.Select((x, i) => (double.MaxValue, i)).ToList();
+            List<bool> X = vss.Tasks.Select(_ => false).ToList();
 
-                for (int i = 0; i < lambdaTrips.Count; i++) {
-                    double G_i = 1; // b
-
-                    for (int j = 0; j < taskVars.Count; j++) {
-                        if (vss.Tasks[j].TripCover.Contains(i)) {
-                            G_i -= taskVars[j].X;
-                        }
+            void updateTaskCostsWithMultipliers() {
+                for (int i = 0; i < costsByTaskIndex.Count; i++) {
+                    int taskIndex = costsByTaskIndex[i].taskIndex;
+                    double cost = vss.Tasks[taskIndex].Cost;
+                    foreach (var tripIndex in vss.Tasks[taskIndex].TripCover) {
+                        cost -= lambdaTrips[tripIndex];
                     }
+                    costsByTaskIndex[i] = (cost, taskIndex);
+                }
 
-                    G.Add(G_i);
+            }
+
+            double solve() {
+                // Reset current solution value
+                for (int i = 0; i < X.Count; i++) X[i] = false;
+
+                List<(double C_i, int taskIndex)> targetTasks = new();
+                for (int i = 0; i < costsByTaskIndex.Count; i++) if (costsByTaskIndex[i].C_i < 0) targetTasks.Add(costsByTaskIndex[i]);
+                double cost = 0;
+                for (int i = 0; i < lambdaTrips.Count; i++) cost += lambdaTrips[i];
+
+
+                var cappedTargetTasks = targetTasks.OrderBy(x => x.C_i).Take(Config.MAX_VEHICLES);
+                foreach (var targetTask in cappedTargetTasks) {
+                    cost += targetTask.C_i;
+                    X[targetTask.taskIndex] = true;
+                }
+
+                return cost;
+            }
+
+            double lastSolutionVal = upperBoundValue;
+            int roundsInThreshold = 0;
+
+            for (int round = 0; round < Config.LANGRANGE_MAX_ROUNDS; round++) {
+                updateTaskCostsWithMultipliers();
+                double z_curr = solve();
+
+                double[] G = new double[lambdaTrips.Count];
+                for (int i = 0; i < G.Length; i++) G[i] = 1; // b
+                for (int taskIndex = 0; taskIndex < X.Count; taskIndex++) {
+                    if (!X[taskIndex]) continue;
+                    foreach (var tripIndex in vss.Tasks[taskIndex].TripCover) G[tripIndex] -= 1;
                 }
 
                 double GSquaredSum = 0;
                 foreach (var g in G) GSquaredSum += g * g;
-                double T = Config.LAGRANGE_VSP_PI * (upperBoundValue - model.ObjVal) / GSquaredSum;
+                double T = Config.LAGRANGE_VSP_PI * (upperBoundValue - z_curr) / GSquaredSum;
 
                 for (int i = 0; i < lambdaTrips.Count; i++) {
                     lambdaTrips[i] = Math.Max(0, lambdaTrips[i] + T * G[i]);
                 }
+
+                // Solution might have stabelized
+                double percentageDiff = Math.Abs(Math.Abs(z_curr - lastSolutionVal) / lastSolutionVal);
+                bool diffInThreshold = percentageDiff < Config.LANGRANGE_THRS;
+                lastSolutionVal = z_curr;
+
+                if (diffInThreshold) {
+                    roundsInThreshold++;
+                }
+                else {
+                    roundsInThreshold = 0;
+                }
+
+                if (roundsInThreshold >= Config.LANGRANGE_THRS_SEQ) break;
             }
+
+            return (lastSolutionVal, X);
         }
 
         public override bool Solve(CancellationToken ct) {
             model = InitModel(ct);
-            gradientDescent();
+            (double objVal, _) = gradientDescent();
 
             // Tracking generated columns
             int maxColumns = Config.VSP_INSTANCES_PER_IT * Config.VSP_MAX_COL_GEN_ITS,
@@ -197,6 +269,7 @@ namespace E_VCSP.Solver {
             Console.WriteLine("Column generation started");
             Console.WriteLine("%\tT\tLB\tLSS\tLSG\tAN\tNF\tDN\tDO\tWRC\tMV");
 
+
             while (currIts < Config.VSP_MAX_COL_GEN_ITS) {
                 // Terminate column generation if cancelled
                 if (ct.IsCancellationRequested) return false;
@@ -206,12 +279,6 @@ namespace E_VCSP.Solver {
 
                 totalGenerated += generatedTasks.Count;
                 lbGenerated += generatedTasks.Count;
-
-                int percent = (int)((totalGenerated / (double)maxColumns) * 100);
-                if (percent >= lastReportedPercent + 10) {
-                    lastReportedPercent = percent - (percent % 10);
-                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{model.ObjVal}");
-                }
 
                 foreach (var task in generatedTasks) {
                     (double reducedCost, VehicleTask newTask) = task;
@@ -233,7 +300,15 @@ namespace E_VCSP.Solver {
 
                         // Create new column to add to model
                         var modelConstrs = model.GetConstrs();
-                        GRBConstr[] constrs = [.. modelConstrs.Where((x) => x.ConstrName == "max_vehicles")];
+                        GRBConstr[] constrs = [.. modelConstrs.Where((constr) => {
+                            if (constr.ConstrName.StartsWith("cover_trip_")) {
+                                int tripIndex = int.Parse(constr.ConstrName.Split("cover_trip_")[1]);
+                                return newTask.TripCover.Contains(tripIndex);
+                            }
+
+                            else
+                                return constr.ConstrName == "max_vehicles";
+                        })];
                         GRBColumn col = new();
                         col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
 
@@ -245,11 +320,15 @@ namespace E_VCSP.Solver {
                     }
                 }
 
-                // Continue.......
-                updateTaskCosts();
-                model.Update();
-                gradientDescent();
+                (double newObjVal, _) = gradientDescent();
+                objVal = newObjVal;
                 currIts++;
+
+                int percent = (int)((totalGenerated / (double)maxColumns) * 100);
+                if (percent >= lastReportedPercent + 10) {
+                    lastReportedPercent = percent - (percent % 10);
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{objVal}");
+                }
 
                 if (seqWithoutRC >= Config.VSP_OPT_IT_THRESHOLD) {
                     Console.WriteLine($"Stopped due to RC > 0 for {Config.VSP_OPT_IT_THRESHOLD} consecutive tasks");
@@ -264,7 +343,7 @@ namespace E_VCSP.Solver {
 
             Console.WriteLine($"Costs: {model.ObjVal}");
 
-            (var selectedTasks, var blocks) = finalizeResults(true);
+            (var selectedTasks, _) = finalizeResults(true);
             vss.SelectedTasks = selectedTasks;
 
             if (Config.DUMP_VSP) {

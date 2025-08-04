@@ -1,4 +1,5 @@
-﻿using E_VCSP.Objects;
+﻿
+using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using System.Collections;
 using System.Text.Json.Serialization;
@@ -41,20 +42,20 @@ namespace E_VCSP.Solver.SolutionState {
         public List<List<BlockArc?>> AdjFull = [[null, null], [null, null]];
 
         public List<Block> Blocks = [];
-        public List<bool> BlockActive = [];
+        public List<int> BlockCount = [];
 
         public List<CrewDuty> SelectedDuties = [];
         public List<CrewDuty> Duties = [];
         public Dictionary<string, CrewDuty> VarnameDutyMapping = [];
         public Dictionary<BitArray, CrewDuty> CoverDutyMapping = new(new Utils.BitArrayComparer());
 
-        public int ActiveBlockCount => BlockActive.Count(b => b);
+        public int ActiveBlockCount => BlockCount.Sum(b => b);
 
-        public CrewSolutionState(Instance instance, List<Block> initialBlocks) {
+        public CrewSolutionState(Instance instance, List<(int count, Block block)> initialBlocks) {
             this.Instance = instance;
 
-            foreach (Block b in initialBlocks) {
-                AddBlock(b);
+            foreach ((int count, Block block) in initialBlocks) {
+                AddBlock(block, count);
             }
         }
 
@@ -113,12 +114,13 @@ namespace E_VCSP.Solver.SolutionState {
             Adj = [[], []];
             AdjFull = [[null, null], [null, null]];
 
-            List<Block> temp = [.. Blocks];
+            List<Block> oldBlocks = [.. Blocks];
+            List<int> oldCounts = [.. BlockCount];
             Blocks.Clear();
-            BlockActive.Clear();
+            BlockCount.Clear();
 
-            foreach (Block b in temp) {
-                AddBlock(b);
+            for (int i = 0; i < oldBlocks.Count; i++) {
+                AddBlock(oldBlocks[i], oldCounts[i]);
             }
         }
 
@@ -166,11 +168,11 @@ namespace E_VCSP.Solver.SolutionState {
             return arc;
         }
 
-        public CrewDuty AddBlock(Block b) {
+        public CrewDuty AddBlock(Block b, int count) {
             int newBlockIndex = Blocks.Count;
             b.Index = newBlockIndex;
             Blocks.Add(b);
-            BlockActive.Add(false);
+            BlockCount.Add(count);
 
             // Create a unit duty in order to process the block
             var duty = new CrewDuty([new CDEBlock(b)]) {

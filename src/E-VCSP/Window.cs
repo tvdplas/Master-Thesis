@@ -19,7 +19,7 @@ namespace E_VCSP {
 
         EVSPCGLagrange? vspSolver;
         CSPCG? cspSolver;
-        EVCSPCG? integratedSolver;
+        EVCSPCGLagrange? integratedSolver;
 
         RosterDisplay rd = new();
 
@@ -239,7 +239,7 @@ namespace E_VCSP {
             css = new(instance, []);
 
             vspSolver = new EVSPCGLagrange(vss);
-            integratedSolver = new EVCSPCG(vss, css);
+            integratedSolver = new EVCSPCGLagrange(vss, css);
 
             string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
             Config.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
@@ -272,12 +272,28 @@ namespace E_VCSP {
         private async void solveCSPClick(object sender, EventArgs e) {
             if (instance == null || vss == null || vss.SelectedTasks.Count == 0) return;
 
-            if (css == null || css.Blocks.Count == 0) {
-                css = new(instance, vss.SelectedTasks.SelectMany(t => Block.FromVehicleTask(t)).ToList());
+            if (css == null || css.Blocks.Count == 0 || vss.SelectedTasks.Count > 0) {
+                Console.WriteLine("Solving based on VSP solution");
+                List<Block> selectedBlocks = vss.SelectedTasks.SelectMany(t => Block.FromVehicleTask(t))
+                .Select((b, i) => { b.Index = i; return b; })
+                .ToList();
+                Dictionary<string, (int count, Block firstRef)> blockCounts = new();
+                foreach (Block block in selectedBlocks) {
+                    string descriptor = block.Descriptor;
+                    if (!blockCounts.ContainsKey(descriptor)) blockCounts[descriptor] = (1, block);
+                    else {
+                        (int count, Block firstRef) = blockCounts[descriptor];
+                        blockCounts[descriptor] = (count + 1, firstRef);
+                    }
+                }
+                var selectedBlocksWithCount = blockCounts.Values.ToList();
+                css = new(instance, selectedBlocksWithCount);
             }
             else {
+                Console.WriteLine("Resetting existing CSP solution");
                 css.ResetFromBlocks();
             }
+            Console.WriteLine($"Total of {css.Blocks.Count} blocks being considered");
             cspSolver = new CSPCG(css);
 
             working = true;
