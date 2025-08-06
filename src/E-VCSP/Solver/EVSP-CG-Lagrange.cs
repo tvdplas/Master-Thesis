@@ -57,22 +57,9 @@ namespace E_VCSP.Solver {
             return selectedTasks;
         }
 
-        private (List<VehicleTask>, List<(int count, Block block)>) finalizeResults(bool console) {
+        private (List<VehicleTask>, List<(Block block, int count)>) finalizeResults(bool console) {
             var selectedTasks = getSelectedTasks(console);
-
-            List<Block> selectedBlocks = selectedTasks.SelectMany(t => Block.FromVehicleTask(t))
-                .Select((b, i) => { b.Index = i; return b; })
-                .ToList();
-            Dictionary<string, (int count, Block firstRef)> blockCounts = new();
-            foreach (Block block in selectedBlocks) {
-                string descriptor = block.Descriptor;
-                if (!blockCounts.ContainsKey(descriptor)) blockCounts[descriptor] = (1, block);
-                else {
-                    (int count, Block firstRef) = blockCounts[descriptor];
-                    blockCounts[descriptor] = (count + 1, firstRef);
-                }
-            }
-            var selectedBlocksWithCount = blockCounts.Values.ToList();
+            var selectedBlocksWithCount = Block.FromVehicleTasks(selectedTasks);
 
             return (selectedTasks, selectedBlocksWithCount);
         }
@@ -128,7 +115,7 @@ namespace E_VCSP.Solver {
 
                 // Switch between set partition and cover
                 char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, Constants.CSTR_BLOCK_COVER + t.Index);
+                model.AddConstr(expr, sense, 1, Constants.CSTR_TRIP_COVER + t.Index);
             }
             GRBVar vehicleCountSlack = model.AddVar(0, vss.Instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
             model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, Constants.CSTR_MAX_VEHICLES);
@@ -184,7 +171,6 @@ namespace E_VCSP.Solver {
                     }
                     costsByTaskIndex[i] = (cost, taskIndex);
                 }
-
             }
 
             double solve() {
@@ -221,7 +207,7 @@ namespace E_VCSP.Solver {
 
                 double GSquaredSum = 0;
                 foreach (var g in G) GSquaredSum += g * g;
-                double T = Config.LAGRANGE_VSP_PI * (upperBoundValue - z_curr) / GSquaredSum;
+                double T = Config.LAGRANGE_PI * (upperBoundValue - z_curr) / GSquaredSum;
 
                 for (int i = 0; i < lambdaTrips.Count; i++) {
                     lambdaTrips[i] = Math.Max(0, lambdaTrips[i] + T * G[i]);

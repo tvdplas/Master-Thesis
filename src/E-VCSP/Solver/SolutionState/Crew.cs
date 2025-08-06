@@ -51,10 +51,10 @@ namespace E_VCSP.Solver.SolutionState {
 
         public int ActiveBlockCount => BlockCount.Sum(b => b);
 
-        public CrewSolutionState(Instance instance, List<(int count, Block block)> initialBlocks) {
+        public CrewSolutionState(Instance instance, List<(Block block, int count)> initialBlocks) {
             this.Instance = instance;
 
-            foreach ((int count, Block block) in initialBlocks) {
+            foreach ((Block block, int count) in initialBlocks) {
                 AddBlock(block, count);
             }
         }

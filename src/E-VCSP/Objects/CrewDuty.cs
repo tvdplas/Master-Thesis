@@ -27,6 +27,11 @@ namespace E_VCSP.Objects {
         public Location StartLocation;
         [JsonInclude]
         public Location EndLocation;
+        public string Descriptor {
+            get {
+                return $"{StartLocation.Index}#{StartTime}#{EndLocation.Index}#{EndTime}";
+            }
+        }
     }
 
     public class CDEBlock : CrewDutyElement {
@@ -179,6 +184,8 @@ namespace E_VCSP.Objects {
         [JsonInclude]
         public List<CrewDutyElement> Elements;
         public List<int> BlockCover;
+
+        public List<string> BlockDescriptorCover;
         [JsonInclude]
         public int Index = -1;
 
@@ -213,6 +220,7 @@ namespace E_VCSP.Objects {
         public CrewDuty(List<CrewDutyElement> elements) {
             Elements = elements;
             BlockCover = [.. elements.Where(e => e.Type == CrewDutyElementType.Block).Select(e => ((CDEBlock)e).Block.Index)];
+            BlockDescriptorCover = [.. elements.Where(e => e.Type == CrewDutyElementType.Block).Select(e => ((CDEBlock)e).Block.Descriptor)];
         }
 
         public BitArray ToBitArray(int blockCount) {

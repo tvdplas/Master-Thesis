@@ -417,7 +417,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Backtrack in order to get path
             // indexes to nodes
             List<VSPLabel> feasibleEnds = allLabels[^1]
-                .Where(x => x.CurrCosts < 0 && !alreadyFound.Contains(x.CoveredTrips))
+                .Where(x => x.CurrCosts < 0
+                    && !alreadyFound.Contains(x.CoveredTrips)
+                    && x.CoveredTrips.Count > Config.VSP_LB_MIN_TRIPS
+                )
                 .OrderBy(x => x.CurrCosts).ToList();
 
             List<VSPLabel> validEnds = [];

@@ -58,22 +58,9 @@ namespace E_VCSP.Solver {
             return selectedTasks;
         }
 
-        private (List<VehicleTask>, List<(int count, Block block)>) finalizeResults(bool console) {
+        private (List<VehicleTask>, List<(Block block, int count)>) finalizeResults(bool console) {
             var selectedTasks = getSelectedTasks(console);
-
-            List<Block> selectedBlocks = selectedTasks.SelectMany(t => Block.FromVehicleTask(t))
-                .Select((b, i) => { b.Index = i; return b; })
-                .ToList();
-            Dictionary<string, (int count, Block firstRef)> blockCounts = new();
-            foreach (Block block in selectedBlocks) {
-                string descriptor = block.Descriptor;
-                if (!blockCounts.ContainsKey(descriptor)) blockCounts[descriptor] = (1, block);
-                else {
-                    (int count, Block firstRef) = blockCounts[descriptor];
-                    blockCounts[descriptor] = (count + 1, firstRef);
-                }
-            }
-            var selectedBlocksWithCount = blockCounts.Values.ToList();
+            var selectedBlocksWithCount = Block.FromVehicleTasks(selectedTasks);
 
             return (selectedTasks, selectedBlocksWithCount);
         }
@@ -128,7 +115,7 @@ namespace E_VCSP.Solver {
 
                 // Switch between set partition and cover
                 char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, Constants.CSTR_BLOCK_COVER + t.Index);
+                model.AddConstr(expr, sense, 1, Constants.CSTR_TRIP_COVER + t.Index);
             }
 
             // Finalize max vehicle constraint with slack

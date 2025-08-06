@@ -286,6 +286,7 @@ namespace E_VCSP.Objects {
         public List<int> TripCover;
         [JsonInclude]
         public List<int> BlockCover;
+        public List<string> BlockDescriptorCover = [];
         [JsonInclude]
         public List<VehicleElement> Elements;
         [JsonInclude]
@@ -319,6 +320,7 @@ namespace E_VCSP.Objects {
         }
 
         public void RecalculateCovers() {
+            TripCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
             TripCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
         }
     }

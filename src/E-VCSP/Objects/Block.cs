@@ -174,9 +174,26 @@ namespace E_VCSP.Objects {
                 additionTarget.Elements.Add(element);
             }
 
-            return blocks
-                .Where(b => b.Elements.Count > 0)
+            var finalizedBlocks = blocks.Where(b => b.Elements.Count > 0).ToList();
+            vt.BlockDescriptorCover = finalizedBlocks.Select(x => x.Descriptor).ToList();
+            return finalizedBlocks;
+        }
+
+        public static List<(Block block, int count)> FromVehicleTasks(List<VehicleTask> vts) {
+            List<Block> selectedBlocks = vts.SelectMany(t => Block.FromVehicleTask(t))
+                .Select((b, i) => { b.Index = i; return b; })
                 .ToList();
+            Dictionary<string, (Block firstRef, int count)> blockCounts = new();
+            foreach (Block block in selectedBlocks) {
+                string descriptor = block.Descriptor;
+                if (!blockCounts.ContainsKey(descriptor)) blockCounts[descriptor] = (block, 1);
+                else {
+                    (Block firstRef, int count) = blockCounts[descriptor];
+                    blockCounts[descriptor] = (firstRef, count + 1);
+                }
+            }
+
+            return blockCounts.Values.ToList();
         }
 
         public override string ToString() {

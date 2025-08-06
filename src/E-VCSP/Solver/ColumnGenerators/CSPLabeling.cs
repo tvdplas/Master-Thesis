@@ -274,7 +274,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (l.Type == DutyType.Broken && l.Idle.startTime != -1) duration -= l.Idle.longIdleTime;
 
                 l.Cost -= maxAvgDurationDualCost * ((duration / (double)Config.CR_TARGET_SHIFT_LENGTH) - 1);
-                l.Cost -= maxLongDualCost * (Config.CR_MAX_OVER_LONG_SHIFT - (duration > Config.CR_TARGET_SHIFT_LENGTH ? 1 : 0));
+                l.Cost -= maxLongDualCost * (Config.CR_MAX_OVER_LONG_DUTY - (duration > Config.CR_TARGET_SHIFT_LENGTH ? 1 : 0));
             }
         }
 

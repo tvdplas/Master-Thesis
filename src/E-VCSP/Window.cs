@@ -274,20 +274,7 @@ namespace E_VCSP {
 
             if (css == null || css.Blocks.Count == 0 || vss.SelectedTasks.Count > 0) {
                 Console.WriteLine("Solving based on VSP solution");
-                List<Block> selectedBlocks = vss.SelectedTasks.SelectMany(t => Block.FromVehicleTask(t))
-                .Select((b, i) => { b.Index = i; return b; })
-                .ToList();
-                Dictionary<string, (int count, Block firstRef)> blockCounts = new();
-                foreach (Block block in selectedBlocks) {
-                    string descriptor = block.Descriptor;
-                    if (!blockCounts.ContainsKey(descriptor)) blockCounts[descriptor] = (1, block);
-                    else {
-                        (int count, Block firstRef) = blockCounts[descriptor];
-                        blockCounts[descriptor] = (count + 1, firstRef);
-                    }
-                }
-                var selectedBlocksWithCount = blockCounts.Values.ToList();
-                css = new(instance, selectedBlocksWithCount);
+                css = new(instance, Block.FromVehicleTasks(vss.SelectedTasks));
             }
             else {
                 Console.WriteLine("Resetting existing CSP solution");

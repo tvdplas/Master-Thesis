@@ -74,7 +74,7 @@ namespace E_VCSP.Solver {
                 CrewDuty duty = css.Duties[i];
 
                 int duration = duty.Elements[^1].EndTime - duty.Elements[0].StartTime;
-                noExcessiveLength += Config.CR_MAX_OVER_LONG_SHIFT * v - (duration > Config.CR_LONG_SHIFT_LENGTH ? v : 0);
+                noExcessiveLength += Config.CR_MAX_OVER_LONG_DUTY * v - (duration > Config.CR_LONG_SHIFT_LENGTH ? v : 0);
                 limitedAverageLength += v * (duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
                 maxBroken += v * Config.CR_MAX_BROKEN_SHIFTS - (duty.Type == DutyType.Broken ? v : 0);
                 maxBetween += v * Config.CR_MAX_BETWEEN_SHIFTS - (duty.Type == DutyType.Between ? v : 0);
@@ -178,10 +178,10 @@ namespace E_VCSP.Solver {
                         GRBColumn col = new();
                         col.AddTerms([.. constrs.Select(c => {
                             if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) return 1.0;
-                            else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return newDuty.Duration > Config.CR_LONG_SHIFT_LENGTH ? Config.CR_MAX_OVER_LONG_SHIFT - 1 : Config.CR_MAX_OVER_LONG_SHIFT;
+                            else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return newDuty.Duration > Config.CR_LONG_SHIFT_LENGTH ? Config.CR_MAX_OVER_LONG_DUTY - 1 : Config.CR_MAX_OVER_LONG_DUTY;
                             else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.Duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
                             else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return newDuty.Type == DutyType.Broken ? Config.CR_MAX_BROKEN_SHIFTS - 1 : Config.CR_MAX_BROKEN_SHIFTS;
-                            else if (c.ConstrName == Config.CSTR_CR_BETWEEN_DUTIES) return newDuty.Type == DutyType.Between ? Config.CR_MAX_BETWEEN_SHIFTS - 1 : Config.CR_MAX_BETWEEN_SHIFTS;
+                            else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES) return newDuty.Type == DutyType.Between ? Config.CR_MAX_BETWEEN_SHIFTS - 1 : Config.CR_MAX_BETWEEN_SHIFTS;
                             else throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
                         })], constrs);
 
@@ -213,7 +213,7 @@ namespace E_VCSP.Solver {
                 int selectedMethodÍndex = sums.FindIndex(x => r <= x);
                 List<CrewColumnGen> selectedMethod = instances[selectedMethodÍndex];
                 Parallel.For(0, Config.CSP_INSTANCES_PER_IT, (i) => {
-                    selectedMethod[i].UpdateDualCosts(model.GetConstrs().ToDictionary(c => c.ConstrName, c => c), 1);
+                    selectedMethod[i].UpdateDualCosts(model.GetConstrs().ToDictionary(c => c.ConstrName, c => c.Pi), 1);
                     generatedDuties[i] = selectedMethod[i].GenerateDuties();
                 });
 

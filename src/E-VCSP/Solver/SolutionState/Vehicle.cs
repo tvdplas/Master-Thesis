@@ -52,6 +52,7 @@ namespace E_VCSP.Solver.SolutionState {
         public int StartTime = int.MaxValue;
         public int EndTime = int.MinValue;
 
+        #region Initialization
         public VehicleSolutionState(Instance instance, VehicleType vehicleType) {
             this.Instance = instance;
             this.VehicleType = vehicleType;
@@ -97,14 +98,26 @@ namespace E_VCSP.Solver.SolutionState {
             Tasks = dump.selectedTasks;
         }
 
-        public void Reset() {
+        public void Reset(bool withTasks = true) {
+            // Reset default vals
+            SelectedTasks = [];
+            Tasks = [];
+            CoverTaskMapping = new(new Utils.BitArrayComparer());
+            VarnameTaskMapping = [];
+            StartTime = int.MaxValue;
+            EndTime = int.MinValue;
+            Nodes = [];
+            AdjFull = [];
+            Adj = [];
+            LocationDHT = [];
+
             // Initialize depot
             Depot = Instance.Locations.Find(x => x.IsDepot) ?? throw new InvalidDataException("No depot found");
 
             // Initialize rest
             generateLocationDHT();
             generateGraph();
-            generateInitialTasks();
+            if (withTasks) generateInitialTasks();
 
             // Min / max times
             foreach (Trip t in Instance.Trips) {
@@ -117,6 +130,7 @@ namespace E_VCSP.Solver.SolutionState {
                 EndTime = Math.Max(maxArrTime, EndTime);
             }
         }
+        #endregion
 
         public void RemoveOvercoverageFromTasks(List<VehicleTask> vehicleTasks) {
             // Determine overcoverage
@@ -212,7 +226,6 @@ namespace E_VCSP.Solver.SolutionState {
                     vt.Elements.InsertRange(startIndex, [dummyIdle]);
                 }
             }
-
 
             // Phase 2: combining idle blocks, adding deadheads
             for (int i = 0; i < vehicleTasks.Count; i++) {
