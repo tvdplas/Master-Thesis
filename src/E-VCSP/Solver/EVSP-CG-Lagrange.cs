@@ -128,15 +128,15 @@ namespace E_VCSP.Solver {
 
                 // Switch between set partition and cover
                 char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, "cover_trip_" + t.Index);
+                model.AddConstr(expr, sense, 1, Constants.CSTR_BLOCK_COVER + t.Index);
             }
             GRBVar vehicleCountSlack = model.AddVar(0, vss.Instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
-            model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
+            model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, Constants.CSTR_MAX_VEHICLES);
 
 
             // Determine upper bound for use in gradient descent
             VSPLSGlobal global = new(vss);
-            global.updateDualCosts(vss.Instance.Trips.Select(_ => 0.0).ToList(), [], []);
+            global.UpdateDualCosts(vss.Instance.Trips.Select(_ => 0.0).ToList(), [], []);
             bool initialPenaltyState = Config.VSP_LS_SHR_ALLOW_PENALTY;
             Config.VSP_LS_SHR_ALLOW_PENALTY = false;
             var initialTasks = global.GenerateVehicleTasks();
@@ -195,7 +195,6 @@ namespace E_VCSP.Solver {
                 for (int i = 0; i < costsByTaskIndex.Count; i++) if (costsByTaskIndex[i].C_i < 0) targetTasks.Add(costsByTaskIndex[i]);
                 double cost = 0;
                 for (int i = 0; i < lambdaTrips.Count; i++) cost += lambdaTrips[i];
-
 
                 var cappedTargetTasks = targetTasks.OrderBy(x => x.C_i).Take(Config.MAX_VEHICLES);
                 foreach (var targetTask in cappedTargetTasks) {
@@ -274,7 +273,7 @@ namespace E_VCSP.Solver {
                 // Terminate column generation if cancelled
                 if (ct.IsCancellationRequested) return false;
 
-                colgenInstance.updateDualCosts(lambdaTrips, [], []);
+                colgenInstance.UpdateDualCosts(lambdaTrips, [], []);
                 List<(double, VehicleTask)> generatedTasks = colgenInstance.GenerateVehicleTasks();
 
                 totalGenerated += generatedTasks.Count;
@@ -301,13 +300,13 @@ namespace E_VCSP.Solver {
                         // Create new column to add to model
                         var modelConstrs = model.GetConstrs();
                         GRBConstr[] constrs = [.. modelConstrs.Where((constr) => {
-                            if (constr.ConstrName.StartsWith("cover_trip_")) {
-                                int tripIndex = int.Parse(constr.ConstrName.Split("cover_trip_")[1]);
+                            if (constr.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) {
+                                int tripIndex = int.Parse(constr.ConstrName.Split(Constants.CSTR_BLOCK_COVER)[1]);
                                 return newTask.TripCover.Contains(tripIndex);
                             }
 
                             else
-                                return constr.ConstrName == "max_vehicles";
+                                return constr.ConstrName == Constants.CSTR_MAX_VEHICLES;
                         })];
                         GRBColumn col = new();
                         col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);

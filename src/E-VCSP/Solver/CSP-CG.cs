@@ -54,7 +54,7 @@ namespace E_VCSP.Solver {
 
                 // Switch between set partition and cover
                 char sense = Config.CSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, count, "cover_block_" + b.Descriptor);
+                model.AddConstr(expr, sense, count, Constants.CSTR_BLOCK_COVER + b.Descriptor);
             }
 
             // Shift type/time limit constraints
@@ -80,10 +80,10 @@ namespace E_VCSP.Solver {
                 maxBetween += v * Config.CR_MAX_BETWEEN_SHIFTS - (duty.Type == DutyType.Between ? v : 0);
             }
 
-            model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, "cr_overall_no_excessive_length");
-            model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, "cr_overall_limited_average_length");
-            model.AddConstr(maxBroken + maxBrokenSlack >= 0, "cr_overall_max_broken");
-            model.AddConstr(maxBetween + maxBetweenSlack >= 0, "cr_overall_max_between");
+            model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, Constants.CSTR_CR_LONG_DUTIES);
+            model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, Constants.CSTR_CR_AVG_TIME);
+            model.AddConstr(maxBroken + maxBrokenSlack >= 0, Constants.CSTR_CR_BROKEN_DUTIES);
+            model.AddConstr(maxBetween + maxBetweenSlack >= 0, Constants.CSTR_CR_BETWEEN_DUTIES);
 
             this.model = model;
             return (model, dutyVars);
@@ -177,11 +177,11 @@ namespace E_VCSP.Solver {
                         )];
                         GRBColumn col = new();
                         col.AddTerms([.. constrs.Select(c => {
-                            if (c.ConstrName.StartsWith("cover_block_")) return 1.0;
-                            else if (c.ConstrName == "cr_overall_no_excessive_length") return newDuty.Duration > Config.CR_LONG_SHIFT_LENGTH ? Config.CR_MAX_OVER_LONG_SHIFT - 1 : Config.CR_MAX_OVER_LONG_SHIFT;
-                            else if (c.ConstrName == "cr_overall_limited_average_length") return (newDuty.Duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
-                            else if (c.ConstrName == "cr_overall_max_broken") return newDuty.Type == DutyType.Broken ? Config.CR_MAX_BROKEN_SHIFTS - 1 : Config.CR_MAX_BROKEN_SHIFTS;
-                            else if (c.ConstrName == "cr_overall_max_between") return newDuty.Type == DutyType.Between ? Config.CR_MAX_BETWEEN_SHIFTS - 1 : Config.CR_MAX_BETWEEN_SHIFTS;
+                            if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) return 1.0;
+                            else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return newDuty.Duration > Config.CR_LONG_SHIFT_LENGTH ? Config.CR_MAX_OVER_LONG_SHIFT - 1 : Config.CR_MAX_OVER_LONG_SHIFT;
+                            else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.Duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
+                            else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return newDuty.Type == DutyType.Broken ? Config.CR_MAX_BROKEN_SHIFTS - 1 : Config.CR_MAX_BROKEN_SHIFTS;
+                            else if (c.ConstrName == Config.CSTR_CR_BETWEEN_DUTIES) return newDuty.Type == DutyType.Between ? Config.CR_MAX_BETWEEN_SHIFTS - 1 : Config.CR_MAX_BETWEEN_SHIFTS;
                             else throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
                         })], constrs);
 

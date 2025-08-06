@@ -128,13 +128,13 @@ namespace E_VCSP.Solver {
 
                 // Switch between set partition and cover
                 char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                model.AddConstr(expr, sense, 1, "cover_trip_" + t.Index);
+                model.AddConstr(expr, sense, 1, Constants.CSTR_BLOCK_COVER + t.Index);
             }
 
             // Finalize max vehicle constraint with slack
             // Note: added after trips so trips have easier indexing. 
             GRBVar vehicleCountSlack = model.AddVar(0, vss.Instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
-            model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, "max_vehicles");
+            model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, Constants.CSTR_MAX_VEHICLES);
 
             this.model = model;
             return (model, taskVars);
@@ -202,12 +202,12 @@ namespace E_VCSP.Solver {
                 List<double> tripDualCosts = model.GetConstrs().Select(x => x.Pi).ToList();
                 if (selectedMethod.Count > 1) {
                     Parallel.For(0, selectedMethod.Count, (i) => {
-                        selectedMethod[i].updateDualCosts(tripDualCosts, [], []);
+                        selectedMethod[i].UpdateDualCosts(tripDualCosts, [], []);
                         generatedTasks.Add(selectedMethod[i].GenerateVehicleTasks());
                     });
                 }
                 else {
-                    selectedMethod[0].updateDualCosts(tripDualCosts, [], []);
+                    selectedMethod[0].UpdateDualCosts(tripDualCosts, [], []);
                     generatedTasks.Add(selectedMethod[0].GenerateVehicleTasks());
                 }
 

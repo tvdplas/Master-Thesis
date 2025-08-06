@@ -9,7 +9,7 @@ namespace E_VCSP.Solver {
         internal Dictionary<string, double> blockDualCosts = [];
         internal Dictionary<string, List<double>> blockDualCostsByStart = [];
 
-        public void updateDualCosts(
+        public void UpdateDualCosts(
             List<double> newTripDualCosts,
             Dictionary<string, double> newBlockDualCosts,
             Dictionary<string, List<double>> newBlockDualCostsByStart

@@ -12,7 +12,7 @@ namespace E_VCSP.Solver {
         private void DEBUG_printDualCostsTripCovers(GRBModel model) {
             List<string> dualCosts = [];
             foreach (var constr in model.GetConstrs()) {
-                if (constr.ConstrName.StartsWith("cover_trip_")) dualCosts.Add(constr.Pi.ToString("0.##"));
+                if (constr.ConstrName.StartsWith(Constants.CSTR_TRIP_COVER)) dualCosts.Add(constr.Pi.ToString("0.##"));
             }
             Console.WriteLine(string.Join(' ', dualCosts));
         }
@@ -20,7 +20,7 @@ namespace E_VCSP.Solver {
         private void DEBUG_printDualCostsBlockCovers(GRBModel model) {
             List<string> dualCosts = [];
             foreach (var constr in model.GetConstrs()) {
-                if (constr.ConstrName.StartsWith("cover_block_")) dualCosts.Add(constr.Pi.ToString("0.##"));
+                if (constr.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) dualCosts.Add(constr.Pi.ToString("0.##"));
             }
             Console.WriteLine(string.Join(' ', dualCosts));
         }
@@ -234,7 +234,7 @@ namespace E_VCSP.Solver {
             foreach (GRBVar v in taskVars) {
                 maxVehiclesExpr += v;
             }
-            model.AddConstr(maxVehiclesExpr - maxVehiclesSlack <= Config.MAX_VEHICLES, "max_vehicles");
+            model.AddConstr(maxVehiclesExpr - maxVehiclesSlack <= Config.MAX_VEHICLES, Constants.CSTR_MAX_VEHICLES);
 
             // Trip cover by vehicle tasks
             foreach (Trip t in vss.Instance.Trips) {
@@ -245,7 +245,7 @@ namespace E_VCSP.Solver {
                     }
                 }
                 char sense = Config.VSP_ALLOW_OVERCOVER ? GRB.GREATER_EQUAL : GRB.EQUAL;
-                string name = "cover_trip_" + t.Index;
+                string name = Constants.CSTR_TRIP_COVER + t.Index;
                 GRBConstr constr = model.AddConstr(expr, sense, 1, name);
                 vehicleConstrs[name] = constr;
             }
@@ -264,7 +264,7 @@ namespace E_VCSP.Solver {
                         expr -= dutyVars[cdIndex];
                 }
 
-                string name = "cover_block_" + knownBlocks[blockIndex].Block.Descriptor;
+                string name = Constants.CSTR_BLOCK_COVER + knownBlocks[blockIndex].Block.Descriptor;
                 crewConstrs[name] = model.AddConstr(expr <= 0, name);
             }
 
@@ -291,14 +291,14 @@ namespace E_VCSP.Solver {
             }
 
 
-            crewConstrs["cr_overall_no_excessive_length"] =
-                model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, "cr_overall_no_excessive_length");
-            crewConstrs["cr_overall_limited_average_length"] =
-                model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, "cr_overall_limited_average_length");
-            crewConstrs["cr_overall_max_broken"] =
-                model.AddConstr(maxBroken + maxBrokenSlack >= 0, "cr_overall_max_broken");
-            crewConstrs["cr_overall_max_between"] =
-                model.AddConstr(maxBetween + maxBetweenSlack >= 0, "cr_overall_max_between");
+            crewConstrs[Constants.CSTR_CR_LONG_DUTIES] =
+                model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, Constants.CSTR_CR_LONG_DUTIES);
+            crewConstrs[Constants.CSTR_CR_AVG_TIME] =
+                model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, Constants.CSTR_CR_AVG_TIME);
+            crewConstrs[Constants.CSTR_CR_BROKEN_DUTIES] =
+                model.AddConstr(maxBroken + maxBrokenSlack >= 0, Constants.CSTR_CR_BROKEN_DUTIES);
+            crewConstrs[Constants.CSTR_CR_BETWEEN_DUTIES] =
+                model.AddConstr(maxBetween + maxBetweenSlack >= 0, Constants.CSTR_CR_BETWEEN_DUTIES);
 
             this.model = model;
             return model;
@@ -336,7 +336,7 @@ namespace E_VCSP.Solver {
                         tripDualCosts.Add(constr.Pi);
                     }
 
-                    if (constr.ConstrName.StartsWith("cover_block_")) {
+                    if (constr.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) {
                         string descriptor = name.Split("_")[^1];
                         string descriptorStart = String.Join("#", descriptor.Split("#").Take(2));
                         blockDualCosts[descriptor] = constr.Pi;
@@ -345,7 +345,7 @@ namespace E_VCSP.Solver {
                     }
                 }
 
-                vspLabelingInstance.updateDualCosts(tripDualCosts, blockDualCosts, blockDualCostsByStart);
+                vspLabelingInstance.UpdateDualCosts(tripDualCosts, blockDualCosts, blockDualCostsByStart);
             }
 
 
@@ -365,15 +365,15 @@ namespace E_VCSP.Solver {
                 GRBConstr[] constrs = [.. modelConstrs.Where((constr) => {
                     string name = constr.ConstrName;
                     // Is a vehicle
-                    if (name == "max_vehicles")
+                    if (name == Constants.CSTR_MAX_VEHICLES)
                         return true;
                     // Vehicle task contains trip
-                    if (name.StartsWith("cover_trip_")) {
+                    if (name.StartsWith(Constants.CSTR_TRIP_COVER)) {
                         int tripIndex = int.Parse(name.Split("_")[^1]);
                         return newTask.TripCover.Contains(tripIndex);
                     }
                     // Vehicle task contains block
-                    if (name.StartsWith("cover_block_")) {
+                    if (name.StartsWith(Constants.CSTR_BLOCK_COVER)) {
                         string blockDescriptor = name.Split("_")[^1];
                         return newTask.BlockCover.Contains(descriptorToKnownBlockIndex[blockDescriptor]);
                     }
@@ -423,7 +423,7 @@ namespace E_VCSP.Solver {
                 var modelConstrs = model.GetConstrs();
                 GRBConstr[] constrs = [.. modelConstrs.Where((constr) => {
                     string name = constr.ConstrName;
-                    if (name.StartsWith("cover_block_")) {
+                    if (name.StartsWith(Constants.CSTR_BLOCK_COVER)) {
                         string blockDescriptor = name.Split("_")[^1];
                         return newDuty.BlockCover.Contains(descriptorToKnownBlockIndex[blockDescriptor]);
                     }
@@ -434,11 +434,11 @@ namespace E_VCSP.Solver {
                 })];
                 GRBColumn col = new();
                 col.AddTerms([..constrs.Select(c => {
-                    if (c.ConstrName.StartsWith("cover_block_")) return -1.0;
-                    else if (c.ConstrName == "cr_overall_no_excessive_length") return newDuty.Duration > Config.CR_LONG_SHIFT_LENGTH ? Config.CR_MAX_OVER_LONG_SHIFT - 1 : Config.CR_MAX_OVER_LONG_SHIFT;
-                    else if (c.ConstrName == "cr_overall_limited_average_length") return (newDuty.Duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
-                    else if (c.ConstrName == "cr_overall_max_broken") return newDuty.Type == DutyType.Broken ? Config.CR_MAX_BROKEN_SHIFTS - 1 : Config.CR_MAX_BROKEN_SHIFTS;
-                    else if (c.ConstrName == "cr_overall_max_between") return newDuty.Type == DutyType.Between ? Config.CR_MAX_BETWEEN_SHIFTS - 1 : Config.CR_MAX_BETWEEN_SHIFTS;
+                    if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) return -1.0;
+                    else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return newDuty.Duration > Config.CR_LONG_SHIFT_LENGTH ? Config.CR_MAX_OVER_LONG_SHIFT - 1 : Config.CR_MAX_OVER_LONG_SHIFT;
+                    else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.Duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
+                    else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return newDuty.Type == DutyType.Broken ? Config.CR_MAX_BROKEN_SHIFTS - 1 : Config.CR_MAX_BROKEN_SHIFTS;
+                    else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES) return newDuty.Type == DutyType.Between ? Config.CR_MAX_BETWEEN_SHIFTS - 1 : Config.CR_MAX_BETWEEN_SHIFTS;
                     else throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
                 })], constrs);
 

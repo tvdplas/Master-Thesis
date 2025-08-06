@@ -21,12 +21,13 @@ namespace E_VCSP.Solver {
 
             for (int i = 0; i < css.Blocks.Count; i++) {
                 if (css.BlockCount[i] == 0) continue; // RC dont matter, save time querying
-                var constr = crewConstrs["cover_block_" + css.Blocks[i].Descriptor];
+                var constr = crewConstrs[Constants.CSTR_BLOCK_COVER + css.Blocks[i].Descriptor];
                 blockDualCosts[i] = blockSign * constr.Pi;
             }
-            maxLongDualCost = crewConstrs["cr_overall_no_excessive_length"].Pi;
-            maxAvgDurationDualCost = crewConstrs["cr_overall_limited_average_length"].Pi;
-            maxBrokenDualCost = crewConstrs["cr_overall_max_broken"].Pi;
+
+            maxLongDualCost = crewConstrs[Constants.CSTR_CR_LONG_DUTIES].Pi;
+            maxAvgDurationDualCost = crewConstrs[Constants.CSTR_CR_AVG_TIME].Pi;
+            maxBrokenDualCost = crewConstrs[Constants.CSTR_CR_BROKEN_DUTIES].Pi;
             maxBetweenDualCost = crewConstrs["cr_overall_max_between"].Pi;
         }
 
