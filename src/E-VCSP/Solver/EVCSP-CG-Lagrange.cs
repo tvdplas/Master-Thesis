@@ -1,8 +1,10 @@
-﻿using E_VCSP.Objects;
+﻿using E_VCSP.Formatting;
+using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
 using Gurobi;
+using System.Runtime.CompilerServices;
 
 namespace E_VCSP.Solver {
     internal class EVCSPCGLagrange : Solver {
@@ -12,16 +14,18 @@ namespace E_VCSP.Solver {
         Dictionary<string, int> knownBlocks = [];
 
         private List<double> lambdaTrips = [];
-        private Dictionary<string, double> lambdaBlocks = [];
+        private double lamdbaMaxTasks = 0;
+        private List<double> lambdaBlocks = [];
         private double lambdaAvgDutyLength = 0;
         private double lambdaMaxLongDuty = 0;
         //private double lambdaMaxBroken = 0;
         //private double lambdaMaxBetween = 0;
         private List<bool> X = []; // Select vt at index
+        private int vehicleSlack = 0; // Amount of over slack we are going
         private List<bool> Y = []; // Select cd at index
 
         private double costUpperBound = double.MaxValue;
-        private (double val, bool stabilized) objVal = (double.MaxValue, true);
+        private (double val, bool converged) objVal = (double.MaxValue, true);
 
         public EVCSPCGLagrange(VehicleSolutionState vss, CrewSolutionState css) {
             this.vss = vss;
@@ -42,7 +46,7 @@ namespace E_VCSP.Solver {
 
             vss.Tasks = initialTasks.Select(x => x.vehicleTask).ToList();
 
-            // Create initial set of crew duties
+            // Process blocks in the initial tasks
             css.Blocks = [];
             css.BlockCount = [];
             css.ResetFromBlocks();
@@ -57,7 +61,14 @@ namespace E_VCSP.Solver {
             dummyDualCosts[Constants.CSTR_CR_LONG_DUTIES] = 0;
             dummyDualCosts[Constants.CSTR_CR_BROKEN_DUTIES] = 0;
             dummyDualCosts[Constants.CSTR_CR_BETWEEN_DUTIES] = 0;
+            foreach (var task in vss.Tasks)
+            {
+                // Ensure block index mapping for tasks
+                foreach (string desc in task.BlockDescriptorCover) task.BlockIndexCover.Add(knownBlocks[desc]);
+            }
 
+
+            // Create initial set of crew duties
             CSPLSGlobal cspGlobal = new(css);
             cspGlobal.UpdateDualCosts(dummyDualCosts, 0);
             List<CrewDuty> initialDuties = cspGlobal.GenerateDuties().Select(x => x.crewDuty).ToList();
@@ -76,7 +87,12 @@ namespace E_VCSP.Solver {
         private void initializeUpperBound() {
             // Determine upper bound
             costUpperBound = 0;
+
+            // vehicle related costs
             foreach (var vt in vss.Tasks) costUpperBound += vt.Cost;
+            costUpperBound += Math.Max(0, vss.Tasks.Count - Config.MAX_VEHICLES) * Config.VH_OVER_MAX_COST;
+
+            // crew related costs
             foreach (var cd in css.Duties) costUpperBound += cd.Cost;
 
             objVal = (costUpperBound, true);
@@ -85,11 +101,11 @@ namespace E_VCSP.Solver {
         private void resetLamdba(bool clear) {
             if (clear) {
                 lambdaTrips = vss.Instance.Trips.Select(x => 0.0).ToList();
-                lambdaBlocks = [];
+                lambdaBlocks = css.Blocks.Select(x => 0.0).ToList();
             }
 
             for (int i = 0; i < vss.Instance.Trips.Count; i++) lambdaTrips[i] = 0;
-            for (int i = 0; i < css.Blocks.Count; i++) lambdaBlocks[css.Blocks[i].Descriptor] = 0;
+            for (int i = 0; i < css.Blocks.Count; i++) lambdaBlocks[css.Blocks[i].Index] = 0;
 
             lambdaAvgDutyLength = 0;
             lambdaMaxLongDuty = 0;
@@ -105,14 +121,19 @@ namespace E_VCSP.Solver {
         }
         #endregion
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool gradientDescent() {
-            resetLamdba(false);
+            if (!objVal.converged) resetLamdba(false);
+
+            double alpha = Math.Pow(Config.LAGRANGE_PI_END / Config.LAGRANGE_PI_START, 1.0 / Config.LANGRANGE_MAX_ROUNDS);
+            double pi = Config.LAGRANGE_PI_START;
 
             List<(double C_i, int taskIndex)> costByTaskIndex =
                 vss.Tasks.Select((x, i) => (double.MaxValue, i)).ToList();
             List<(double C_j, int dutyIndex)> costByDutyIndex =
                 css.Duties.Select((x, i) => (double.MaxValue, i)).ToList();
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             void updateCostsWithMultipliers() {
                 for (int i = 0; i < costByTaskIndex.Count; i++) {
                     int taskIndex = costByTaskIndex[i].taskIndex;
@@ -121,8 +142,8 @@ namespace E_VCSP.Solver {
 
                     foreach (var tripIndex in task.TripCover)
                         cost -= lambdaTrips[tripIndex];
-                    foreach (var blockDescriptor in task.BlockDescriptorCover)
-                        cost += lambdaBlocks[blockDescriptor];
+                    foreach (var blockIndex in task.BlockIndexCover)
+                        cost += lambdaBlocks[blockIndex];
 
                     costByTaskIndex[i] = (cost, taskIndex);
                 }
@@ -132,8 +153,8 @@ namespace E_VCSP.Solver {
                     CrewDuty duty = css.Duties[dutyIndex];
                     double cost = duty.Cost;
 
-                    foreach (var blockDescriptor in duty.BlockDescriptorCover)
-                        cost -= lambdaBlocks[blockDescriptor];
+                    foreach (var blockIndex in duty.BlockIndexCover)
+                        cost -= lambdaBlocks[blockIndex];
 
                     int isLongDuty = duty.Duration > Config.CR_LONG_SHIFT_LENGTH ? 1 : 0;
                     int isBetweenDuty = duty.Type == DutyType.Between ? 1 : 0;
@@ -148,6 +169,7 @@ namespace E_VCSP.Solver {
                 }
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             double solve() {
                 // Reset current solution value
                 for (int i = 0; i < X.Count; i++)
@@ -222,6 +244,7 @@ namespace E_VCSP.Solver {
                 return cost;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             void updateMultipliers(double z_curr) {
                 // Trips
                 double[] GTrips = new double[lambdaTrips.Count];
@@ -233,23 +256,22 @@ namespace E_VCSP.Solver {
                 }
 
                 // Blocks
-                Dictionary<string, double> GBlocks = []; // b == 0
+                double[] GBlocks = new double[lambdaBlocks.Count]; // b == 0
                 double GAvgDutyLength = 0;
                 double GMaxLongDuty = 0;
                 //double GMaxBroken = 0; 
                 //double GMaxBetween = 0;
-                for (int i = 0; i < css.Blocks.Count; i++) GBlocks[css.Blocks[i].Descriptor] = 0.0;
                 for (int taskIndex = 0; taskIndex < X.Count; taskIndex++) {
                     if (!X[taskIndex]) continue;
-                    foreach (var blockDescriptor in vss.Tasks[taskIndex].BlockDescriptorCover) {
-                        GBlocks[blockDescriptor] += 1;
+                    foreach (var blockIndex in vss.Tasks[taskIndex].BlockIndexCover) {
+                        GBlocks[blockIndex] += 1;
                     }
                 }
                 for (int dutyIndex = 0; dutyIndex < Y.Count; dutyIndex++) {
                     if (!Y[dutyIndex]) continue;
                     var duty = css.Duties[dutyIndex];
-                    foreach (var blockDescriptor in duty.BlockDescriptorCover) {
-                        GBlocks[blockDescriptor] -= 1;
+                    foreach (var blockIndex in duty.BlockIndexCover) {
+                        GBlocks[blockIndex] -= 1;
                     }
 
                     int isLongDuty = duty.Duration > Config.CR_LONG_SHIFT_LENGTH ? 1 : 0;
@@ -264,21 +286,21 @@ namespace E_VCSP.Solver {
 
                 double GSquaredSum = 0;
                 for (int i = 0; i < GTrips.Length; i++) GSquaredSum += GTrips[i] * GTrips[i];
-                foreach (var g in GBlocks.Values) GSquaredSum += g * g;
+                for (int i = 0; i < GBlocks.Length; i++) GSquaredSum += GBlocks[i] * GBlocks[i];
                 GSquaredSum += GAvgDutyLength * GAvgDutyLength;
                 GSquaredSum += GMaxLongDuty * GMaxLongDuty;
                 //GSquaredSum += GMaxBroken * GMaxBroken;
                 //GSquaredSum += GMaxBetween * GMaxBetween;
 
-                double T = Config.LAGRANGE_PI * (costUpperBound - z_curr) / GSquaredSum;
+                double T = pi * (costUpperBound - z_curr) / GSquaredSum;
 
                 for (int i = 0; i < lambdaTrips.Count; i++) {
                     // >= constraint
                     lambdaTrips[i] = Math.Max(0, lambdaTrips[i] + T * GTrips[i]);
                 }
-                foreach (string descriptor in lambdaBlocks.Keys) {
+                for (int i = 0; i < lambdaBlocks.Count; i++) {
                     // == constraint
-                    lambdaBlocks[descriptor] = lambdaBlocks[descriptor] + T * GBlocks[descriptor];
+                    lambdaBlocks[i] = lambdaBlocks[i] + T * GBlocks[i];
                 }
 
                 // >= constraint
@@ -293,7 +315,8 @@ namespace E_VCSP.Solver {
             int roundsInThreshold = 0;
             bool converged = false;
 
-            for (int i = 0; i < Config.LANGRANGE_MAX_ROUNDS && !converged; i++) {
+            int i = 0;
+            for (; i < Config.LANGRANGE_MAX_ROUNDS && !converged; i++) {
                 updateCostsWithMultipliers();
                 double z_curr = solve();
                 if (double.IsNaN(z_curr)) {
@@ -301,6 +324,7 @@ namespace E_VCSP.Solver {
                     throw new InvalidOperationException();
                 }
                 updateMultipliers(z_curr);
+                pi *= alpha;
 
                 // Solution might have stabelized
                 double percentageDiff = Math.Abs(Math.Abs(z_curr - lastSolutionVal) / lastSolutionVal);
@@ -317,12 +341,39 @@ namespace E_VCSP.Solver {
                 if (roundsInThreshold >= Config.LANGRANGE_THRS_SEQ) converged = true;
             }
 
+            // throw away the worst vehicle tasks / crew duties
+            if (vss.Tasks.Count > Config.VCSP_MAX_TASKS_DURING_SOLVE)
+            {
+                costByTaskIndex.Sort();
+                HashSet<int> indicesToRemove = new();
+                for (int j = Config.VCSP_MAX_TASKS_DURING_SOLVE; j < costByTaskIndex.Count; j++)
+                {
+                    indicesToRemove.Add(costByTaskIndex[j].taskIndex);
+                }
+                vss.Tasks = vss.Tasks.Where((_, i) => !indicesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
+                X = X.Where((_, i) => !indicesToRemove.Contains(i)).ToList();
+            }
+            if (css.Duties.Count > Config.VCSP_MAX_DUTIES_DURING_SOLVE)
+            {
+                costByDutyIndex.Sort();
+                HashSet<int> indicesToRemove = new();
+                for (int j = Config.VCSP_MAX_DUTIES_DURING_SOLVE; j < costByDutyIndex.Count; j++)
+                {
+                    indicesToRemove.Add(costByDutyIndex[j].dutyIndex);
+                }
+                css.Duties = css.Duties.Where((_, i) => !indicesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
+                Y = Y.Where((_, i) => !indicesToRemove.Contains(i)).ToList();
+            }
+
+
+
             objVal = (lastSolutionVal, converged);
+
             return converged;
         }
 
         private Dictionary<string, double> crewDualCost() {
-            Dictionary<string, double> res = lambdaBlocks.Select(kv => (Constants.CSTR_BLOCK_COVER + kv.Key, kv.Value)).ToDictionary();
+            Dictionary<string, double> res = lambdaBlocks.Select((l, i) => (Constants.CSTR_BLOCK_COVER + css.Blocks[i].Descriptor, l)).ToDictionary();
             res[Constants.CSTR_CR_AVG_TIME] = lambdaAvgDutyLength;
             res[Constants.CSTR_CR_LONG_DUTIES] = lambdaMaxLongDuty;
             res[Constants.CSTR_CR_BROKEN_DUTIES] = 0;
@@ -330,28 +381,31 @@ namespace E_VCSP.Solver {
             return res;
         }
 
-        private void runVehicleIts(bool initial) {
-            int maxIts = initial ? Config.VCSP_VH_ITS_INIT : Config.VCSP_VH_ITS_ROUND;
+        private void runVehicleIts(int round) {
+            int maxIts = round == 0 ? Config.VCSP_VH_ITS_INIT : Config.VCSP_VH_ITS_ROUND;
             VSPLabeling vspLabelingInstance = new(vss);
-
 
             void updateDualCosts() {
                 Dictionary<string, double> blockDualCosts = new();
                 Dictionary<string, List<double>> blockDualCostsByStart = new();
 
-                foreach (var b in css.Blocks) {
+                for (int i = 0; i < css.Blocks.Count; i++) {
+                    Block b = css.Blocks[i];
                     string descriptor = b.Descriptor;
                     string descriptorStart = String.Join("#", descriptor.Split("#").Take(2));
+
+
+                    blockDualCosts[descriptor] = -lambdaBlocks[i]; 
                     if (blockDualCostsByStart.ContainsKey(descriptorStart))
-                        blockDualCostsByStart[descriptorStart].Add(-lambdaBlocks[descriptor]);
+                        blockDualCostsByStart[descriptorStart].Add(-lambdaBlocks[i]);
                     else blockDualCostsByStart[descriptorStart] =
-                            [-lambdaBlocks[descriptor]];
+                            [-lambdaBlocks[i]];
                 }
 
                 // TODO: validate if this is correct
                 vspLabelingInstance.UpdateDualCosts(
                     lambdaTrips,
-                    blockDualCosts.Select((kv) => (kv.Key, -kv.Value)).ToDictionary(),
+                    blockDualCosts,
                     blockDualCostsByStart
                 );
             }
@@ -364,6 +418,7 @@ namespace E_VCSP.Solver {
                     if (reducedCosts > 0) continue;
 
                     newTask.Index = vss.Tasks.Count;
+
                     // Determine blocks for task; add any not yet known ones to css
                     List<Block> blocks = Block.FromVehicleTask(newTask);
                     foreach (Block b in blocks) {
@@ -372,19 +427,24 @@ namespace E_VCSP.Solver {
                             knownBlocks[desc] = css.Blocks.Count;
                             css.AddBlock(b, 1);
                             Y.Add(false); //unit duty from block being added
-                            lambdaBlocks[desc] = 0;
+                            lambdaBlocks.Add(0); // New block multiplier
                         }
+
+                        int blockIndex = knownBlocks[desc];
+                        newTask.BlockIndexCover.Add(blockIndex);
                     }
+
                     vss.Tasks.Add(newTask);
                     X.Add(false);
                 }
 
                 gradientDescent();
+                Console.WriteLine($"{round}.V${currIt}\t{objVal.val:0.##f}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
             }
         }
 
-        private void runCrewIts(bool initial) {
-            int maxIts = initial ? Config.VCSP_CR_ITS_INIT : Config.VCSP_CR_ITS_ROUND;
+        private void runCrewIts(int round) {
+            int maxIts = round == 0 ? Config.VCSP_CR_ITS_INIT : Config.VCSP_CR_ITS_ROUND;
 
             Dictionary<string, int> activeBlockCounts = [];
             for (int i = 0; i < X.Count; i++) {
@@ -418,6 +478,7 @@ namespace E_VCSP.Solver {
                     Y.Add(false);
                 }
                 gradientDescent();
+                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##f}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
             }
         }
 
@@ -431,6 +492,7 @@ namespace E_VCSP.Solver {
             model.Parameters.TimeLimit = Config.VCSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 3; // upper bound
             model.Parameters.Presolve = 2; // aggresive presolve
+            model.SetCallback(new CustomGRBCallback());
 
             List<GRBVar> taskVars = [], dutyVars = [];
             for (int i = 0; i < vss.Tasks.Count; i++) {
@@ -538,13 +600,13 @@ namespace E_VCSP.Solver {
 
             // Initialize dual cost
             gradientDescent();
-            Console.WriteLine($"I\t{objVal.val:0.##f}\t{objVal.stabilized}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+            Console.WriteLine($"I\t{objVal.val:0.##f}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
 
             for (int round = 0; round < Config.VCSP_ROUNDS; round++) {
-                runVehicleIts(round == 0);
-                runCrewIts(round == 0);
+                runVehicleIts(round);
+                runCrewIts(round);
 
-                Console.WriteLine($"{round}\t{objVal.val:0.##f}\t{objVal.stabilized}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+                Console.WriteLine($"{round}\t{objVal.val:0.##f}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
             }
 
             solveILP();

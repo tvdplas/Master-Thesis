@@ -207,7 +207,7 @@ namespace E_VCSP.Solver {
 
                 double GSquaredSum = 0;
                 foreach (var g in G) GSquaredSum += g * g;
-                double T = Config.LAGRANGE_PI * (upperBoundValue - z_curr) / GSquaredSum;
+                double T = Config.LAGRANGE_PI_START * (upperBoundValue - z_curr) / GSquaredSum;
 
                 for (int i = 0; i < lambdaTrips.Count; i++) {
                     lambdaTrips[i] = Math.Max(0, lambdaTrips[i] + T * G[i]);

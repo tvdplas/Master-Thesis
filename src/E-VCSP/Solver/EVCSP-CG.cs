@@ -111,7 +111,7 @@ namespace E_VCSP.Solver {
                 if (v.VarName.StartsWith("cd_") && v.X > 0) {
                     CrewDuty dvt = css.VarnameDutyMapping[v.VarName];
                     duties.Add(dvt);
-                    foreach (int i in dvt.BlockCover) covered[i]++;
+                    foreach (int i in dvt.BlockIndexCover) covered[i]++;
                 }
             }
 
@@ -179,7 +179,7 @@ namespace E_VCSP.Solver {
                 BlockCover.Add(knownBlockIndex);
             }
 
-            vt.BlockCover = BlockCover;
+            vt.BlockIndexCover = BlockCover;
             if (addNewConstrs) model!.Update();
         }
 
@@ -246,12 +246,12 @@ namespace E_VCSP.Solver {
                 GRBLinExpr expr = new();
 
                 for (int vtIndex = 0; vtIndex < taskVars.Count; vtIndex++) {
-                    if (vss.Tasks[vtIndex].BlockCover.Contains(blockIndex))
+                    if (vss.Tasks[vtIndex].BlockIndexCover.Contains(blockIndex))
                         expr += taskVars[vtIndex];
                 }
 
                 for (int cdIndex = 0; cdIndex < dutyVars.Count; cdIndex++) {
-                    if (css.Duties[cdIndex].BlockCover.Contains(blockIndex))
+                    if (css.Duties[cdIndex].BlockIndexCover.Contains(blockIndex))
                         expr -= dutyVars[cdIndex];
                 }
 
@@ -303,7 +303,7 @@ namespace E_VCSP.Solver {
             for (int i = 0; i < taskVars.Count; i++) {
                 if (taskVars[i].X > 0) {
                     // TODO: dit werkt zo niet meer
-                    foreach (int knownBlockIndex in vss.Tasks[i].BlockCover)
+                    foreach (int knownBlockIndex in vss.Tasks[i].BlockIndexCover)
                         knownBlocks[knownBlockIndex].CoveredCount += taskVars[i].X;
                 }
             }
@@ -366,7 +366,7 @@ namespace E_VCSP.Solver {
                     // Vehicle task contains block
                     if (name.StartsWith(Constants.CSTR_BLOCK_COVER)) {
                         string blockDescriptor = name.Split("_")[^1];
-                        return newTask.BlockCover.Contains(descriptorToKnownBlockIndex[blockDescriptor]);
+                        return newTask.BlockIndexCover.Contains(descriptorToKnownBlockIndex[blockDescriptor]);
                     }
                     // Constraint not relevant
                     return false;
@@ -416,7 +416,7 @@ namespace E_VCSP.Solver {
                     string name = constr.ConstrName;
                     if (name.StartsWith(Constants.CSTR_BLOCK_COVER)) {
                         string blockDescriptor = name.Split("_")[^1];
-                        return newDuty.BlockCover.Contains(descriptorToKnownBlockIndex[blockDescriptor]);
+                        return newDuty.BlockIndexCover.Contains(descriptorToKnownBlockIndex[blockDescriptor]);
                     }
 
                     // Overall crew schedule constraints

@@ -79,7 +79,7 @@ namespace E_VCSP.Solver.SolutionState {
             }).ToList();
 
             List<CrewDuty> duties = dump.selectedDuties.Select((d, i) => {
-                d.BlockCover = [];
+                d.BlockIndexCover = [];
                 d.Elements = d.Elements.Select(e => {
                     e.StartLocation = Instance.Locations.Find(l => l.Id == e.StartLocation.Id)!;
                     e.EndLocation = Instance.Locations.Find(l => l.Id == e.EndLocation.Id)!;
@@ -92,7 +92,7 @@ namespace E_VCSP.Solver.SolutionState {
                             && x.EndLocation.Id == cdeb.EndLocation.Id;
                         });
                         cdeb.Block = blocks[blockIndex];
-                        d.BlockCover.Add(blockIndex);
+                        d.BlockIndexCover.Add(blockIndex);
                     }
                     return e;
                 }).ToList();

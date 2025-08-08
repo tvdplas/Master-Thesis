@@ -183,7 +183,7 @@ namespace E_VCSP.Objects {
         public DutyType Type;
         [JsonInclude]
         public List<CrewDutyElement> Elements;
-        public List<int> BlockCover;
+        public List<int> BlockIndexCover;
 
         public List<string> BlockDescriptorCover;
         [JsonInclude]
@@ -222,13 +222,13 @@ namespace E_VCSP.Objects {
 
         public CrewDuty(List<CrewDutyElement> elements) {
             Elements = elements;
-            BlockCover = [.. elements.Where(e => e.Type == CrewDutyElementType.Block).Select(e => ((CDEBlock)e).Block.Index)];
+            BlockIndexCover = [.. elements.Where(e => e.Type == CrewDutyElementType.Block).Select(e => ((CDEBlock)e).Block.Index)];
             BlockDescriptorCover = [.. elements.Where(e => e.Type == CrewDutyElementType.Block).Select(e => ((CDEBlock)e).Block.Descriptor)];
         }
 
         public BitArray ToBitArray(int blockCount) {
             BitArray ba = new(blockCount);
-            for (int i = 0; i < BlockCover.Count; i++) ba[BlockCover[i]] = true;
+            for (int i = 0; i < BlockIndexCover.Count; i++) ba[BlockIndexCover[i]] = true;
             return ba;
         }
 

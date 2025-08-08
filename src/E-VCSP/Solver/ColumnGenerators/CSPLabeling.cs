@@ -375,8 +375,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 for (int j = 1; j < (Config.CSP_LB_SEC_COL_ATTEMPTS + 1); j++) {
                     reset();
-                    for (int k = 0; k < (int)((double)j * baseTask.crewDuty.BlockCover.Count / (Config.CSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
-                        blockedBlock[baseTask.crewDuty.BlockCover[k]] = true;
+                    for (int k = 0; k < (int)((double)j * baseTask.crewDuty.BlockIndexCover.Count / (Config.CSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
+                        blockedBlock[baseTask.crewDuty.BlockIndexCover[k]] = true;
                     }
                     runLabeling();
                     secondaryTasks.AddRange(extractDuties("secondary"));

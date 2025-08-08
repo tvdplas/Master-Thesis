@@ -1,4 +1,6 @@
-﻿namespace E_VCSP {
+﻿using System.Net.NetworkInformation;
+
+namespace E_VCSP {
     public class Header { }
     public enum GraphElementDisplay {
         None,
@@ -145,9 +147,12 @@
         public static int VCSP_CR_ITS_ROUND = 3;
         public static int VCSP_VH_INSTANCES = 1;
         public static int VCSP_CR_INSTANCES = 5;
+        public static int VCSP_MAX_TASKS_DURING_SOLVE = 10000;
+        public static int VCSP_MAX_DUTIES_DURING_SOLVE = 5000;
 
         public static Header LAGRANGE = new();
-        public static double LAGRANGE_PI = 1; // (0, 2]
+        public static double LAGRANGE_PI_START = 1; // (0, 2]
+        public static double LAGRANGE_PI_END = 0.001; // (0, 2]
         public static double LANGRANGE_THRS = 0.01; // % diff between two sequential solutions to be considered "done"
         public static int LANGRANGE_THRS_SEQ = 5; // number of sequential rounds within threshold to be considered done
         public static int LANGRANGE_MAX_ROUNDS = 5000; // number of sequential rounds within threshold to be considered done

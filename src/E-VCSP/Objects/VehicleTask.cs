@@ -285,7 +285,7 @@ namespace E_VCSP.Objects {
         [JsonInclude]
         public List<int> TripCover;
         [JsonInclude]
-        public List<int> BlockCover;
+        public List<int> BlockIndexCover;
         public List<string> BlockDescriptorCover = [];
         [JsonInclude]
         public List<VehicleElement> Elements;
@@ -320,7 +320,7 @@ namespace E_VCSP.Objects {
         public VehicleTask(List<VehicleElement> elements) {
             Elements = elements;
             TripCover = [];
-            BlockCover = [];
+            BlockIndexCover = [];
             RecalculateCovers();
         }
 

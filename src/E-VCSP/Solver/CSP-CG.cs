@@ -49,7 +49,7 @@ namespace E_VCSP.Solver {
                 int count = css.BlockCount[blockIndex];
                 GRBLinExpr expr = new();
                 for (int i = 0; i < css.Duties.Count; i++) {
-                    if (css.Duties[i].BlockCover.Contains(b.Index)) expr.AddTerm(1, dutyVars[i]);
+                    if (css.Duties[i].BlockIndexCover.Contains(b.Index)) expr.AddTerm(1, dutyVars[i]);
                 }
 
                 // Switch between set partition and cover
@@ -98,7 +98,7 @@ namespace E_VCSP.Solver {
                 if (v.VarName.StartsWith("cd_") && v.X == 1) {
                     CrewDuty dvt = css.VarnameDutyMapping[v.VarName];
                     duties.Add(dvt);
-                    foreach (int i in dvt.BlockCover) covered[i]++;
+                    foreach (int i in dvt.BlockIndexCover) covered[i]++;
                 }
             }
 
@@ -173,7 +173,7 @@ namespace E_VCSP.Solver {
                         // Create new column to add to model
                         var modelConstrs = model.GetConstrs();
                         GRBConstr[] constrs = [.. modelConstrs.Where(
-                            (_, i) => newDuty.BlockCover.Contains(i) || i >= css.Blocks.Count  // Covers block || one of the shift type.length constraints
+                            (_, i) => newDuty.BlockIndexCover.Contains(i) || i >= css.Blocks.Count  // Covers block || one of the shift type.length constraints
                         )];
                         GRBColumn col = new();
                         col.AddTerms([.. constrs.Select(c => {
