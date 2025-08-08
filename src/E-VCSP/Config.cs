@@ -25,19 +25,13 @@
         public static bool DUMP_VSP = false;
         public static bool DUMP_CSP = false;
 
-        // Nodes
-        public static Header NODES = new();
-        public static int MIN_NODE_TIME = 300;
-        public static int MIN_NODE_WIDTH = 75;
-        public static int NODE_HEIGHT = 40;
-
         public static Header DATA = new();
         public static double KWH_COST = 0.32; // based on national average price
         public static int MIN_CHARGE_TIME = 300;
-        public static int MAX_VEHICLES = 17; // Maximum number of vehicles that can be used in the solution.
-        public static int MAX_DUTIES = 50; // Maximum number of vehicles that can be used in the solution.
+        public static int MAX_VEHICLES = 20; // Maximum number of vehicles that can be used in the solution.
+        public static int MAX_DUTIES = 100; // Maximum number of vehicles that can be used in the solution.
         public static double VH_M_COST = 0.00005; // verified at qbuzz
-        public static double VH_OVER_MAX_COST = 1000000; // Cost per vehicle of going over. only used as penalty
+        public static double VH_OVER_MAX_COST = 0; // Cost per vehicle of going over. only used as penalty
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double VH_IDLE_COST = 0; // Cost per unit of time for being idle.
         public static int MAX_STEERING_TIME = 60 * 60 * 4; // conitnous driving time
@@ -75,11 +69,11 @@
 
         public static Header VSP_LABELING = new();
         public static double VSP_LB_WEIGHT = 1;
-        public static int VSP_LB_MAX_COLS = 50;
+        public static int VSP_LB_MAX_COLS = 5;
         public static int VSP_LB_MIN_TRIPS = 3; // min number of trips in a single vehicle task
         public static bool VSP_LB_ATTEMPT_DISJOINT = true;
         public static double VSP_LB_CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same
-        public static double VSP_LB_SEC_COL_COUNT = 1; // Number of primary columns to generate secondary columns for 
+        public static double VSP_LB_SEC_COL_COUNT = 5; // Number of primary columns to generate secondary columns for 
         public static double VSP_LB_SEC_COL_ATTEMPTS = 4; // Number of attempts per secondary column
 
         public static Header VSP_LS_SHARED_PENALTIES = new();
@@ -156,6 +150,6 @@
         public static double LAGRANGE_PI = 1; // (0, 2]
         public static double LANGRANGE_THRS = 0.01; // % diff between two sequential solutions to be considered "done"
         public static int LANGRANGE_THRS_SEQ = 5; // number of sequential rounds within threshold to be considered done
-        public static int LANGRANGE_MAX_ROUNDS = 200; // number of sequential rounds within threshold to be considered done
+        public static int LANGRANGE_MAX_ROUNDS = 5000; // number of sequential rounds within threshold to be considered done
     }
 }

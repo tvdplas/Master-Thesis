@@ -1,5 +1,4 @@
-﻿using E_VCSP.Formatting;
-using E_VCSP.Objects;
+﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
@@ -22,7 +21,7 @@ namespace E_VCSP.Solver {
         private List<bool> Y = []; // Select cd at index
 
         private double costUpperBound = double.MaxValue;
-        private double objVal = double.MaxValue;
+        private (double val, bool stabilized) objVal = (double.MaxValue, true);
 
         public EVCSPCGLagrange(VehicleSolutionState vss, CrewSolutionState css) {
             this.vss = vss;
@@ -80,7 +79,7 @@ namespace E_VCSP.Solver {
             foreach (var vt in vss.Tasks) costUpperBound += vt.Cost;
             foreach (var cd in css.Duties) costUpperBound += cd.Cost;
 
-            objVal = costUpperBound;
+            objVal = (costUpperBound, true);
         }
 
         private void resetLamdba(bool clear) {
@@ -318,7 +317,7 @@ namespace E_VCSP.Solver {
                 if (roundsInThreshold >= Config.LANGRANGE_THRS_SEQ) converged = true;
             }
 
-            objVal = lastSolutionVal;
+            objVal = (lastSolutionVal, converged);
             return converged;
         }
 
@@ -344,12 +343,17 @@ namespace E_VCSP.Solver {
                     string descriptor = b.Descriptor;
                     string descriptorStart = String.Join("#", descriptor.Split("#").Take(2));
                     if (blockDualCostsByStart.ContainsKey(descriptorStart))
-                        blockDualCostsByStart[descriptorStart].Add(lambdaBlocks[descriptor]);
+                        blockDualCostsByStart[descriptorStart].Add(-lambdaBlocks[descriptor]);
                     else blockDualCostsByStart[descriptorStart] =
-                            [lambdaBlocks[descriptor]];
+                            [-lambdaBlocks[descriptor]];
                 }
 
-                vspLabelingInstance.UpdateDualCosts(lambdaTrips, blockDualCosts, blockDualCostsByStart);
+                // TODO: validate if this is correct
+                vspLabelingInstance.UpdateDualCosts(
+                    lambdaTrips,
+                    blockDualCosts.Select((kv) => (kv.Key, -kv.Value)).ToDictionary(),
+                    blockDualCostsByStart
+                );
             }
 
             for (int currIt = 0; currIt < maxIts; currIt++) {
@@ -417,25 +421,7 @@ namespace E_VCSP.Solver {
             }
         }
 
-        public override bool Solve(CancellationToken ct) {
-            initializeCover();
-            initializeUpperBound();
-            initializeLagrangeModel();
-
-            // Initialize dual cost
-            bool initiallyConverged = gradientDescent();
-            Console.WriteLine($"ObjVal: {objVal}, Converged: {initiallyConverged}");
-
-            for (int i = 0; i < Config.VCSP_ROUNDS; i++) {
-                // Generate new vehicle tasks
-                runVehicleIts(false);
-
-                // Generate new crew duties based on vehicle tasks in X
-                runCrewIts(false);
-
-                Console.WriteLine($"ObjVal: {objVal}");
-            }
-
+        private void solveILP() {
             // Solve using ILP
             GRBEnv env = new() {
                 LogToConsole = 1,
@@ -445,11 +431,7 @@ namespace E_VCSP.Solver {
             model.Parameters.TimeLimit = Config.VCSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 3; // upper bound
             model.Parameters.Presolve = 2; // aggresive presolve
-            model.SetCallback(new CustomGRBCallback());
-            ct.Register(() => {
-                Console.WriteLine("Cancellation requested.");
-                model.Terminate();
-            });
+
             List<GRBVar> taskVars = [], dutyVars = [];
             for (int i = 0; i < vss.Tasks.Count; i++) {
                 string name = $"vt_{i}";
@@ -547,6 +529,25 @@ namespace E_VCSP.Solver {
 
 
             Console.WriteLine($"Solution found with {vss.SelectedTasks.Count} vehicles, {css.SelectedDuties.Count} duties, overall costs {model.ObjVal}");
+        }
+
+        public override bool Solve(CancellationToken ct) {
+            initializeCover();
+            initializeUpperBound();
+            initializeLagrangeModel();
+
+            // Initialize dual cost
+            gradientDescent();
+            Console.WriteLine($"I\t{objVal.val:0.##f}\t{objVal.stabilized}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+
+            for (int round = 0; round < Config.VCSP_ROUNDS; round++) {
+                runVehicleIts(round == 0);
+                runCrewIts(round == 0);
+
+                Console.WriteLine($"{round}\t{objVal.val:0.##f}\t{objVal.stabilized}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+            }
+
+            solveILP();
 
             return true;
         }

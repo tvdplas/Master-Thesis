@@ -30,12 +30,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 // Create depot -> dh1 -> idle1 -> trip -> dh2 -> idle2 -> depot
                 VSPLSNode depotStart = new() {
-                    PVE = new PVEDepot(vss.Depot, vss.StartTime - Config.MIN_NODE_TIME, vss.StartTime),
+                    PVE = new PVEDepot(vss.Depot, vss.StartTime - Constants.MIN_NODE_TIME, vss.StartTime),
                 };
                 VSPLSNode travel1 = depotStart.AddAfter(new PVETravel(depotTripArc.DeadheadTemplate, vss.StartTime, t.StartTime, vss.VehicleType));
                 VSPLSNode trip = travel1.AddAfter(new PVETrip(t, vss.VehicleType));
                 VSPLSNode travel2 = trip.AddAfter(new PVETravel(tripDepotArc.DeadheadTemplate, t.EndTime, vss.EndTime, vss.VehicleType));
-                VSPLSNode depotEnd = travel2.AddAfter(new PVEDepot(vss.Depot, vss.EndTime, vss.EndTime + Config.MIN_NODE_TIME));
+                VSPLSNode depotEnd = travel2.AddAfter(new PVEDepot(vss.Depot, vss.EndTime, vss.EndTime + Constants.MIN_NODE_TIME));
 
                 tasks.Add(depotStart);
             }

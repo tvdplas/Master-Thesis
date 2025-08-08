@@ -289,16 +289,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 PartialVehicleElement VE = curr.PVE;
 
                 if (VE.Type == PVEType.Depot) {
-                    VEIdle vei;
-                    if (curr.Prev == null) {
-                        vei = new(VE.StartLocation!, VE.StartTime, ((PVETravel)curr.Next!.PVE).DepartureTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
-
-                    }
-                    else {
-                        vei = new(VE.StartLocation!, ((PVETravel)curr.Prev!.PVE).ArrivalTime, VE.EndTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
-                    }
-                    elements.Add(vei);
-                    currSoC += VE.SoCDiff;
+                    // Do nothing
                 }
                 else if (VE.Type == PVEType.Travel) {
                     PVETravel pvet = (PVETravel)VE;
@@ -565,12 +556,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (times.Count == 0) return LSOpResult.Invalid;
 
             var timeSlot = times[random.Next(times.Count)];
-            var padding = Math.Max(0, (timeSlot.end - timeSlot.start - Config.MIN_NODE_TIME) / 2);
+            var padding = Math.Max(0, (timeSlot.end - timeSlot.start - Constants.MIN_NODE_TIME) / 2);
 
             return addStop(head, new PVECharge(
                 selectedLocation,
                 Math.Min(timeSlot.start + padding, timeSlot.end),
-                Math.Min(timeSlot.start + padding + Config.MIN_NODE_TIME, timeSlot.end)),
+                Math.Min(timeSlot.start + padding + Constants.MIN_NODE_TIME, timeSlot.end)),
                 0
             );
         }

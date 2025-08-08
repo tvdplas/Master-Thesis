@@ -291,8 +291,12 @@ namespace E_VCSP.Objects {
         public List<VehicleElement> Elements;
         [JsonInclude]
         public int Index = -1;
+
+        private double cachedCost = -1;
         public double Cost {
             get {
+                if (cachedCost != -1) return cachedCost;
+
                 // Driving / idle / charging costs throughout the day
                 double cost = Elements.Sum(e => e.Cost);
 
@@ -302,6 +306,7 @@ namespace E_VCSP.Objects {
                 // Cost of just using vehicle
                 cost += Config.VH_PULLOUT_COST;
 
+                cachedCost = cost;
                 return cost;
             }
         }
@@ -322,6 +327,7 @@ namespace E_VCSP.Objects {
         public void RecalculateCovers() {
             TripCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
             TripCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
+            cachedCost = -1;
         }
     }
 }

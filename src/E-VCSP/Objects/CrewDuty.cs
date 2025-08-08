@@ -189,8 +189,10 @@ namespace E_VCSP.Objects {
         [JsonInclude]
         public int Index = -1;
 
+        private double cachedCost = -1;
         public double Cost {
             get {
+                if (cachedCost != -1) return cachedCost;
                 double cost = Config.CR_SHIFT_COST; // base
                 // Driven time
                 cost += Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST);
@@ -213,6 +215,7 @@ namespace E_VCSP.Objects {
                     cost += Config.CR_BROKEN_SHIFT_COST;
                 }
 
+                cachedCost = cost;
                 return cost;
             }
         }

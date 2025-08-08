@@ -34,14 +34,14 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Create depot nodes, connecting dh + idle time to ensure that there is always a feasible start / end to the vehicle task
             head = new VSPLSNode() {
-                PVE = new PVEDepot(vss.Depot, vss.StartTime - Config.MIN_NODE_TIME, vss.StartTime),
+                PVE = new PVEDepot(vss.Depot, vss.StartTime - Constants.MIN_NODE_TIME, vss.StartTime),
             };
 
             head.AddAfter(
                     new PVETravel(dht, vss.StartTime, vss.EndTime, vss.VehicleType)
                 )
                 .AddAfter(
-                    new PVEDepot(vss.Depot, vss.EndTime, vss.EndTime + Config.MIN_NODE_TIME)
+                    new PVEDepot(vss.Depot, vss.EndTime, vss.EndTime + Constants.MIN_NODE_TIME)
                 );
         }
 

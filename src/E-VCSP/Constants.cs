@@ -1,5 +1,7 @@
 ﻿namespace E_VCSP {
     public static class Constants {
+        public static int MIN_NODE_TIME = 300;
+
         public static string CSTR_MAX_VEHICLES = "max_vehicles";
         public static string CSTR_TRIP_COVER = "cover_trip_"; // + trip index
         public static string CSTR_BLOCK_COVER = "cover_block_"; // + block descriptor
