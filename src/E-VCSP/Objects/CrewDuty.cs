@@ -179,6 +179,7 @@ namespace E_VCSP.Objects {
     }
 
     public class CrewDuty {
+        public bool IsUnit = false;
         [JsonInclude]
         public DutyType Type;
         [JsonInclude]
@@ -188,6 +189,7 @@ namespace E_VCSP.Objects {
         public List<string> BlockDescriptorCover;
         [JsonInclude]
         public int Index = -1;
+        
 
         private double cachedCost = -1;
         public double Cost {
@@ -220,6 +222,35 @@ namespace E_VCSP.Objects {
             }
         }
 
+        private int cachedDuration = -1;
+        public int Duration {
+            get
+            {
+                if (cachedDuration != -1) return cachedDuration;
+
+                int duration = Elements[^1].EndTime - Elements[0].StartTime;
+                if (Type == DutyType.Broken)
+                {
+                    var largestIdle = Elements
+                        .Where(e => e.Type == CrewDutyElementType.Idle)
+                        .OrderByDescending(e => e.EndTime - e.StartTime)
+                        .FirstOrDefault();
+
+                    if (largestIdle != null)
+                    {
+                        duration -= largestIdle.EndTime - largestIdle.StartTime;
+                    }
+                }
+
+                cachedDuration = duration;
+                return cachedDuration;
+            }
+        }
+
+        public int IsLongDuty => Duration > Config.CR_LONG_SHIFT_LENGTH ? 1 : 0;
+        public int IsBrokenDuty => Type == DutyType.Broken ? 1 : 0;
+        public int IsBetweenDuty => Type == DutyType.Between ? 1 : 0;
+
         public CrewDuty(List<CrewDutyElement> elements) {
             Elements = elements;
             BlockIndexCover = [.. elements.Where(e => e.Type == CrewDutyElementType.Block).Select(e => ((CDEBlock)e).Block.Index)];
@@ -246,8 +277,6 @@ namespace E_VCSP.Objects {
 
             return $"[{Index}] {type} duty";
         }
-
-        public int Duration => Elements[^1].EndTime - Elements[0].StartTime;
     }
 }
 

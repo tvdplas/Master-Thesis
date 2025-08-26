@@ -278,6 +278,7 @@ namespace E_VCSP.Objects {
     }
 
     public class VehicleTask {
+        public bool IsUnit = false;
         [JsonInclude]
         public required string Source;
         [JsonInclude]

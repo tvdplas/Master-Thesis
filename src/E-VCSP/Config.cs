@@ -149,6 +149,7 @@ namespace E_VCSP {
         public static int VCSP_CR_INSTANCES = 5;
         public static int VCSP_MAX_TASKS_DURING_SOLVE = 10000;
         public static int VCSP_MAX_DUTIES_DURING_SOLVE = 5000;
+        public static bool VCSP_ALLOW_CREW_CSTR_SLACK = false;
 
         public static Header LAGRANGE = new();
         public static double LAGRANGE_PI_START = 1; // (0, 2]

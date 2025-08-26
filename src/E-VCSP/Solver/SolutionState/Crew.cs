@@ -177,7 +177,8 @@ namespace E_VCSP.Solver.SolutionState {
             // Create a unit duty in order to process the block
             var duty = new CrewDuty([new CDEBlock(b)]) {
                 Index = Duties.Count,
-                Type = DutyType.Single
+                Type = DutyType.Single,
+                IsUnit = true,
             };
             Duties.Add(duty);
 

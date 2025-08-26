@@ -384,7 +384,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             }
 
             primaryTasks.AddRange(secondaryTasks);
-            return primaryTasks;
+            return primaryTasks.Where(x => x.crewDuty != null).ToList();
         }
     }
 }
