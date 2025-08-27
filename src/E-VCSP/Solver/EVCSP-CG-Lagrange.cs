@@ -4,7 +4,6 @@ using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
 using Gurobi;
-using System.Runtime.CompilerServices;
 
 namespace E_VCSP.Solver {
     internal class EVCSPCGLagrange : Solver {
@@ -16,6 +15,7 @@ namespace E_VCSP.Solver {
         private List<bool> X = []; // Select vt at index
         private int vehicleSlack = 0; // Amount of over slack we are going
         private List<bool> Y = []; // Select cd at index
+        private int maxDutiesSlack = 0; // Amount of over slack we are going
 
         /// <summary> >= 0 \forall i </summary>
         private List<double> lambdaTrips = [];
@@ -24,6 +24,8 @@ namespace E_VCSP.Solver {
         /// <summary> >= 0 </summary>
         private double lamdbaMaxVehicles = 0;
         /// <summary> >= 0 </summary>
+        private double lamdbaMaxDuties = 0;
+        /// <summary> >= 0 </summary>
         private double lambdaAvgDutyLength = 0;
         /// <summary> >= 0 </summary>
         private double lambdaMaxLongDuty = 0;
@@ -31,7 +33,6 @@ namespace E_VCSP.Solver {
         private double lambdaMaxBroken = 0;
         /// <summary> >= 0 </summary>
         private double lambdaMaxBetween = 0;
-
 
         private double costUpperBound = double.MaxValue;
         private (double val, bool converged) objVal = (double.MaxValue, true);
@@ -70,14 +71,12 @@ namespace E_VCSP.Solver {
             dummyDualCosts[Constants.CSTR_CR_LONG_DUTIES] = 0;
             dummyDualCosts[Constants.CSTR_CR_BROKEN_DUTIES] = 0;
             dummyDualCosts[Constants.CSTR_CR_BETWEEN_DUTIES] = 0;
-            foreach (var task in vss.Tasks)
-            {
+            foreach (var task in vss.Tasks) {
                 // Ensure block index mapping for tasks
-                foreach (string desc in task.BlockDescriptorCover) 
+                foreach (string desc in task.BlockDescriptorCover)
                     task.BlockIndexCover.Add(knownBlocks[desc]);
                 task.IsUnit = true;
             }
-
 
             // Create initial set of crew duties
             CSPLSGlobal cspGlobal = new(css);
@@ -106,6 +105,7 @@ namespace E_VCSP.Solver {
 
             // crew related costs
             foreach (var cd in css.Duties) costUpperBound += cd.Cost;
+            costUpperBound += Math.Max(0, vss.Tasks.Count - Config.MAX_DUTIES) * Config.VH_OVER_MAX_COST;
 
             objVal = (costUpperBound, true);
         }
@@ -117,19 +117,23 @@ namespace E_VCSP.Solver {
             }
 
             for (int i = 0; i < vss.Instance.Trips.Count; i++) lambdaTrips[i] = 0;
+            lamdbaMaxVehicles = 0;
             for (int i = 0; i < css.Blocks.Count; i++) lambdaBlocks[css.Blocks[i].Index] = 0;
+            lamdbaMaxDuties = 0;
 
             lambdaAvgDutyLength = 0;
             lambdaMaxLongDuty = 0;
-            //lambdaMaxBroken = 0;
-            //lambdaMaxBetween = 0;
+            lambdaMaxBroken = 0;
+            lambdaMaxBetween = 0;
         }
 
         private void initializeLagrangeModel() {
             resetLamdba(true);
 
             for (int i = 0; i < vss.Tasks.Count; i++) X.Add(false);
+            vehicleSlack = 0;
             for (int i = 0; i < css.Duties.Count; i++) Y.Add(false);
+            maxDutiesSlack = 0;
         }
         #endregion
 
@@ -146,8 +150,7 @@ namespace E_VCSP.Solver {
 
             void updateCostsWithMultipliers() {
                 // Cost for selection of vehicle task vt
-                for (int i = 0; i < costByTaskIndex.Count; i++)
-                {
+                for (int i = 0; i < costByTaskIndex.Count; i++) {
                     int taskIndex = costByTaskIndex[i].taskIndex;
                     VehicleTask task = vss.Tasks[taskIndex];
                     double cost = task.Cost;
@@ -171,10 +174,10 @@ namespace E_VCSP.Solver {
                     foreach (var blockIndex in duty.BlockIndexCover)
                         cost += lambdaBlocks[blockIndex];
 
-                    cost += lambdaAvgDutyLength * ((double)duty.Duration / Config.CR_TARGET_SHIFT_LENGTH - 1);
-                    cost -= lambdaMaxLongDuty * (Config.CR_MAX_OVER_LONG_DUTY - duty.IsLongDuty);
-                    cost -= lambdaMaxBroken * (Config.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty);
-                    cost -= lambdaMaxBetween * (Config.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty);
+                    cost += lambdaAvgDutyLength * ((double)duty.Duration / Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                    cost -= lambdaMaxLongDuty * (Constants.CR_MAX_OVER_LONG_DUTY - duty.IsLongDuty);
+                    cost -= lambdaMaxBroken * (Constants.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty);
+                    cost -= lambdaMaxBetween * (Constants.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty);
 
                     costByDutyIndex[i] = (cost, dutyIndex);
                 }
@@ -182,11 +185,10 @@ namespace E_VCSP.Solver {
 
             double solve() {
                 // Reset current solution value
-                for (int i = 0; i < X.Count; i++)
-                    X[i] = false;
+                for (int i = 0; i < X.Count; i++) X[i] = false;
                 vehicleSlack = 0;
-                for (int i = 0; i < Y.Count; i++)
-                    Y[i] = false;
+                for (int i = 0; i < Y.Count; i++) Y[i] = false;
+                maxDutiesSlack = 0;
 
                 double cost = 0;
 
@@ -196,28 +198,24 @@ namespace E_VCSP.Solver {
 
                 // Vehicles
                 costByTaskIndex.Sort();
-                int selectedCount = 0;
-                double slackPenalty = Config.VH_OVER_MAX_COST - lamdbaMaxVehicles;
-                for (int i = 0; i < costByTaskIndex.Count; i++)
-                {
+                int selectedTaskCount = 0;
+                double taskSlackPenalty = Config.VH_OVER_MAX_COST - lamdbaMaxVehicles;
+                for (int i = 0; i < costByTaskIndex.Count; i++) {
                     var targetTask = costByTaskIndex[i];
-                    if (selectedCount < Config.MAX_VEHICLES && targetTask.C_i < 0)
-                    {
+                    if (selectedTaskCount < Config.MAX_VEHICLES && targetTask.C_i < 0) {
                         // Select normally
                         X[targetTask.taskIndex] = true;
                         cost += targetTask.C_i;
-                        selectedCount++;
+                        selectedTaskCount++;
                     }
-                    else if (selectedCount >= Config.MAX_VEHICLES && targetTask.C_i + slackPenalty < 0)
-                    {
+                    else if (selectedTaskCount >= Config.MAX_VEHICLES && targetTask.C_i + taskSlackPenalty < 0) {
                         // Select as slack vehicle
                         X[targetTask.taskIndex] = true;
-                        cost += targetTask.C_i + slackPenalty;
-                        selectedCount++;
+                        cost += targetTask.C_i + taskSlackPenalty;
+                        selectedTaskCount++;
                         vehicleSlack++;
                     }
-                    else
-                    {
+                    else {
                         // No profit to be made anymore, stop
                         break;
                     }
@@ -225,13 +223,27 @@ namespace E_VCSP.Solver {
 
                 // Crew
                 costByDutyIndex.Sort();
-
+                int selectedDutyCount = 0;
+                double crewSlackPenalty = Config.CR_OVER_MAX_COST - lamdbaMaxDuties;
                 for (int i = 0; i < costByDutyIndex.Count; i++) {
                     var targetDuty = costByDutyIndex[i];
-                    if (targetDuty.C_j >= 0) break;
 
-                    cost += targetDuty.C_j;
-                    Y[targetDuty.dutyIndex] = true;
+                    if (selectedDutyCount < Config.MAX_DUTIES && targetDuty.C_j < 0) {
+                        // Select normally
+                        cost += targetDuty.C_j;
+                        Y[targetDuty.dutyIndex] = true;
+                        selectedDutyCount++;
+                    }
+                    else if (selectedDutyCount >= Config.MAX_DUTIES && targetDuty.C_j + crewSlackPenalty < 0) {
+                        // Select as slack vehicle
+                        cost += targetDuty.C_j + crewSlackPenalty;
+                        Y[targetDuty.dutyIndex] = true;
+                        selectedDutyCount++;
+                        maxDutiesSlack++;
+                    }
+                    else {
+                        break;
+                    }
                 }
 
                 return cost;
@@ -249,14 +261,13 @@ namespace E_VCSP.Solver {
 
                 // Vehicle slack
                 double GMaxVehicles = -vehicleSlack - Config.MAX_VEHICLES;
-                for (int taskIndex = 0; taskIndex < X.Count; taskIndex++)
-                {
+                for (int taskIndex = 0; taskIndex < X.Count; taskIndex++) {
                     if (X[taskIndex]) GMaxVehicles++;
                 }
 
-
                 // Blocks / duties
                 double[] GBlocks = new double[lambdaBlocks.Count]; // b == 0
+                double GMaxDuties = -maxDutiesSlack - Config.MAX_DUTIES;
                 double GAvgDutyLength = 0;
                 double GMaxLongDuty = 0;
                 double GMaxBroken = 0;
@@ -270,21 +281,23 @@ namespace E_VCSP.Solver {
                 }
                 for (int dutyIndex = 0; dutyIndex < Y.Count; dutyIndex++) {
                     if (!Y[dutyIndex]) continue;
+                    GMaxDuties++;
                     var duty = css.Duties[dutyIndex];
                     foreach (var blockIndex in duty.BlockIndexCover) {
                         GBlocks[blockIndex] += 1;
                     }
 
-                    GAvgDutyLength += ((double)duty.Duration / Config.CR_TARGET_SHIFT_LENGTH - 1.0);
-                    GMaxLongDuty -= (Config.CR_MAX_OVER_LONG_DUTY - duty.IsLongDuty);
-                    GMaxBroken -= (Config.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty);
-                    GMaxBetween -= (Config.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty);
+                    GAvgDutyLength += ((double)duty.Duration / Constants.CR_TARGET_SHIFT_LENGTH - 1.0);
+                    GMaxLongDuty -= (Constants.CR_MAX_OVER_LONG_DUTY - duty.IsLongDuty);
+                    GMaxBroken -= (Constants.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty);
+                    GMaxBetween -= (Constants.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty);
                 }
 
                 double GSquaredSum = 0;
                 for (int i = 0; i < GTrips.Length; i++) GSquaredSum += GTrips[i] * GTrips[i];
                 GSquaredSum += GMaxVehicles * GMaxVehicles;
                 for (int i = 0; i < GBlocks.Length; i++) GSquaredSum += GBlocks[i] * GBlocks[i];
+                GSquaredSum += GMaxDuties * GMaxDuties;
                 GSquaredSum += GAvgDutyLength * GAvgDutyLength;
                 GSquaredSum += GMaxLongDuty * GMaxLongDuty;
                 GSquaredSum += GMaxBroken * GMaxBroken;
@@ -302,6 +315,7 @@ namespace E_VCSP.Solver {
                     // == constraint
                     lambdaBlocks[i] = lambdaBlocks[i] + T * GBlocks[i];
                 }
+                lamdbaMaxDuties = Math.Max(0, lamdbaMaxDuties + T * GMaxDuties);
 
                 lambdaAvgDutyLength = Math.Max(0, lambdaAvgDutyLength + T * GAvgDutyLength);
                 lambdaMaxLongDuty = Math.Max(0, lambdaMaxLongDuty + T * GMaxLongDuty);
@@ -340,24 +354,20 @@ namespace E_VCSP.Solver {
             }
 
             // throw away the worst vehicle tasks / crew duties
-            if (vss.Tasks.Count > Config.VCSP_MAX_TASKS_DURING_SOLVE)
-            {
+            if (vss.Tasks.Count > Config.VCSP_MAX_TASKS_DURING_SOLVE) {
                 costByTaskIndex.Sort();
                 HashSet<int> indicesToRemove = new();
-                for (int j = Config.VCSP_MAX_TASKS_DURING_SOLVE; j < costByTaskIndex.Count; j++)
-                {
+                for (int j = Config.VCSP_MAX_TASKS_DURING_SOLVE; j < costByTaskIndex.Count; j++) {
                     if (!vss.Tasks[costByTaskIndex[j].taskIndex].IsUnit)
                         indicesToRemove.Add(costByTaskIndex[j].taskIndex);
                 }
                 vss.Tasks = vss.Tasks.Where((vt, i) => !indicesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
                 X = X.Where((_, i) => !indicesToRemove.Contains(i)).ToList();
             }
-            if (css.Duties.Count > Config.VCSP_MAX_DUTIES_DURING_SOLVE)
-            {
+            if (css.Duties.Count > Config.VCSP_MAX_DUTIES_DURING_SOLVE) {
                 costByDutyIndex.Sort();
                 HashSet<int> indicesToRemove = new();
-                for (int j = Config.VCSP_MAX_DUTIES_DURING_SOLVE; j < costByDutyIndex.Count; j++)
-                {
+                for (int j = Config.VCSP_MAX_DUTIES_DURING_SOLVE; j < costByDutyIndex.Count; j++) {
                     if (!css.Duties[costByDutyIndex[j].dutyIndex].IsUnit)
                         indicesToRemove.Add(costByDutyIndex[j].dutyIndex);
                 }
@@ -392,8 +402,7 @@ namespace E_VCSP.Solver {
                     string descriptor = b.Descriptor;
                     string descriptorStart = String.Join("#", descriptor.Split("#").Take(2));
 
-
-                    blockDualCosts[descriptor] = lambdaBlocks[i]; 
+                    blockDualCosts[descriptor] = lambdaBlocks[i];
                     if (blockDualCostsByStart.ContainsKey(descriptorStart))
                         blockDualCostsByStart[descriptorStart].Add(lambdaBlocks[i]);
                     else blockDualCostsByStart[descriptorStart] =
@@ -437,7 +446,7 @@ namespace E_VCSP.Solver {
                 }
 
                 gradientDescent();
-                Console.WriteLine($"{round}.V${currIt}\t{objVal.val:0.##f}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
             }
         }
 
@@ -465,19 +474,19 @@ namespace E_VCSP.Solver {
                 Parallel.For(0, cspLabelingInstances.Length, (i) => {
                     cspLabelingInstances[i].UpdateDualCosts(crewDualCost(), 1);
                     var res = cspLabelingInstances[i].GenerateDuties();
-                    foreach (var resCol in res) 
+                    foreach (var resCol in res)
                         if (resCol.crewDuty != null) newColumns.Add(resCol);
                 });
 
                 foreach ((double reducedCost, CrewDuty newDuty) in newColumns) {
-                    if (reducedCost > 0) continue;
+                    if (reducedCost >= 0) continue;
 
                     newDuty.Index = css.Duties.Count;
                     css.Duties.Add(newDuty);
                     Y.Add(false);
                 }
                 gradientDescent();
-                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##f}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
             }
         }
 
@@ -508,7 +517,7 @@ namespace E_VCSP.Solver {
             // Max selected vehicle tasks
             GRBLinExpr maxVehiclesExpr = new();
             GRBVar maxVehiclesSlack = model.AddVar(
-                0, Config.VCSP_ALLOW_VH_CSTR_SLACK ? GRB.INFINITY : 0, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_slack"
+                0, Config.VCSP_VH_CSTR_SLACK ? GRB.INFINITY : 0, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_slack"
             );
             foreach (GRBVar v in taskVars) {
                 maxVehiclesExpr += v;
@@ -547,6 +556,15 @@ namespace E_VCSP.Solver {
                 model.AddConstr(expr <= 0, name);
             }
 
+            GRBLinExpr maxDutiesExpr = new();
+            GRBVar maxDutiesSlack = model.AddVar(
+                0, Config.VCSP_CR_MAX_CSTR_SLACK ? GRB.INFINITY : 0, Config.CR_OVER_MAX_COST, GRB.CONTINUOUS, "duty_slack"
+            );
+            foreach (GRBVar v in dutyVars) {
+                maxDutiesExpr += v;
+            }
+            model.AddConstr(maxDutiesExpr - maxDutiesSlack <= Config.MAX_DUTIES, Constants.CSTR_MAX_DUTIES);
+
             // Duty type / avg duration
             GRBLinExpr noExcessiveLength = new(); // max 15% > 8.5h
             GRBLinExpr limitedAverageLength = new(); // avg 8 hours
@@ -554,8 +572,7 @@ namespace E_VCSP.Solver {
             GRBLinExpr maxBetween = new(); // max 10% between
 
             int slackCosts = 10000;
-            double maxSlack = Config.VCSP_ALLOW_CREW_CSTR_SLACK ? 0 : GRB.INFINITY;
-
+            double maxSlack = Config.VCSP_CR_OTH_CSTR_SLACK ? 0 : GRB.INFINITY;
 
             GRBVar noExcessiveLengthSlack = model.AddVar(0, maxSlack, slackCosts, GRB.CONTINUOUS, "noExcessiveLengthSlack");
             GRBVar limitedAverageLengthSlack = model.AddVar(0, maxSlack, slackCosts, GRB.CONTINUOUS, "limitedAverageLengthSlack");
@@ -567,10 +584,10 @@ namespace E_VCSP.Solver {
                 CrewDuty duty = css.Duties[i];
 
                 int duration = duty.Elements[^1].EndTime - duty.Elements[0].StartTime;
-                noExcessiveLength += Config.CR_MAX_OVER_LONG_DUTY * v - (duration > Config.CR_LONG_SHIFT_LENGTH ? v : 0);
-                limitedAverageLength += v * (duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
-                maxBroken += v * Config.CR_MAX_BROKEN_SHIFTS - (duty.Type == DutyType.Broken ? v : 0);
-                maxBetween += v * Config.CR_MAX_BETWEEN_SHIFTS - (duty.Type == DutyType.Between ? v : 0);
+                noExcessiveLength += Constants.CR_MAX_OVER_LONG_DUTY * v - (duty.IsLongDuty * v);
+                limitedAverageLength += v * (duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                maxBroken += v * Constants.CR_MAX_BROKEN_SHIFTS - (duty.IsBrokenDuty * v);
+                maxBetween += v * Constants.CR_MAX_BETWEEN_SHIFTS - (duty.IsBetweenDuty * v);
             }
 
             model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, Constants.CSTR_CR_LONG_DUTIES);
@@ -581,7 +598,6 @@ namespace E_VCSP.Solver {
             Config.CONSOLE_GUROBI = true;
             model.Optimize();
             Config.CONSOLE_GUROBI = false;
-
 
             vss.SelectedTasks = [];
             css.SelectedDuties = [];
@@ -594,18 +610,18 @@ namespace E_VCSP.Solver {
                 css.SelectedDuties.Add(css.Duties[i]);
             }
 
-
             Console.WriteLine($"Solution found with {vss.SelectedTasks.Count} vehicles, {css.SelectedDuties.Count} duties, overall costs {model.ObjVal}");
             Console.WriteLine("Cost breakdown:");
-            Console.WriteLine($"\tVehicle tasks: {vss.SelectedTasks.Sum(x => x.Cost)}");
-            Console.WriteLine($"\tCrew duties: {css.SelectedDuties.Sum(x => x.Cost)}");
-            Console.WriteLine($"\tPenalties:");
-            Console.WriteLine($"\t\tVehicle slack: {maxVehiclesSlack.X * Config.VH_OVER_MAX_COST}");
-            Console.WriteLine($"\t\tSingle shifts: {css.SelectedDuties.Sum(x => x.Type == DutyType.Single ? 1 : 0) * Config.CR_SINGLE_SHIFT_COST} (included in duty costs)");
-            Console.WriteLine($"\t\tAvg duty length slack: { limitedAverageLengthSlack.X * slackCosts}");
-            Console.WriteLine($"\t\tLong duty slack: {noExcessiveLengthSlack.X * slackCosts}");
-            Console.WriteLine($"\t\tBroken duty slack: {maxBrokenSlack.X * slackCosts}");
-            Console.WriteLine($"\t\tBetween duty slack: {maxBetweenSlack.X * slackCosts}");
+            Console.WriteLine($"Vehicle tasks: {vss.SelectedTasks.Sum(x => x.Cost)}");
+            Console.WriteLine($"Crew duties: {css.SelectedDuties.Sum(x => x.Cost)}");
+            Console.WriteLine($"Penalties:");
+            Console.WriteLine($"\tVehicle slack: {maxVehiclesSlack.X * Config.VH_OVER_MAX_COST}");
+            Console.WriteLine($"\tDuty slack: {maxDutiesSlack.X * Config.CR_OVER_MAX_COST}");
+            Console.WriteLine($"\tSingle shifts: {css.SelectedDuties.Sum(x => x.Type == DutyType.Single ? 1 : 0) * Config.CR_SINGLE_SHIFT_COST} (included in duty costs)");
+            Console.WriteLine($"\tAvg duty length slack: {limitedAverageLengthSlack.X * slackCosts}");
+            Console.WriteLine($"\tLong duty slack: {noExcessiveLengthSlack.X * slackCosts}");
+            Console.WriteLine($"\tBroken duty slack: {maxBrokenSlack.X * slackCosts}");
+            Console.WriteLine($"\tBetween duty slack: {maxBetweenSlack.X * slackCosts}");
         }
 
         public override bool Solve(CancellationToken ct) {
@@ -615,13 +631,13 @@ namespace E_VCSP.Solver {
 
             // Initialize dual cost
             gradientDescent();
-            Console.WriteLine($"I\t{objVal.val:0.##f}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+            Console.WriteLine($"I\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
 
             for (int round = 0; round < Config.VCSP_ROUNDS; round++) {
                 runVehicleIts(round);
                 runCrewIts(round);
 
-                Console.WriteLine($"{round}\t{objVal.val:0.##f}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+                Console.WriteLine($"{round}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
             }
 
             solveILP();

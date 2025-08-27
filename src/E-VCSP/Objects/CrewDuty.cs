@@ -189,7 +189,7 @@ namespace E_VCSP.Objects {
         public List<string> BlockDescriptorCover;
         [JsonInclude]
         public int Index = -1;
-        
+
 
         private double cachedCost = -1;
         public double Cost {
@@ -197,7 +197,7 @@ namespace E_VCSP.Objects {
                 if (cachedCost != -1) return cachedCost;
                 double cost = Config.CR_SHIFT_COST; // base
                 // Driven time
-                cost += Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST);
+                cost += Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Constants.CR_HOURLY_COST);
                 // Special type
                 if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;
                 // Special type + remove largest idle
@@ -211,10 +211,10 @@ namespace E_VCSP.Objects {
                         //throw new InvalidDataException("Broken shift with no idle");
                     }
                     else {
-                        cost -= (largestIdle.EndTime - largestIdle.StartTime) / (60.0 * 60.0) * Config.CR_HOURLY_COST; // remove largest idle
+                        cost -= (largestIdle.EndTime - largestIdle.StartTime) / (60.0 * 60.0) * Constants.CR_HOURLY_COST; // remove largest idle
                     }
 
-                    cost += Config.CR_BROKEN_SHIFT_COST;
+                    cost += Constants.CR_BROKEN_SHIFT_COST;
                 }
 
                 cachedCost = cost;
@@ -224,20 +224,17 @@ namespace E_VCSP.Objects {
 
         private int cachedDuration = -1;
         public int Duration {
-            get
-            {
+            get {
                 if (cachedDuration != -1) return cachedDuration;
 
                 int duration = Elements[^1].EndTime - Elements[0].StartTime;
-                if (Type == DutyType.Broken)
-                {
+                if (Type == DutyType.Broken) {
                     var largestIdle = Elements
                         .Where(e => e.Type == CrewDutyElementType.Idle)
                         .OrderByDescending(e => e.EndTime - e.StartTime)
                         .FirstOrDefault();
 
-                    if (largestIdle != null)
-                    {
+                    if (largestIdle != null) {
                         duration -= largestIdle.EndTime - largestIdle.StartTime;
                     }
                 }
@@ -247,7 +244,7 @@ namespace E_VCSP.Objects {
             }
         }
 
-        public int IsLongDuty => Duration > Config.CR_LONG_SHIFT_LENGTH ? 1 : 0;
+        public int IsLongDuty => Duration > Constants.CR_LONG_SHIFT_LENGTH ? 1 : 0;
         public int IsBrokenDuty => Type == DutyType.Broken ? 1 : 0;
         public int IsBetweenDuty => Type == DutyType.Between ? 1 : 0;
 

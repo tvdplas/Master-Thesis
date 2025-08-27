@@ -29,22 +29,22 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 (int st, int bt) = Breaks[i];
                 if (!longIdleUsed && Idle.startTime != -1 && Idle.startTime < st) {
                     // First check time traveled before big idle, then update last break time accordingly
-                    if (Idle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
+                    if (Idle.startTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
                     lastBreak = Idle.startTime + Idle.longIdleTime;
                     longIdleUsed = true;
                 }
 
                 // Too long between breaks
-                if (st - lastBreak > Config.MAX_STEERING_TIME) return false;
+                if (st - lastBreak > Constants.MAX_STEERING_TIME) return false;
                 lastBreak = st + bt;
             }
             if (!longIdleUsed && Idle.startTime != -1 && Idle.startTime < currEndTime) {
                 // First check time traveled before big idle, then update last break time accordingly
-                if (Idle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
+                if (Idle.startTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
                 lastBreak = Idle.startTime + Idle.longIdleTime;
                 longIdleUsed = true;
             }
-            if (currEndTime - lastBreak > Config.MAX_STEERING_TIME) return false;
+            if (currEndTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
 
             if (final) {
                 // Reset for break time during idle, so seperately handled
@@ -107,9 +107,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
         internal bool isFeasible(int currentEndTime, bool final) {
             int duration = currentEndTime - StartTime;
             // Max shift length (normal / broken)
-            if (duration > Config.CR_MAX_SHIFT_LENGTH && Type != DutyType.Broken) return false;
-            if (duration > Config.CR_MAX_SHIFT_LENGTH + Config.CR_MAX_LONG_IDLE_TIME) return false;
-            if (Idle.startTime != -1 && duration - Idle.longIdleTime > Config.CR_MAX_SHIFT_LENGTH) return false;
+            if (duration > Constants.CR_MAX_SHIFT_LENGTH && Type != DutyType.Broken) return false;
+            if (duration > Constants.CR_MAX_SHIFT_LENGTH + Constants.CR_MAX_LONG_IDLE_TIME) return false;
+            if (Idle.startTime != -1 && duration - Idle.longIdleTime > Constants.CR_MAX_SHIFT_LENGTH) return false;
             // No long idles in non-broken shifts
             if (Type != DutyType.Broken && Idle.startTime != -1)
                 return false;
@@ -127,7 +127,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     if (Idle.startTime == -1)
                         return false;
                     // Too long
-                    if (duration - Idle.longIdleTime > Config.CR_MAX_SHIFT_LENGTH)
+                    if (duration - Idle.longIdleTime > Constants.CR_MAX_SHIFT_LENGTH)
                         return false;
                 }
                 // End times in range
@@ -181,9 +181,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 int rho_broken = dt == DutyType.Broken ? 1 : 0;
                 int rho_between = dt == DutyType.Between ? 1 : 0;
 
-                double baseCost = Config.CR_SHIFT_COST + rho_broken * Config.CR_BROKEN_SHIFT_COST;
-                baseCost -= maxBrokenDualCost * (Config.CR_MAX_BROKEN_SHIFTS - rho_broken);
-                baseCost -= maxBetweenDualCost * (Config.CR_MAX_BETWEEN_SHIFTS - rho_between);
+                double baseCost = Config.CR_SHIFT_COST + rho_broken * Constants.CR_BROKEN_SHIFT_COST;
+                baseCost -= maxBrokenDualCost * (Constants.CR_MAX_BROKEN_SHIFTS - rho_broken);
+                baseCost -= maxBetweenDualCost * (Constants.CR_MAX_BETWEEN_SHIFTS - rho_between);
 
                 // Start by setting out all possible duty types from the depot start
                 for (int targetBlockIndex = 0; targetBlockIndex < css.Blocks.Count; targetBlockIndex++) {
@@ -223,7 +223,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     activeLabelsWithContent.RemoveAt(activeLabelsWithContent.Count - 1);
                 }
 
-
                 // Expand node if possible 
                 for (int targetBlockIndex = 0; targetBlockIndex < css.Blocks.Count + 2; targetBlockIndex++) {
                     if (targetBlockIndex == css.Blocks.Count || blockedBlock[targetBlockIndex]) continue;
@@ -246,7 +245,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                     int addedTime = arc.Type != BlockArcType.LongIdle ? timeDiff : timeDiff - arc.IdleTime;
 
-                    double costFromTime = addedTime / (60.0 * 60.0) * Config.CR_HOURLY_COST;
+                    double costFromTime = addedTime / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
                     double costFromRc = targetBlockIndex < css.Blocks.Count ? -blockDualCosts[targetBlockIndex] : 0;
 
                     CSPLabel newLabel = new() {
@@ -273,8 +272,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 int duration = css.Blocks[l.PrevBlockId].EndTime - l.StartTime;
                 if (l.Type == DutyType.Broken && l.Idle.startTime != -1) duration -= l.Idle.longIdleTime;
 
-                l.Cost -= maxAvgDurationDualCost * ((duration / (double)Config.CR_TARGET_SHIFT_LENGTH) - 1);
-                l.Cost -= maxLongDualCost * (Config.CR_MAX_OVER_LONG_DUTY - (duration > Config.CR_TARGET_SHIFT_LENGTH ? 1 : 0));
+                l.Cost -= maxAvgDurationDualCost * ((duration / (double)Constants.CR_TARGET_SHIFT_LENGTH) - 1);
+                l.Cost -= maxLongDualCost * (Constants.CR_MAX_OVER_LONG_DUTY - (duration > Constants.CR_TARGET_SHIFT_LENGTH ? 1 : 0));
             }
         }
 

@@ -166,7 +166,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 // See if handover can be performed
                 bool handoverAllowed = l.HandoverAllowed && idleEndTime - idleStartTime >= l.MinHandoverTime;
                 if (handoverAllowed) {
-                    int overTime = (idleStartTime - lastHandoverChance) - Config.MAX_STEERING_TIME;
+                    int overTime = (idleStartTime - lastHandoverChance) - Constants.MAX_STEERING_TIME;
                     if (overTime > 0) overSteeringTime.Add(overTime);
                     lastHandoverChance = idleEndTime;
                 }
@@ -174,7 +174,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 // See if sign on / off can be performed
                 bool signOnOffAllowed = l.CrewBase && idleEndTime - idleStartTime >= l.MinHandoverTime;
                 if (signOnOffAllowed) {
-                    int overTime = (idleStartTime - lastSignOnOffChance) - Config.MAX_NO_HUB_TIME;
+                    int overTime = (idleStartTime - lastSignOnOffChance) - Constants.MAX_NO_HUB_TIME;
                     if (overTime > 0) overCrewbaseTime.Add(overTime);
                     lastSignOnOffChance = idleEndTime;
                 }
@@ -222,7 +222,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                     // Only charging, not actually driving anything in between. If so, ignore any costs there, and only charge
                     bool onlyCharge =
-                        chargeTimeBefore + (VE.EndTime - VE.StartTime) + chargeTimeAfter >= Config.MIN_CHARGE_TIME // min charging time is met
+                        chargeTimeBefore + (VE.EndTime - VE.StartTime) + chargeTimeAfter >= Constants.MIN_CHARGE_TIME // min charging time is met
                         && (VE.Type == PVEType.HandoverDetour || VE.Type == PVEType.ChargeDetour) // Remains at same location
                         && VE.StartLocation!.CanCharge; // can actually charge
 
@@ -231,14 +231,14 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     }
                     else {
                         // Possible charge before
-                        if (chargeTimeBefore >= Config.MIN_CHARGE_TIME) performCharge(chargeTimeBefore, VE.StartLocation!);
+                        if (chargeTimeBefore >= Constants.MIN_CHARGE_TIME) performCharge(chargeTimeBefore, VE.StartLocation!);
 
                         // Perform element
                         drivingCost += VE.DrivingCost;
                         currSoC += VE.SoCDiff;
 
                         // Possible charge after
-                        if (chargeTimeAfter >= Config.MIN_CHARGE_TIME) performCharge(chargeTimeAfter, VE.EndLocation!);
+                        if (chargeTimeAfter >= Constants.MIN_CHARGE_TIME) performCharge(chargeTimeAfter, VE.EndLocation!);
                     }
                 }
 
@@ -246,13 +246,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
             }
 
             // Add night charging costs
-            chargingCost += Math.Min(0, vt.StartSoC - currSoC) * vt.Capacity / 100 * Config.KWH_COST;
+            chargingCost += Math.Min(0, vt.StartSoC - currSoC) * vt.Capacity / 100 * Constants.KWH_COST;
 
             // Finalize all times / charge at the depot
             int arrivalTime = ((PVETravel)curr.Prev!.PVE).ArrivalTime;
-            int handoverOvertime = (arrivalTime - lastHandoverChance) - Config.MAX_STEERING_TIME;
+            int handoverOvertime = (arrivalTime - lastHandoverChance) - Constants.MAX_STEERING_TIME;
             if (handoverOvertime > 0) overSteeringTime.Add(handoverOvertime);
-            int crewbaseOvertime = (arrivalTime - lastSignOnOffChance) - Config.MAX_NO_HUB_TIME;
+            int crewbaseOvertime = (arrivalTime - lastSignOnOffChance) - Constants.MAX_NO_HUB_TIME;
             if (crewbaseOvertime > 0) overCrewbaseTime.Add(crewbaseOvertime);
             double SoCDeficit = vt.MinSoC - currSoC;
             if (SoCDeficit > 0) underCharge.Add(SoCDeficit);
@@ -313,14 +313,14 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                     // Only charging, not actually driving anything in between. If so, ignore any costs there, and only charge
                     bool onlyCharge =
-                        chargeTimeBefore + (VE.EndTime - VE.StartTime) + chargeTimeAfter >= Config.MIN_CHARGE_TIME // min charging time is met
+                        chargeTimeBefore + (VE.EndTime - VE.StartTime) + chargeTimeAfter >= Constants.MIN_CHARGE_TIME // min charging time is met
                         && (VE.Type == PVEType.HandoverDetour || VE.Type == PVEType.ChargeDetour) // Remains at same location
                         && VE.StartLocation!.CanCharge; // can actually charge
 
                     if (onlyCharge) performCharge(prevTravel.ArrivalTime, chargeTimeBefore + (VE.EndTime - VE.StartTime) + chargeTimeAfter, VE.StartLocation!);
                     else {
-                        bool chargeBefore = chargeTimeBefore >= Config.MIN_CHARGE_TIME;
-                        bool chargeAfter = chargeTimeAfter >= Config.MIN_CHARGE_TIME;
+                        bool chargeBefore = chargeTimeBefore >= Constants.MIN_CHARGE_TIME;
+                        bool chargeAfter = chargeTimeAfter >= Constants.MIN_CHARGE_TIME;
 
                         // Possible charge before
                         if (chargeBefore) performCharge(prevTravel.ArrivalTime, chargeTimeBefore, VE.StartLocation!);

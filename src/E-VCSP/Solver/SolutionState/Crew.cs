@@ -138,7 +138,7 @@ namespace E_VCSP.Solver.SolutionState {
                 ? idleTime - idleLocation.BrutoNetto
                 : 0;
 
-            if (nettoBreakTime >= Config.CR_MIN_BREAK_TIME && nettoBreakTime <= Config.CR_MAX_BREAK_TIME) {
+            if (nettoBreakTime >= Constants.CR_MIN_BREAK_TIME && nettoBreakTime <= Constants.CR_MAX_BREAK_TIME) {
                 breakTime = idleTime - idleLocation.BrutoNetto;
                 bruttoNettoTime = idleLocation.BrutoNetto;
                 idleTime = 0;
@@ -146,11 +146,11 @@ namespace E_VCSP.Solver.SolutionState {
             }
 
             // Short idle; can happen anywhere (driver remains in bus)
-            else if (Config.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_SHORT_IDLE_TIME)
+            else if (Constants.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Constants.CR_MAX_SHORT_IDLE_TIME)
                 blockArcType = BlockArcType.ShortIdle;
 
             // Long idle used for split shifts
-            else if (idleLocation.CrewBase && Config.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_LONG_IDLE_TIME)
+            else if (idleLocation.CrewBase && Constants.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Constants.CR_MAX_LONG_IDLE_TIME)
                 blockArcType = BlockArcType.LongIdle;
 
             if (blockArcType != BlockArcType.Invalid) {

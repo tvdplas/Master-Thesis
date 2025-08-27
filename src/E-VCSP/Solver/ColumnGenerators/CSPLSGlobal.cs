@@ -153,12 +153,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
         ];
 
         private int[] DutyTypeMaxDurations = [
-            Config.CR_MAX_SHIFT_LENGTH, // Early
-            Config.CR_MAX_SHIFT_LENGTH, // Day
-            Config.CR_MAX_SHIFT_LENGTH, // Late
+            Constants.CR_MAX_SHIFT_LENGTH, // Early
+            Constants.CR_MAX_SHIFT_LENGTH, // Day
+            Constants.CR_MAX_SHIFT_LENGTH, // Late
             7 * 60 * 60, // Night
-            Config.CR_MAX_SHIFT_LENGTH, // Between
-            Config.CR_MAX_SHIFT_LENGTH, // Broken
+            Constants.CR_MAX_SHIFT_LENGTH, // Between
+            Constants.CR_MAX_SHIFT_LENGTH, // Broken
         ];
 
         public bool IsFeasible(DutyType dt, bool final = false) {
@@ -182,7 +182,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             bool longIdleUsed = false;
 
             if (dt == DutyType.Broken) {
-                var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
+                var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Constants.CR_MIN_LONG_IDLE_TIME);
                 if (longestIdle != null) longIdle = (longestIdle.CDE.StartTime, longestIdle.CDE.EndTime - longestIdle.CDE.EndTime);
             }
 
@@ -200,13 +200,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime < breakStartTime) {
                     // First check time traveled before big idle, then update last break time accordingly
-                    if (longIdle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
+                    if (longIdle.startTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
                     lastBreak = longIdle.startTime + longIdle.duration;
                     longIdleUsed = true;
                 }
 
                 // Too long between breaks
-                if (cde.StartTime - lastBreak > Config.MAX_STEERING_TIME) {
+                if (cde.StartTime - lastBreak > Constants.MAX_STEERING_TIME) {
                     return false;
                 }
                 lastBreak = cde.EndTime;
@@ -216,11 +216,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime > lastBreak) {
                 // Check if there is a long idle after the last break
-                if (longIdle.startTime - lastBreak > Config.MAX_STEERING_TIME) return false;
+                if (longIdle.startTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
                 lastBreak = longIdle.startTime + longIdle.duration;
                 longIdleUsed = true;
             }
-            if (tail.CDE.EndTime - lastBreak > Config.MAX_STEERING_TIME) return false;
+            if (tail.CDE.EndTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
 
             if (longIdle.startTime != -1) {
                 // Before / after long idle is handled seperately
@@ -286,7 +286,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (head == null || tail == null) return 0;
                 int baseDuration = tail.CDE.EndTime - head.CDE.StartTime;
                 if (Type == DutyType.Broken) {
-                    var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
+                    var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Constants.CR_MIN_LONG_IDLE_TIME);
 
                     if (longestIdle == null) return baseDuration;
                     return baseDuration - (longestIdle.CDE.EndTime - longestIdle.CDE.StartTime);
@@ -299,7 +299,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         public double Cost {
             get {
                 double cost = BaseCost;
-                cost += PaidDuration / (60.0 * 60.0) * Config.CR_HOURLY_COST;
+                cost += PaidDuration / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
                 if (head == null || tail == null) return cost;
 
                 if (!head.CDE.StartLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
@@ -313,7 +313,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             get {
                 double cost = Config.CR_SHIFT_COST;
                 if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;
-                if (Type == DutyType.Broken) cost += Config.CR_BROKEN_SHIFT_COST;
+                if (Type == DutyType.Broken) cost += Constants.CR_BROKEN_SHIFT_COST;
                 return cost;
             }
         }

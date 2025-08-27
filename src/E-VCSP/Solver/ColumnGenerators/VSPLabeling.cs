@@ -198,8 +198,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             : vss.Instance.Trips[targetIndex].StartTime - vss.Instance.Trips[expandingLabelIndex].EndTime - arc.DeadheadTemplate.Duration;
 
                         int canCharge = 0;
-                        if (idleTime > Config.MIN_CHARGE_TIME && !depotStart && vss.Instance.Trips[expandingLabelIndex].To.CanCharge) canCharge += 1;
-                        if (idleTime > Config.MIN_CHARGE_TIME && !depotEnd && vss.Instance.Trips[targetIndex].From.CanCharge) canCharge += 2;
+                        if (idleTime > Constants.MIN_CHARGE_TIME && !depotStart && vss.Instance.Trips[expandingLabelIndex].To.CanCharge) canCharge += 1;
+                        if (idleTime > Constants.MIN_CHARGE_TIME && !depotEnd && vss.Instance.Trips[targetIndex].From.CanCharge) canCharge += 2;
 
                         Location? chargeLocation = null;
                         if (canCharge > 0) {
@@ -213,7 +213,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         double maxBlockSavings = expandingLabel.MaxBlockSavings;
                         string blockDescriptorStart = expandingLabel.CurrentBlockStart;
 
-                        double costs = arc.DeadheadTemplate.Distance * Config.VH_M_COST;
+                        double costs = arc.DeadheadTemplate.Distance * Constants.VH_M_COST;
                         if (targetIndex < vss.Instance.Trips.Count) costs -= tripDualCosts[targetIndex];
 
                         if (canCharge == 0) steeringTime += idleTime;
@@ -250,7 +250,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         SoC -= arc.DeadheadTemplate.Distance * vss.VehicleType.DriveUsage;
                         steeringTime += arc.DeadheadTemplate.Duration;
                         hubTime += arc.DeadheadTemplate.Duration;
-                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME || hubTime >= Config.MAX_NO_HUB_TIME) continue;
+                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Constants.MAX_STEERING_TIME || hubTime >= Constants.MAX_NO_HUB_TIME) continue;
 
                         if (canCharge >= 2) {
                             var res = chargeLocation!.ChargingCurves[vss.VehicleType.Index].MaxChargeGained(SoC, idleTime);
@@ -318,14 +318,14 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                         // No time to perform charge
                         int idleTime = (arc.EndTime - arc.StartTime) - (dht1.Duration + dht2.Duration);
-                        if (idleTime < Config.MIN_CHARGE_TIME) continue;
+                        if (idleTime < Constants.MIN_CHARGE_TIME) continue;
 
                         // There's time to perform the detour; calculate feasibility. 
                         // Always assume that detour is performed directly after previous label
                         int steeringTime = expandingLabel.SteeringTime;
                         int hubTime = expandingLabel.LastHubTime;
                         double SoC = expandingLabel.CurrSoC;
-                        double costs = (dht1.Distance + dht2.Distance) * Config.VH_M_COST;
+                        double costs = (dht1.Distance + dht2.Distance) * Constants.VH_M_COST;
                         double minBlockSavings = expandingLabel.MinBlockSavings;
                         double maxBlockSavings = expandingLabel.MaxBlockSavings;
                         string blockDescriptorStart = expandingLabel.CurrentBlockStart;
@@ -334,7 +334,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         steeringTime += dht1.Duration;
                         hubTime += dht1.Duration;
                         SoC -= dht1.Distance * vss.VehicleType.DriveUsage;
-                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME || hubTime >= Config.MAX_NO_HUB_TIME) continue;
+                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Constants.MAX_STEERING_TIME || hubTime >= Constants.MAX_NO_HUB_TIME) continue;
 
                         // Check if we can reset steering/hub time now that we are at charging location
                         if (handoverAllowed(candidateLocation, idleTime)) {
@@ -364,7 +364,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         steeringTime += dht2.Duration;
                         hubTime += dht2.Duration;
                         SoC -= dht2.Distance * vss.VehicleType.DriveUsage;
-                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Config.MAX_STEERING_TIME || hubTime >= Config.MAX_NO_HUB_TIME) continue;
+                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Constants.MAX_STEERING_TIME || hubTime >= Constants.MAX_NO_HUB_TIME) continue;
 
                         statsAtTrip.Add((
                             SoC,
@@ -385,8 +385,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         stats.SoC -= (targetTrip?.Distance ?? 0) * vss.VehicleType.DriveUsage;
                         stats.steeringTime += targetTrip?.Duration ?? 0;
                         stats.hubTime += targetTrip?.Duration ?? 0;
-                        stats.cost += (targetTrip?.Distance ?? 0) * Config.VH_M_COST;
-                        if (stats.SoC < vss.VehicleType.MinSoC || stats.steeringTime >= Config.MAX_STEERING_TIME || stats.hubTime >= Config.MAX_NO_HUB_TIME) continue;
+                        stats.cost += (targetTrip?.Distance ?? 0) * Constants.VH_M_COST;
+                        if (stats.SoC < vss.VehicleType.MinSoC || stats.steeringTime >= Constants.MAX_STEERING_TIME || stats.hubTime >= Constants.MAX_NO_HUB_TIME) continue;
 
                         activeLabelCount += addLabel(new VSPLabel() {
                             PrevId = expandingLabel.Id,
@@ -409,7 +409,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Perform cost correction for charge at end
             foreach (var finalLabel in allLabels[^1]) {
                 finalLabel.CurrCosts += Math.Max(0, vss.VehicleType.StartSoC - finalLabel.CurrSoC)
-                    * vss.VehicleType.Capacity / 100 * Config.KWH_COST;
+                    * vss.VehicleType.Capacity / 100 * Constants.KWH_COST;
             }
         }
 

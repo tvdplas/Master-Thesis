@@ -1,10 +1,8 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
-namespace E_VCSP.Objects.ParsedData
-{
-    public class ChargeResult
-    {
+namespace E_VCSP.Objects.ParsedData {
+    public class ChargeResult {
         [JsonInclude]
         public double SoCGained;
         [JsonInclude]
@@ -16,10 +14,8 @@ namespace E_VCSP.Objects.ParsedData
     /// <summary>
     /// Describes a piecewise linear charging curve.
     /// </summary>
-    public class ChargingCurve
-    {
-        public class CurvePiece
-        {
+    public class ChargingCurve {
+        public class CurvePiece {
             [JsonInclude]
             public int MinSoC;
             [JsonInclude]
@@ -34,35 +30,28 @@ namespace E_VCSP.Objects.ParsedData
         [JsonInclude]
         public double CostPerPercentage;
 
-        public ChargingCurve(List<CurvePiece> pieces, double costPerPercentage)
-        {
+        public ChargingCurve(List<CurvePiece> pieces, double costPerPercentage) {
             Pieces = pieces;
             CostPerPercentage = costPerPercentage;
         }
 
-        public ChargingCurve(List<(int SoC, double rate)> rates, double totalCapacity)
-        {
-            if (rates.Count == 0)
-            {
+        public ChargingCurve(List<(int SoC, double rate)> rates, double totalCapacity) {
+            if (rates.Count == 0) {
                 throw new InvalidDataException("No charging rates provided");
             }
 
             Pieces = [];
             int prevSoC = 0;
 
-            for (int i = 0; i < rates.Count; i++)
-            {
-                if (rates[i].rate < 0)
-                {
+            for (int i = 0; i < rates.Count; i++) {
+                if (rates[i].rate < 0) {
                     throw new InvalidDataException("Provided charging rate was negative");
                 }
-                if (prevSoC >= rates[i].SoC)
-                {
+                if (prevSoC >= rates[i].SoC) {
                     throw new InvalidDataException("Given list of rates don't describe a charging curve. SoC cannot decrease or stay the same.");
                 }
 
-                Pieces.Add(new()
-                {
+                Pieces.Add(new() {
                     MinSoC = prevSoC,
                     MaxSoC = rates[i].SoC,
                     Rate = rates[i].rate,
@@ -71,7 +60,7 @@ namespace E_VCSP.Objects.ParsedData
             }
 
             // Charging cost per percentage gained 
-            CostPerPercentage = Config.KWH_COST * totalCapacity / 100;
+            CostPerPercentage = Constants.KWH_COST * totalCapacity / 100;
         }
 
         /// <summary>
@@ -81,13 +70,10 @@ namespace E_VCSP.Objects.ParsedData
         /// <param name="expand">Allow expansion</param>
         /// <returns>Piece if one exists</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        CurvePiece? getPiece(double currSoC)
-        {
+        CurvePiece? getPiece(double currSoC) {
             CurvePiece? p = null;
-            for (int i = 0; i < Pieces.Count; i++)
-            {
-                if (currSoC < Pieces[i].MaxSoC)
-                {
+            for (int i = 0; i < Pieces.Count; i++) {
+                if (currSoC < Pieces[i].MaxSoC) {
                     p = Pieces[i];
                     break;
                 }
@@ -103,14 +89,12 @@ namespace E_VCSP.Objects.ParsedData
         /// <param name="startSoC">SoC at start of charging operation</param>
         /// <param name="time">Time allowed for use in the operation</param>
         /// <returns>Tuple with maxSoCGained, timetaken and total cost if charging actions is performed fully</returns>
-        public ChargeResult MaxChargeGained(double startSoC, int time)
-        {
+        public ChargeResult MaxChargeGained(double startSoC, int time) {
 
             int timeRemaining = time;
             double currSoC = startSoC;
 
-            while (timeRemaining > 0 && currSoC < 100)
-            {
+            while (timeRemaining > 0 && currSoC < 100) {
                 // Get the part of the charging curve which is currently applicable.
                 CurvePiece p = getPiece(currSoC)!;
 
@@ -124,8 +108,7 @@ namespace E_VCSP.Objects.ParsedData
                 timeRemaining -= usableTime;
             }
 
-            return new ChargeResult()
-            {
+            return new ChargeResult() {
                 SoCGained = currSoC - startSoC,
                 TimeUsed = time - timeRemaining,
                 Cost = CostPerPercentage * (currSoC - startSoC),
@@ -138,13 +121,11 @@ namespace E_VCSP.Objects.ParsedData
         /// <param name="startSoC">SoC that vehicle starts at</param>
         /// <param name="targetSoC">Target SoC</param>
         /// <returns>Charge result representing the requested charge</returns>
-        public ChargeResult ChargeCosts(double startSoC, double targetSoC)
-        {
+        public ChargeResult ChargeCosts(double startSoC, double targetSoC) {
             double currSoC = startSoC;
             int currTime = 0;
 
-            while (currSoC < targetSoC)
-            {
+            while (currSoC < targetSoC) {
                 // First piece that fits; default to last (slowest)
                 CurvePiece? p = getPiece(currSoC);
                 if (p == null) throw new InvalidDataException("No piece found");
@@ -158,8 +139,7 @@ namespace E_VCSP.Objects.ParsedData
                 currTime += timeUsed;
             }
 
-            return new ChargeResult()
-            {
+            return new ChargeResult() {
                 SoCGained = targetSoC - startSoC,
                 TimeUsed = currTime,
                 Cost = CostPerPercentage * (targetSoC - startSoC),

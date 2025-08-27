@@ -274,11 +274,10 @@ namespace E_VCSP.Solver {
                 GRBVar v = dutyVars[i];
                 CrewDuty duty = css.Duties[i];
 
-                int duration = duty.Elements[^1].EndTime - duty.Elements[0].StartTime;
-                noExcessiveLength += Config.CR_MAX_OVER_LONG_DUTY * v - (duration > Config.CR_LONG_SHIFT_LENGTH ? v : 0);
-                limitedAverageLength += v * (duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
-                maxBroken += v * Config.CR_MAX_BROKEN_SHIFTS - (duty.Type == DutyType.Broken ? v : 0);
-                maxBetween += v * Config.CR_MAX_BETWEEN_SHIFTS - (duty.Type == DutyType.Between ? v : 0);
+                noExcessiveLength += Constants.CR_MAX_OVER_LONG_DUTY * v - (duty.IsLongDuty * v);
+                limitedAverageLength += v * (duty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                maxBroken += v * Constants.CR_MAX_BROKEN_SHIFTS - (duty.IsBrokenDuty * v);
+                maxBetween += v * Constants.CR_MAX_BETWEEN_SHIFTS - (duty.IsBetweenDuty * v);
             }
 
 
@@ -406,10 +405,10 @@ namespace E_VCSP.Solver {
 
 
                 // overall schedule contributions
-                double excessiveLength = Config.CR_MAX_OVER_LONG_DUTY - (newDuty.Duration > Config.CR_LONG_SHIFT_LENGTH ? 1 : 0);
-                double limitedAverageLength = newDuty.Duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1;
-                double maxBroken = Config.CR_MAX_BROKEN_SHIFTS - (newDuty.Type == DutyType.Broken ? 1 : 0);
-                double maxBetween = Config.CR_MAX_BETWEEN_SHIFTS - (newDuty.Type == DutyType.Between ? 1 : 0);
+                double excessiveLength = Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
+                double limitedAverageLength = newDuty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1;
+                double maxBroken = Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
+                double maxBetween = Constants.CR_MAX_BETWEEN_SHIFTS - newDuty.IsBetweenDuty;
 
                 var modelConstrs = model.GetConstrs();
                 GRBConstr[] constrs = [.. modelConstrs.Where((constr) => {
@@ -426,10 +425,10 @@ namespace E_VCSP.Solver {
                 GRBColumn col = new();
                 col.AddTerms([..constrs.Select(c => {
                     if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) return -1.0;
-                    else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return newDuty.Duration > Config.CR_LONG_SHIFT_LENGTH ? Config.CR_MAX_OVER_LONG_DUTY - 1 : Config.CR_MAX_OVER_LONG_DUTY;
-                    else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.Duration / (double)Config.CR_TARGET_SHIFT_LENGTH - 1);
-                    else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return newDuty.Type == DutyType.Broken ? Config.CR_MAX_BROKEN_SHIFTS - 1 : Config.CR_MAX_BROKEN_SHIFTS;
-                    else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES) return newDuty.Type == DutyType.Between ? Config.CR_MAX_BETWEEN_SHIFTS - 1 : Config.CR_MAX_BETWEEN_SHIFTS;
+                    else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
+                    else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                    else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
+                    else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES) return Constants.CR_MAX_BETWEEN_SHIFTS - newDuty.IsBetweenDuty;
                     else throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
                 })], constrs);
 

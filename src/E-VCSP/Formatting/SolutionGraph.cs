@@ -82,7 +82,7 @@ namespace E_VCSP.Formatting {
                         StartTime = block.StartTime,
                         EndTime = block.EndTime,
                         Content = $"{block.StartLocation} -> {block.EndLocation} ({block.Index})",
-                        Color = block.EndTime - block.StartTime > Config.MAX_STEERING_TIME ? Color.Red : Color.LightBlue
+                        Color = block.EndTime - block.StartTime > Constants.MAX_STEERING_TIME ? Color.Red : Color.LightBlue
                     });
 
                     if (j + 1 < task.Count && block.EndTime < task[j + 1].StartTime) {
@@ -146,7 +146,7 @@ namespace E_VCSP.Formatting {
                         if (element is CDEIdle cdei) {
                             int totalTime = cdei.EndTime - cdei.StartTime;
                             content = $"idle {cdei.StartLocation}";
-                            color = totalTime > Config.CR_MIN_LONG_IDLE_TIME ? Color.MintCream : Color.White;
+                            color = totalTime > Constants.CR_MIN_LONG_IDLE_TIME ? Color.MintCream : Color.White;
                         }
                         else if (element is CDEBlock cdebl) {
                             color = Color.LightBlue;

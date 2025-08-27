@@ -1,6 +1,4 @@
-﻿using System.Net.NetworkInformation;
-
-namespace E_VCSP {
+﻿namespace E_VCSP {
     public class Header { }
     public enum GraphElementDisplay {
         None,
@@ -27,33 +25,14 @@ namespace E_VCSP {
         public static bool DUMP_VSP = false;
         public static bool DUMP_CSP = false;
 
-        public static Header DATA = new();
-        public static double KWH_COST = 0.32; // based on national average price
-        public static int MIN_CHARGE_TIME = 300;
-        public static int MAX_VEHICLES = 17; // Maximum number of vehicles that can be used in the solution.
-        public static int MAX_DUTIES = 100; // Maximum number of vehicles that can be used in the solution.
-        public static double VH_M_COST = 0.00005; // verified at qbuzz
-        public static double VH_OVER_MAX_COST = 5000; // Cost per vehicle of going over. only used as penalty
+        public static Header SOLVER_HINTS = new();
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
-        public static double VH_IDLE_COST = 0; // Cost per unit of time for being idle.
-        public static int MAX_STEERING_TIME = 60 * 60 * 4; // conitnous driving time
-        public static int MAX_NO_HUB_TIME = 60 * 60 * 8; // conitnous time without visiting crew hub
         public static double CR_SHIFT_COST = 100; // Minimum price to pay a crew member
-        public static double CR_HOURLY_COST = 65; // hourly cost of employee. based on qbuzz data
-        public static double CR_BROKEN_SHIFT_COST = 20; // additional surcharge for broken shift. based on qbuzz data
         public static double CR_SINGLE_SHIFT_COST = 1_000; // penalty for use of initial shifts
-        public static double CR_MAX_BROKEN_SHIFTS = 0.3;
-        public static double CR_MAX_BETWEEN_SHIFTS = 0.1;
-        public static double CR_MAX_OVER_LONG_DUTY = 0.15;
-        public static int CR_TARGET_SHIFT_LENGTH = 8 * 60 * 60;
-        public static int CR_LONG_SHIFT_LENGTH = (int)(8.5 * 60 * 60);
-        public static int CR_MAX_SHIFT_LENGTH = 9 * 60 * 60;
-        public static int CR_MIN_BREAK_TIME = 15 * 60; // Min break length
-        public static int CR_MAX_BREAK_TIME = 1 * 60 * 60; // Max break length
-        public static int CR_MIN_SHORT_IDLE_TIME = 0; // Min idle time which is not part of a split shift
-        public static int CR_MAX_SHORT_IDLE_TIME = 15 * 60; // Max idle time which is not part of a split shift
-        public static int CR_MIN_LONG_IDLE_TIME = 2 * 60 * 60; // Min idle time which is part of a split shift
-        public static int CR_MAX_LONG_IDLE_TIME = 5 * 60 * 60; // Max idle time which is part of a split shift
+        public static int MAX_VEHICLES = 18; // Maximum number of vehicles that can be used in the solution.
+        public static double VH_OVER_MAX_COST = 5000; // Cost per vehicle of going over. only used as penalty
+        public static int MAX_DUTIES = 38; // Maximum number of vehicles that can be used in the solution.
+        public static double CR_OVER_MAX_COST = 2000; // Cost per vehicle of going over. only used as penalty
 
         public static Header VSP = new();
         public static bool VSP_DETERMINE_IIS = false;
@@ -148,8 +127,9 @@ namespace E_VCSP {
         public static int VCSP_CR_INSTANCES = 5;
         public static int VCSP_MAX_TASKS_DURING_SOLVE = 20000;
         public static int VCSP_MAX_DUTIES_DURING_SOLVE = 20000;
-        public static bool VCSP_ALLOW_VH_CSTR_SLACK = false;
-        public static bool VCSP_ALLOW_CREW_CSTR_SLACK = false;
+        public static bool VCSP_VH_CSTR_SLACK = false;
+        public static bool VCSP_CR_MAX_CSTR_SLACK = false;
+        public static bool VCSP_CR_OTH_CSTR_SLACK = false;
 
         public static Header LAGRANGE = new();
         public static double LAGRANGE_PI_START = 1; // (0, 2]

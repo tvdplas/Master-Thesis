@@ -129,7 +129,7 @@ namespace E_VCSP.Objects {
         public VETrip(Trip trip, VehicleType vt) : base() {
             Type = VEType.Trip;
             Trip = trip;
-            Cost = trip.Distance * Config.VH_M_COST;
+            Cost = trip.Distance * Constants.VH_M_COST;
             SoCDiff = -trip.Distance * vt.DriveUsage;
             StartTime = trip.StartTime;
             EndTime = trip.EndTime;
@@ -183,7 +183,7 @@ namespace E_VCSP.Objects {
             StartLocation = dht.From;
             EndLocation = dht.To;
 
-            Cost = dht.Distance * Config.VH_M_COST;
+            Cost = dht.Distance * Constants.VH_M_COST;
             SoCDiff = -(dht.Distance * vt.DriveUsage);
         }
 
@@ -302,7 +302,7 @@ namespace E_VCSP.Objects {
                 double cost = Elements.Sum(e => e.Cost);
 
                 // Costs of overnight recharge
-                cost += Math.Max(0, vehicleType.StartSoC - (double)Elements[^1]!.EndSoCInTask!) * vehicleType.Capacity / 100 * Config.KWH_COST;
+                cost += Math.Max(0, vehicleType.StartSoC - (double)Elements[^1]!.EndSoCInTask!) * vehicleType.Capacity / 100 * Constants.KWH_COST;
 
                 // Cost of just using vehicle
                 cost += Config.VH_PULLOUT_COST;
