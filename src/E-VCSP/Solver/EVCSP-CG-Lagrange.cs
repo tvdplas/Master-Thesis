@@ -507,7 +507,9 @@ namespace E_VCSP.Solver {
 
             // Max selected vehicle tasks
             GRBLinExpr maxVehiclesExpr = new();
-            GRBVar maxVehiclesSlack = model.AddVar(0, GRB.INFINITY, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_slack");
+            GRBVar maxVehiclesSlack = model.AddVar(
+                0, Config.VCSP_ALLOW_VH_CSTR_SLACK ? GRB.INFINITY : 0, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_slack"
+            );
             foreach (GRBVar v in taskVars) {
                 maxVehiclesExpr += v;
             }
