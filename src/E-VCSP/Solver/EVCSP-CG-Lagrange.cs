@@ -10,7 +10,9 @@ namespace E_VCSP.Solver {
         public readonly VehicleSolutionState vss;
         public readonly CrewSolutionState css;
 
-        Dictionary<string, int> knownBlocks = [];
+        private readonly Random random = new();
+
+        private Dictionary<string, int> knownBlocks = [];
 
         private List<bool> X = []; // Select vt at index
         private int vehicleSlack = 0; // Amount of over slack we are going
@@ -481,9 +483,16 @@ namespace E_VCSP.Solver {
 
                 // 
                 for (int i = 0; i < css.Blocks.Count; i++) {
+                    // Block will be used as a basis for expanding
                     if (css.BlockCount[i] == 0) continue;
+                    if (random.Next() >= Config.VSCP_BLOCK_ADD_CHANCE * css.BlockCount[i]) continue;
 
-                    if ()
+                    Block block = css.Blocks[i];
+
+                    // Check if first element of block can be expanded
+                    if (block.Elements[0].Type == BlockElementType.Deadhead) {
+
+                    }
                 }
 
                 Parallel.For(0, cspLabelingInstances.Length, (i) => {
@@ -520,12 +529,12 @@ namespace E_VCSP.Solver {
             List<GRBVar> taskVars = [], dutyVars = [];
             for (int i = 0; i < vss.Tasks.Count; i++) {
                 string name = $"vt_{i}";
-                GRBVar v = model.AddVar(0, 1, vss.Tasks[i].Cost, GRB.BINARY, name);
+                GRBVar v = model.AddVar(0, GRB.INFINITY, vss.Tasks[i].Cost, GRB.BINARY, name);
                 taskVars.Add(v);
             }
             for (int i = 0; i < css.Duties.Count; i++) {
                 string name = $"cd_{i}";
-                GRBVar v = model.AddVar(0, 1, css.Duties[i].Cost, GRB.BINARY, name);
+                GRBVar v = model.AddVar(0, GRB.INFINITY, css.Duties[i].Cost, GRB.INTEGER, name);
                 dutyVars.Add(v);
             }
 

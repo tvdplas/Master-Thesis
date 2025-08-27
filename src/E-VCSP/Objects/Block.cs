@@ -109,7 +109,7 @@ namespace E_VCSP.Objects {
     public class Block {
         static List<BlockElementType> IDLE_TYPES = [BlockElementType.Idle, BlockElementType.Charge];
 
-        List<BlockElement> Elements = new();
+        public List<BlockElement> Elements = new();
         public int Index = -1;
 
         public Location StartLocation {
