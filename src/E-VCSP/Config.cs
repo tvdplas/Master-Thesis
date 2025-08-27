@@ -127,9 +127,10 @@
         public static int VCSP_CR_INSTANCES = 5;
         public static int VCSP_MAX_TASKS_DURING_SOLVE = 20000;
         public static int VCSP_MAX_DUTIES_DURING_SOLVE = 20000;
-        public static bool VCSP_VH_CSTR_SLACK = false;
-        public static bool VCSP_CR_MAX_CSTR_SLACK = false;
+        public static bool VCSP_VH_CSTR_SLACK = true;
+        public static bool VCSP_CR_MAX_CSTR_SLACK = true;
         public static bool VCSP_CR_OTH_CSTR_SLACK = false;
+        public static double VSCP_BLOCK_ADD_CHANCE = 0.1;
 
         public static Header LAGRANGE = new();
         public static double LAGRANGE_PI_START = 1; // (0, 2]

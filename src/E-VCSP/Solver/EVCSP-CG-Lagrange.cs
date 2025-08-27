@@ -453,26 +453,41 @@ namespace E_VCSP.Solver {
         private void runCrewIts(int round) {
             int maxIts = round == 0 ? Config.VCSP_CR_ITS_INIT : Config.VCSP_CR_ITS_ROUND;
 
-            Dictionary<string, int> activeBlockCounts = [];
-            for (int i = 0; i < X.Count; i++) {
-                if (!X[i]) continue;
+            List<int> blockCount = new(css.Blocks.Count);
+            for (int i = 0; i < css.Blocks.Count; i++) blockCount.Add(0);
 
-                VehicleTask task = vss.Tasks[i];
-                for (int j = 0; j < task.BlockDescriptorCover.Count; j++) {
-                    if (activeBlockCounts.ContainsKey(task.BlockDescriptorCover[j])) activeBlockCounts[task.BlockDescriptorCover[j]]++;
-                    else activeBlockCounts[task.BlockDescriptorCover[j]] = 1;
+            int updateBlockCount() {
+                int total = 0;
+                for (int i = 0; i < css.Blocks.Count; i++) blockCount[i] = 0;
+                for (int i = 0; i < X.Count; i++) {
+                    if (!X[i]) continue;
+
+                    VehicleTask task = vss.Tasks[i];
+                    foreach (int blockIndex in task.BlockIndexCover) {
+                        blockCount[blockIndex]++;
+                        total++;
+                    }
                 }
-            }
 
-            List<int> blockCount = css.Blocks.Select(x => activeBlockCounts.ContainsKey(x.Descriptor) ? activeBlockCounts[x.Descriptor] : 0).ToList();
-            css.BlockCount = blockCount;
+                css.BlockCount = blockCount;
+                return total;
+            }
 
             CSPLabeling[] cspLabelingInstances = [.. Enumerable.Range(0, Config.VCSP_CR_INSTANCES).Select(_ => new CSPLabeling(css))];
             for (int it = 0; it < maxIts; it++) {
+                int totalBlocks = updateBlockCount();
+                var dualCost = crewDualCost();
                 List<(double reducedCosts, CrewDuty newDuty)> newColumns = [];
 
+                // 
+                for (int i = 0; i < css.Blocks.Count; i++) {
+                    if (css.BlockCount[i] == 0) continue;
+
+                    if ()
+                }
+
                 Parallel.For(0, cspLabelingInstances.Length, (i) => {
-                    cspLabelingInstances[i].UpdateDualCosts(crewDualCost(), 1);
+                    cspLabelingInstances[i].UpdateDualCosts(dualCost, 1);
                     var res = cspLabelingInstances[i].GenerateDuties();
                     foreach (var resCol in res)
                         if (resCol.crewDuty != null) newColumns.Add(resCol);
