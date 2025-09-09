@@ -20,7 +20,7 @@ namespace E_VCSP.Solver {
             // Env
             GRBEnv env = new() {
                 LogToConsole = 1,
-                LogFile = Path.Combine(Config.RUN_LOG_FOLDER, "cspcg_gurobi.log")
+                LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "cspcg_gurobi.log")
             };
 
             // Model

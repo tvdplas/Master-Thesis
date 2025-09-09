@@ -60,7 +60,7 @@ namespace E_VCSP.Solver.SolutionState {
         }
 
         public void Dump() {
-            File.WriteAllText(Path.Join(Config.RUN_LOG_FOLDER, "css-result.json"),
+            File.WriteAllText(Path.Join(Constants.RUN_LOG_FOLDER, "css-result.json"),
             System.Text.Json.JsonSerializer.Serialize(new CrewSolutionStateDump {
                 path = Instance.Path,
                 blocks = Blocks.Select(b => BlockDump.FromBlock(b)).ToList(),

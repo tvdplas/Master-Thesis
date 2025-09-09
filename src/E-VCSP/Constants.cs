@@ -1,5 +1,10 @@
 ﻿namespace E_VCSP {
     public static class Constants {
+        //
+
+
+
+        // Min width of each node
         public static int MIN_NODE_TIME = 300;
 
         // Constraint names
@@ -33,5 +38,7 @@
         public static int CR_MAX_SHORT_IDLE_TIME = 15 * 60; // Max idle time which is not part of a split shift
         public static int CR_MIN_LONG_IDLE_TIME = 2 * 60 * 60; // Min idle time which is part of a split shift
         public static int CR_MAX_LONG_IDLE_TIME = 5 * 60 * 60; // Max idle time which is part of a split shift
+        public static string DATA_FOLDER = "";
+        public static string RUN_LOG_FOLDER = "";
     }
 }

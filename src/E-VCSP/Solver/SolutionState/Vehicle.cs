@@ -62,7 +62,7 @@ namespace E_VCSP.Solver.SolutionState {
         }
 
         public void Dump() {
-            File.WriteAllText(Config.RUN_LOG_FOLDER + "vss-result.json", JsonSerializer.Serialize(new VehicleSolutionStateDump() {
+            File.WriteAllText(Constants.RUN_LOG_FOLDER + "vss-result.json", JsonSerializer.Serialize(new VehicleSolutionStateDump() {
                 selectedTasks = SelectedTasks,
                 vehicleType = VehicleType,
                 path = Instance.Path,

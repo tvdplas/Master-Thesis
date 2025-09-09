@@ -34,8 +34,8 @@ namespace E_VCSP.Formatting {
                 }
             }
 
-            if (Config.RUN_LOG_FOLDER != "") {
-                File.AppendAllText(Config.RUN_LOG_FOLDER + "log.txt", output.ToString());
+            if (Constants.RUN_LOG_FOLDER != "") {
+                File.AppendAllText(Constants.RUN_LOG_FOLDER + "log.txt", output.ToString());
             }
             AppendTextToTextBox(output.ToString());
         }

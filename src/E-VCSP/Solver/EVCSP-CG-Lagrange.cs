@@ -518,7 +518,7 @@ namespace E_VCSP.Solver {
             // Solve using ILP
             GRBEnv env = new() {
                 LogToConsole = 1,
-                LogFile = Path.Combine(Config.RUN_LOG_FOLDER, "evcspcg_gurobi.log")
+                LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "evcspcg_gurobi.log")
             };
             GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.VCSP_SOLVER_TIMEOUT_SEC;

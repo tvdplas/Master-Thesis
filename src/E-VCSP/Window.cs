@@ -112,14 +112,6 @@ namespace E_VCSP {
                 controlsMap[field.Name] = inputControl;
                 yOffset += 30;
             }
-
-            Button applyButton = new() {
-                Text = "Apply Changes",
-                Location = new System.Drawing.Point(10, yOffset + 10),
-                Width = 200
-            };
-            applyButton.Click += (sender, e) => reload();
-            scrollablePanel.Controls.Add(applyButton);
         }
 
         private static void UpdateString(FieldInfo field, string text) {
@@ -138,9 +130,8 @@ namespace E_VCSP {
             if (res == DialogResult.OK) {
                 activeFolder = loadFolderBrowser.SelectedPath;
                 activeFolderLabel.Text = activeFolder.Split("\\").Last();
-                Console.WriteLine($"Loaded folder: {activeFolder}");
+                Console.WriteLine($"Selected folder: {activeFolder}");
             }
-            reload();
         }
 
         private void stopButtonClick(object sender, EventArgs e) {
@@ -242,16 +233,16 @@ namespace E_VCSP {
             integratedSolver = new EVCSPCGLagrange(vss, css);
 
             string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
-            Config.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
-            Directory.CreateDirectory(Config.RUN_LOG_FOLDER);
+            Constants.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
+            Directory.CreateDirectory(Constants.RUN_LOG_FOLDER);
 
             Type configType = typeof(Config);
             FieldInfo[] fields = configType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             StringBuilder configDump = new();
             foreach (FieldInfo field in fields)
                 configDump.AppendLine($"{field.Name}: {field.GetValue(null)}");
-            File.WriteAllText(Config.RUN_LOG_FOLDER + "config.txt", configDump.ToString());
-            Console.WriteLine($"Instance reloaded. Current config state dumped to {Config.RUN_LOG_FOLDER + "config.txt"}");
+            File.WriteAllText(Constants.RUN_LOG_FOLDER + "config.txt", configDump.ToString());
+            Console.WriteLine($"Instance reloaded. Current config state dumped to {Constants.RUN_LOG_FOLDER + "config.txt"}");
         }
 
         private void toggleGraphView(object sender, EventArgs e) {

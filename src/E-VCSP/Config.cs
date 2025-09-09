@@ -1,24 +1,6 @@
 ﻿namespace E_VCSP {
     public class Header { }
-    public enum GraphElementDisplay {
-        None,
-        Id,
-        Trips,
-        Details,
-        TripsAndDetails,
-    }
-
-    public enum ChargeDisplay {
-        ChargeOnly,
-        ChargeHighlighted,
-        All,
-    }
-
     public static class Config {
-        public static Header PROGRAM = new();
-        public static string DATA_FOLDER = "";
-        public static string RUN_LOG_FOLDER = "";
-
         // Graph display
         public static Header DEBUG = new();
         public static bool CONSOLE_GUROBI = false;
