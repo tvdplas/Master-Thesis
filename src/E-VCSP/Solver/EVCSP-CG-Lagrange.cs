@@ -448,7 +448,7 @@ namespace E_VCSP.Solver {
                 }
 
                 gradientDescent();
-                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}\t{newColumns.Count}");
             }
         }
 
@@ -510,7 +510,7 @@ namespace E_VCSP.Solver {
                     Y.Add(false);
                 }
                 gradientDescent();
-                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}");
+                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}\t{newColumns.Count}");
             }
         }
 
