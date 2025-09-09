@@ -109,6 +109,7 @@ namespace E_VCSP.Objects {
     public class Block {
         static List<BlockElementType> IDLE_TYPES = [BlockElementType.Idle, BlockElementType.Charge];
 
+        [JsonInclude]
         public List<BlockElement> Elements = new();
         public int Index = -1;
 
@@ -135,9 +136,7 @@ namespace E_VCSP.Objects {
         }
 
         public string Descriptor {
-            get {
-                return $"{StartLocation.Index}#{StartTime}#{EndLocation.Index}#{EndTime}";
-            }
+            get => Utils.Descriptor.Create(StartLocation, StartTime, EndLocation, EndTime);
         }
 
         public static Block FromDescriptor(Location startLocation, int startTime, Location endLocation, int endTime) {

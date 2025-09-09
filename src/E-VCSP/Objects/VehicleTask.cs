@@ -294,6 +294,7 @@ namespace E_VCSP.Objects {
         public int Index = -1;
 
         private double cachedCost = -1;
+        public void InvalidateCostCache() => cachedCost = -1;
         public double Cost {
             get {
                 if (cachedCost != -1) return cachedCost;
@@ -322,13 +323,12 @@ namespace E_VCSP.Objects {
             Elements = elements;
             TripCover = [];
             BlockIndexCover = [];
-            RecalculateCovers();
+            RecalcTripCovers();
         }
 
-        public void RecalculateCovers() {
+        public void RecalcTripCovers() {
             TripCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
-            TripCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
-            cachedCost = -1;
+            InvalidateCostCache();
         }
     }
 }

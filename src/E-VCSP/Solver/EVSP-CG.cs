@@ -88,7 +88,6 @@ namespace E_VCSP.Solver {
                 model.Terminate();
             });
 
-
             // Add variable for each task/column; add to maxVehicle constraint
             GRBLinExpr maxVehicles = new();
             List<GRBVar> taskVars = [];
@@ -317,8 +316,6 @@ namespace E_VCSP.Solver {
             Config.CONSOLE_GUROBI = true; // Force enable console at end as this solve takes a long time
             model.Optimize();
 
-            Console.WriteLine($"Costs: {model.ObjVal}, vehicle slack: {model.GetVarByName("vehicle_count_slack").X}");
-
             if (model.Status == GRB.Status.INFEASIBLE || model.Status == GRB.Status.INTERRUPTED) {
                 Console.WriteLine("Model infeasible / canceled");
                 if (Config.VSP_DETERMINE_IIS) {
@@ -330,8 +327,13 @@ namespace E_VCSP.Solver {
                 return false;
             }
 
+            Console.WriteLine($"Solution found with {taskVars.Where(x => x.X == 1).Count()} vehicles, overall costs {model.ObjVal}");
+
             (var selectedTasks, var blocks) = finalizeResults(true);
             vss.SelectedTasks = selectedTasks;
+
+
+            vss.PrintCostBreakdown((int)model.GetVarByName("vehicle_count_slack").X);
 
             if (Config.DUMP_VSP) {
                 vss.Dump();

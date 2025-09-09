@@ -17,14 +17,14 @@ namespace E_VCSP {
         VehicleSolutionState? vss;
         CrewSolutionState? css;
 
-        EVSPCGLagrange? vspSolver;
+        EVSPCG? vspSolver;
         CSPCG? cspSolver;
         EVCSPCGLagrange? integratedSolver;
 
         RosterDisplay rd = new();
 
         bool working = false;
-        int __view = 0;
+        int __view = 0; // 0: vehicles, 1: blocks, 2: duties, 3: general
         int view {
             get {
                 return __view;
@@ -229,7 +229,7 @@ namespace E_VCSP {
             vss = new(instance, instance.VehicleTypes[0]);
             css = new(instance, []);
 
-            vspSolver = new EVSPCGLagrange(vss);
+            vspSolver = new(vss);
             integratedSolver = new EVCSPCGLagrange(vss, css);
 
             string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");

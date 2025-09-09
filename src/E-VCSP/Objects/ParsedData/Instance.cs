@@ -14,6 +14,9 @@ namespace E_VCSP.Objects.ParsedData {
         public List<DeadheadTemplate> DeadheadTemplates;
         public List<DeadheadTemplate> ExtendedTemplates;
 
+        public Dictionary<string, List<int>> StartDescriptorToTripIndex = [];
+        public Dictionary<string, List<int>> EndDescriptorToTripIndex = [];
+
         public Instance(string path) {
             Path = path;
 
@@ -36,8 +39,16 @@ namespace E_VCSP.Objects.ParsedData {
             for (int i = 0; i < Trips.Count; i++) {
                 Trips[i].Index = i;
                 Trips[i].Id = "t" + i;
-            }
 
+                // Create trip lookup based on start location + time, and end location + time
+                string startDesc = Utils.Descriptor.Create(Trips[i].From, Trips[i].StartTime);
+                StartDescriptorToTripIndex.TryAdd(startDesc, []);
+                StartDescriptorToTripIndex[startDesc].Add(i);
+
+                string endDesc = Utils.Descriptor.Create(Trips[i].To, Trips[i].EndTime);
+                EndDescriptorToTripIndex.TryAdd(endDesc, []);
+                EndDescriptorToTripIndex[endDesc].Add(i);
+            }
 
             // Vehicle types; can add charging curve info to locations
             VehicleTypes = new ParserVehicleTypes().Parse(path, Locations);

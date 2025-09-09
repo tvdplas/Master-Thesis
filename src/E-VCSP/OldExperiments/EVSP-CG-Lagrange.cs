@@ -5,7 +5,7 @@ using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
 using Gurobi;
 
-namespace E_VCSP.Solver {
+namespace E_VCSP.OldExperiments {
     public class EVSPCGLagrange : Solver {
         private GRBModel? model;
         public VehicleSolutionState vss;
@@ -309,9 +309,9 @@ namespace E_VCSP.Solver {
                 objVal = newObjVal;
                 currIts++;
 
-                int percent = (int)((totalGenerated / (double)maxColumns) * 100);
+                int percent = (int)(totalGenerated / (double)maxColumns * 100);
                 if (percent >= lastReportedPercent + 10) {
-                    lastReportedPercent = percent - (percent % 10);
+                    lastReportedPercent = percent - percent % 10;
                     Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{objVal}");
                 }
 

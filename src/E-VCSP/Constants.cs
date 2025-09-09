@@ -17,6 +17,9 @@
         public static string CSTR_CR_BROKEN_DUTIES = "cr_overall_max_broken";
         public static string CSTR_CR_BETWEEN_DUTIES = "cr_overall_max_between";
 
+        // "Hard" constraint slack penalties
+        public static double CR_HARD_CONSTR_PENALTY = 10000;
+
         // Driving/Charging
         public static double KWH_COST = 0.32; // based on national average price
         public static int MIN_CHARGE_TIME = 300;
@@ -38,6 +41,7 @@
         public static int CR_MAX_SHORT_IDLE_TIME = 15 * 60; // Max idle time which is not part of a split shift
         public static int CR_MIN_LONG_IDLE_TIME = 2 * 60 * 60; // Min idle time which is part of a split shift
         public static int CR_MAX_LONG_IDLE_TIME = 5 * 60 * 60; // Max idle time which is part of a split shift
+
         public static string DATA_FOLDER = "";
         public static string RUN_LOG_FOLDER = "";
     }

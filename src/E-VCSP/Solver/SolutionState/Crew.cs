@@ -104,6 +104,8 @@ namespace E_VCSP.Solver.SolutionState {
             ResetFromBlocks();
             Duties.AddRange(duties);
             SelectedDuties = duties;
+
+            PrintCostBreakdown();
         }
 
         public void ResetFromBlocks() {
@@ -231,6 +233,36 @@ namespace E_VCSP.Solver.SolutionState {
 
             // Return the unit duty used to cover the new block
             return duty;
+        }
+
+        public void PrintCostBreakdown(
+            int countSlack = 0,
+            double avgDutySlack = 0,
+            double longDutySlack = 0,
+            double brokenDutySlack = 0,
+            double betweenDutySlack = 0
+        ) {
+            double countPenalty = countSlack * Config.VH_OVER_MAX_COST;
+            double avgPenalty = avgDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
+            double longPenalty = longDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
+            double maxBrokenPenalty = brokenDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
+            double maxBetweenPenalty = betweenDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
+            double totalPenalty = countPenalty + avgPenalty + longPenalty + maxBrokenPenalty + maxBetweenPenalty;
+            string breakdown =
+            $"""
+            Overall crew costs: {SelectedDuties.Sum(x => x.Cost) + totalPenalty}
+            Cost breakdown:
+            Crew duties: {SelectedDuties.Sum(x => x.Cost)}
+                Single shifts: {SelectedDuties.Sum(x => x.Type == DutyType.Single ? 1 : 0) * Config.CR_SINGLE_SHIFT_COST} (included in duty costs)
+            Penalties:
+                Duty slack: {countSlack * Config.CR_OVER_MAX_COST}
+                Avg duty length slack: {avgPenalty}
+                Long duty slack: {longPenalty}
+                Broken duty slack: {maxBrokenPenalty}
+                Between duty slack: {maxBetweenPenalty}
+            """;
+
+            Console.WriteLine(breakdown);
         }
     }
 }

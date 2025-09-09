@@ -230,11 +230,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
                                 int locationIndex = chargeLocation.Index;
                                 int idleStartTime = arc.StartTime;
                                 int idleEndTime = arc.StartTime + idleTime;
-                                string descriptor = blockDescriptorStart + $"#{locationIndex}#{idleStartTime}";
+                                string descriptor = $"{blockDescriptorStart}#{Descriptor.Create(chargeLocation, idleStartTime)}";
                                 costs -= blockDualCosts.GetValueOrDefault(descriptor);
 
                                 // Initialize new range
-                                blockDescriptorStart = $"{locationIndex}#{idleEndTime}";
+                                blockDescriptorStart = Descriptor.Create(chargeLocation, idleEndTime);
                                 minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                                 maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                             }
@@ -242,7 +242,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                         // Initialize block descriptor start
                         if (depotStart && !depotEnd) {
-                            blockDescriptorStart = $"{depot.Index}#{arc.StartTime}";
+                            blockDescriptorStart = Descriptor.Create(depot, arc.StartTime);
                             minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                             maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
@@ -261,14 +261,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             steeringTime = 0;
 
                             // Finalize block dual costs by adding to actual costs
-                            int locationIndex = targetTrip.From.Index;
                             int idleStartTime = arc.StartTime + arc.DeadheadTemplate.Duration;
                             int idleEndTime = arc.EndTime;
-                            string descriptor = blockDescriptorStart + $"#{locationIndex}#{idleStartTime}";
+                            string descriptor = blockDescriptorStart + "#" + Descriptor.Create(targetTrip.From, idleStartTime);
                             costs -= blockDualCosts.GetValueOrDefault(descriptor);
 
                             // Initialize new range
-                            blockDescriptorStart = $"{locationIndex}#{idleEndTime}";
+                            blockDescriptorStart = Descriptor.Create(targetTrip.From, idleEndTime);
                             minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                             maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
@@ -341,14 +340,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             steeringTime = 0;
 
                             // Finalize block dual costs by adding to actual costs
-                            int locationIndex = candidateLocation.Index;
                             int idleStartTime = arc.StartTime + dht1.Duration;
                             int idleEndTime = arc.StartTime + dht1.Duration + idleTime;
-                            string descriptor = blockDescriptorStart + $"#{locationIndex}#{idleStartTime}";
+                            string descriptor = blockDescriptorStart + "#" + Descriptor.Create(candidateLocation, idleStartTime);
                             costs -= blockDualCosts.GetValueOrDefault(descriptor);
 
                             // Initialize new range
-                            blockDescriptorStart = $"{locationIndex}#{idleEndTime}";
+                            blockDescriptorStart = Descriptor.Create(candidateLocation, idleEndTime);
                             minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                             maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
@@ -485,7 +483,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                         int idleTime = trip!.StartTime - dht1.Duration - dht2.Duration - currTime;
 
-
                         taskElements.Add(new VEDeadhead(dht1, currTime, currTime + dht1.Duration, vss.VehicleType) {
                             StartSoCInTask = CurrSoC,
                             EndSoCInTask = CurrSoC - dht1.Distance * vss.VehicleType.DriveUsage,
@@ -540,7 +537,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         });
                         currTime += dht.Duration;
                         CurrSoC -= dht.Distance * vss.VehicleType.DriveUsage;
-
 
                         // Charge after deadhead
                         if (curr.label.ChargeTime == ChargeTime.Target) {

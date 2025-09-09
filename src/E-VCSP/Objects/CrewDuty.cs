@@ -28,9 +28,7 @@ namespace E_VCSP.Objects {
         [JsonInclude]
         public Location EndLocation;
         public string Descriptor {
-            get {
-                return $"{StartLocation.Index}#{StartTime}#{EndLocation.Index}#{EndTime}";
-            }
+            get => Utils.Descriptor.Create(StartLocation, StartTime, EndLocation, EndTime);
         }
     }
 
@@ -190,13 +188,12 @@ namespace E_VCSP.Objects {
         [JsonInclude]
         public int Index = -1;
 
-
         private double cachedCost = -1;
         public double Cost {
             get {
                 if (cachedCost != -1) return cachedCost;
                 double cost = Config.CR_SHIFT_COST; // base
-                // Driven time
+                                                    // Driven time
                 cost += Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Constants.CR_HOURLY_COST);
                 // Special type
                 if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;

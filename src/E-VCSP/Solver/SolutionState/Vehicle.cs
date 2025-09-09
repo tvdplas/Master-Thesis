@@ -96,6 +96,7 @@ namespace E_VCSP.Solver.SolutionState {
 
             SelectedTasks = dump.selectedTasks;
             Tasks = dump.selectedTasks;
+            PrintCostBreakdown();
         }
 
         public void Reset(bool withTasks = true) {
@@ -128,6 +129,171 @@ namespace E_VCSP.Solver.SolutionState {
                 // Trip to depot
                 int maxArrTime = t.EndTime + AdjFull[t.Index][Instance.DepotEndIndex]!.DeadheadTemplate.Duration;
                 EndTime = Math.Max(maxArrTime, EndTime);
+            }
+        }
+        #endregion
+
+        #region Initialize Graph and Tasks
+        private void generateGraph() {
+            // Transform trips into nodes, add depot start/end
+            // Depot start = ^2, depot end = ^1
+            for (int i = 0; i < Instance.Trips.Count; i++) {
+                Nodes.Add(new TripNode() { Index = i, Trip = Instance.Trips[i] });
+            }
+
+            Nodes.Add(new DepotNode() { Index = Nodes.Count, Depot = Depot }); // Start depot
+            Nodes.Add(new DepotNode() { Index = Nodes.Count, Depot = Depot }); // End depot
+
+
+            // Initialize adjacency lists
+            for (int i = 0; i < Nodes.Count; i++) {
+                AdjFull.Add([]);
+                Adj.Add([]);
+                for (int j = 0; j < Nodes.Count; j++) {
+                    AdjFull[i].Add(null);
+                }
+            }
+
+            // depot start -> trip arcs
+            for (int i = 0; i < Nodes.Count - 2; i++) {
+                TripNode tn = (TripNode)Nodes[i];
+                DeadheadTemplate? dht = LocationDHT[Depot.Index][tn.Trip.From.Index] ?? throw new InvalidDataException("No travel possible from depot to trip");
+                VSPArc arc = new VSPArc() {
+                    StartTime = tn.Trip.StartTime - dht.Duration,
+                    EndTime = tn.Trip.StartTime,
+                    From = Nodes[^2],
+                    To = tn,
+                    DeadheadTemplate = dht
+                };
+                AdjFull[^2][i] = arc;
+                Adj[^2].Add(arc);
+            }
+            // trip -> depot end arcs
+            for (int i = 0; i < Nodes.Count - 2; i++) {
+                TripNode tn = (TripNode)Nodes[i];
+                DeadheadTemplate? dht = LocationDHT[tn.Trip.To.Index][Depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
+                VSPArc arc = new VSPArc() {
+                    StartTime = tn.Trip.EndTime,
+                    EndTime = tn.Trip.EndTime + dht.Duration,
+                    From = tn,
+                    To = Nodes[^1],
+                    DeadheadTemplate = dht
+                };
+                AdjFull[i][^1] = arc;
+                Adj[i].Add(arc);
+            }
+            // depot -> depot arc
+            {
+                DeadheadTemplate? dht = LocationDHT[Depot.Index][Depot.Index] ?? throw new InvalidDataException("No travel possible from depot to depot");
+                VSPArc arc = new VSPArc() {
+                    StartTime = 0,
+                    EndTime = 0,
+                    From = Nodes[^2],
+                    To = Nodes[^1],
+                    DeadheadTemplate = dht
+                };
+                AdjFull[^2][^1] = arc;
+                Adj[^2].Add(arc);
+            }
+
+            int totalSimplified = 0;
+
+            // Trip to trip arcs
+            for (int i = 0; i < Nodes.Count - 2; i++) {
+                TripNode tn1 = (TripNode)Nodes[i];
+
+                for (int j = 0; j < Nodes.Count - 2; j++) {
+                    if (i == j) continue;
+
+                    TripNode tn2 = (TripNode)Nodes[j];
+                    DeadheadTemplate? dht = LocationDHT[tn1.Trip.To.Index][tn2.Trip.From.Index];
+                    if (dht == null) continue; // not a possible drive
+                    if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
+
+                    VSPArc arc = new VSPArc() {
+                        StartTime = tn1.Trip.EndTime,
+                        EndTime = tn2.Trip.StartTime,
+                        To = tn2,
+                        From = tn1,
+                        DeadheadTemplate = dht
+                    };
+
+                    AdjFull[i][j] = arc;
+                    Adj[i].Add(arc);
+                }
+            }
+
+            double avgOutgoingBeforeSimplify = Adj.Where((x, i) => i < Instance.Trips.Count).Sum(x => x.Count) / ((double)Adj.Count - 2);
+
+            // Preprocessing: filter by min length, if one is found with low time only use that 
+            for (int i = 0; i < Nodes.Count - 2; i++) {
+                TripNode tn1 = (TripNode)Nodes[i];
+                List<int> directArcIndexes = [];
+
+                for (int dai = 0; dai < Adj[i].Count; dai++) {
+                    VSPArc arc = Adj[i][dai];
+                    if (arc.To.Index < Instance.Trips.Count) {
+                        Trip t2 = ((TripNode)arc.To).Trip;
+
+                        int timeDiff = t2.StartTime - tn1.Trip.EndTime;
+                        if (timeDiff <= Config.VSP_PRE_DIRECT_TIME) {
+                            directArcIndexes.Add(t2.Index);
+                        }
+                    }
+                }
+
+                if (directArcIndexes.Count > 0) {
+                    totalSimplified++;
+                    Adj[i] = Adj[i].Where((x, i) => x.To.Index >= Instance.Trips.Count || directArcIndexes.Contains(x.To.Index)).ToList();
+                    AdjFull[i] = AdjFull[i].Select((x, i) => x == null || x.To.Index >= Instance.Trips.Count || directArcIndexes.Contains(x.To.Index) ? x : null).ToList();
+                }
+            }
+
+            double avgOutgoingAfterSimplify = Adj.Where((x, i) => i < Instance.Trips.Count).Sum(x => x.Count) / ((double)Adj.Count - 2);
+
+            Console.WriteLine($"Simplified the arcs of {totalSimplified} trips");
+            Console.WriteLine($"Avg outgoing arcs before/after simplification: {avgOutgoingBeforeSimplify}/{avgOutgoingAfterSimplify}");
+        }
+
+        private void generateLocationDHT() {
+            foreach (Location l1 in Instance.Locations) {
+                LocationDHT.Add([]);
+                foreach (Location l2 in Instance.Locations) {
+                    DeadheadTemplate? dht = Instance.DeadheadTemplates.Find((x) => x.From == l1 && x.To == l2);
+                    LocationDHT[l1.Index].Add(dht);
+                }
+            }
+        }
+
+        private void generateInitialTasks() {
+            for (int i = 0; i < Instance.Trips.Count; i++) {
+                Trip t = Instance.Trips[i];
+                DeadheadTemplate dhTo = AdjFull[Instance.DepotStartIndex][i]?.DeadheadTemplate ?? throw new InvalidDataException("No arc from depot to trip");
+                DeadheadTemplate dhFrom = AdjFull[i][Instance.DepotEndIndex]?.DeadheadTemplate ?? throw new InvalidDataException("No arc from trip to depot");
+
+                double currSoC = VehicleType.StartSoC;
+                VEDeadhead toTrip = new(dhTo, Instance.Trips[i].StartTime - dhTo.Duration, Instance.Trips[i].StartTime, VehicleType) {
+                    StartSoCInTask = currSoC,
+                    EndSoCInTask = currSoC - dhTo.Distance * VehicleType.DriveUsage
+                };
+                currSoC -= dhTo.Distance * VehicleType.DriveUsage;
+                VETrip trip = new(t, VehicleType) {
+                    StartSoCInTask = currSoC,
+                    EndSoCInTask = currSoC - t.Distance * VehicleType.DriveUsage
+                };
+                currSoC -= t.Distance * VehicleType.DriveUsage;
+                VEDeadhead fromTrip = new(dhFrom, Instance.Trips[i].EndTime, Instance.Trips[i].EndTime + dhFrom.Duration, VehicleType) {
+                    StartSoCInTask = currSoC,
+                    EndSoCInTask = currSoC - dhFrom.Distance * VehicleType.DriveUsage
+                };
+
+                VehicleTask vehicleTask = new([toTrip, trip, fromTrip]) {
+                    vehicleType = VehicleType,
+                    Index = i,
+                    Source = "Base cover",
+                };
+
+                Tasks.Add(vehicleTask);
             }
         }
         #endregion
@@ -271,170 +437,26 @@ namespace E_VCSP.Solver.SolutionState {
 
                 if (idles.Count > 0) replace();
             }
+
+            // Reset calculated costs as they may have changed
+            foreach (var vt in vehicleTasks) vt.RecalcTripCovers();
         }
 
-        private void generateGraph() {
-            // Transform trips into nodes, add depot start/end
-            // Depot start = ^2, depot end = ^1
-            for (int i = 0; i < Instance.Trips.Count; i++) {
-                Nodes.Add(new TripNode() { Index = i, Trip = Instance.Trips[i] });
-            }
+        public void PrintCostBreakdown(int slack = 0) {
+            string breakdown =
+            $"""
+            Overall vehicle costs: {SelectedTasks.Sum(x => x.Cost) + slack * Config.VH_OVER_MAX_COST}
+            Cost breakdown:
+            Vehicle tasks: {SelectedTasks.Sum(x => x.Cost)}
+                Vehicle pullout costs: {SelectedTasks.Count * Config.VH_PULLOUT_COST}
+                Trip driving costs: {SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Trip ? y.Cost : 0))}
+                Trip battery costs: {SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Trip ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0))}
+                Other driving costs: {SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type != VEType.Trip && y.Type != VEType.Charge ? y.Cost : 0))}
+                Other battery costs: {SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type != VEType.Trip && y.Type != VEType.Charge ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0))}
+            Vehicle slack penalty: {slack * Config.VH_OVER_MAX_COST}
+            """;
 
-            Nodes.Add(new DepotNode() { Index = Nodes.Count, Depot = Depot }); // Start depot
-            Nodes.Add(new DepotNode() { Index = Nodes.Count, Depot = Depot }); // End depot
-
-
-            // Initialize adjacency lists
-            for (int i = 0; i < Nodes.Count; i++) {
-                AdjFull.Add([]);
-                Adj.Add([]);
-                for (int j = 0; j < Nodes.Count; j++) {
-                    AdjFull[i].Add(null);
-                }
-            }
-
-            // depot start -> trip arcs
-            for (int i = 0; i < Nodes.Count - 2; i++) {
-                TripNode tn = (TripNode)Nodes[i];
-                DeadheadTemplate? dht = LocationDHT[Depot.Index][tn.Trip.From.Index] ?? throw new InvalidDataException("No travel possible from depot to trip");
-                VSPArc arc = new VSPArc() {
-                    StartTime = tn.Trip.StartTime - dht.Duration,
-                    EndTime = tn.Trip.StartTime,
-                    From = Nodes[^2],
-                    To = tn,
-                    DeadheadTemplate = dht
-                };
-                AdjFull[^2][i] = arc;
-                Adj[^2].Add(arc);
-            }
-            // trip -> depot end arcs
-            for (int i = 0; i < Nodes.Count - 2; i++) {
-                TripNode tn = (TripNode)Nodes[i];
-                DeadheadTemplate? dht = LocationDHT[tn.Trip.To.Index][Depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
-                VSPArc arc = new VSPArc() {
-                    StartTime = tn.Trip.EndTime,
-                    EndTime = tn.Trip.EndTime + dht.Duration,
-                    From = tn,
-                    To = Nodes[^1],
-                    DeadheadTemplate = dht
-                };
-                AdjFull[i][^1] = arc;
-                Adj[i].Add(arc);
-            }
-            // depot -> depot arc
-            {
-                DeadheadTemplate? dht = LocationDHT[Depot.Index][Depot.Index] ?? throw new InvalidDataException("No travel possible from depot to depot");
-                VSPArc arc = new VSPArc() {
-                    StartTime = 0,
-                    EndTime = 0,
-                    From = Nodes[^2],
-                    To = Nodes[^1],
-                    DeadheadTemplate = dht
-                };
-                AdjFull[^2][^1] = arc;
-                Adj[^2].Add(arc);
-            }
-
-            int totalSimplified = 0;
-
-            // Trip to trip arcs
-            for (int i = 0; i < Nodes.Count - 2; i++) {
-                TripNode tn1 = (TripNode)Nodes[i];
-
-                for (int j = 0; j < Nodes.Count - 2; j++) {
-                    if (i == j) continue;
-
-                    TripNode tn2 = (TripNode)Nodes[j];
-                    DeadheadTemplate? dht = LocationDHT[tn1.Trip.To.Index][tn2.Trip.From.Index];
-                    if (dht == null) continue; // not a possible drive
-                    if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
-
-                    VSPArc arc = new VSPArc() {
-                        StartTime = tn1.Trip.EndTime,
-                        EndTime = tn2.Trip.StartTime,
-                        To = tn2,
-                        From = tn1,
-                        DeadheadTemplate = dht
-                    };
-
-                    AdjFull[i][j] = arc;
-                    Adj[i].Add(arc);
-                }
-            }
-
-            double avgOutgoingBeforeSimplify = Adj.Where((x, i) => i < Instance.Trips.Count).Sum(x => x.Count) / ((double)Adj.Count - 2);
-
-            // Preprocessing: filter by min length, if one is found with low time only use that 
-            for (int i = 0; i < Nodes.Count - 2; i++) {
-                TripNode tn1 = (TripNode)Nodes[i];
-                List<int> directArcIndexes = [];
-
-                for (int dai = 0; dai < Adj[i].Count; dai++) {
-                    VSPArc arc = Adj[i][dai];
-                    if (arc.To.Index < Instance.Trips.Count) {
-                        Trip t2 = ((TripNode)arc.To).Trip;
-
-                        int timeDiff = t2.StartTime - tn1.Trip.EndTime;
-                        if (timeDiff <= Config.VSP_PRE_DIRECT_TIME) {
-                            directArcIndexes.Add(t2.Index);
-                        }
-                    }
-                }
-
-                if (directArcIndexes.Count > 0) {
-                    totalSimplified++;
-                    Adj[i] = Adj[i].Where((x, i) => x.To.Index >= Instance.Trips.Count || directArcIndexes.Contains(x.To.Index)).ToList();
-                    AdjFull[i] = AdjFull[i].Select((x, i) => x == null || x.To.Index >= Instance.Trips.Count || directArcIndexes.Contains(x.To.Index) ? x : null).ToList();
-                }
-            }
-
-            double avgOutgoingAfterSimplify = Adj.Where((x, i) => i < Instance.Trips.Count).Sum(x => x.Count) / ((double)Adj.Count - 2);
-
-            Console.WriteLine($"Simplified the arcs of {totalSimplified} trips");
-            Console.WriteLine($"Avg outgoing arcs before simplification: {avgOutgoingBeforeSimplify}");
-            Console.WriteLine($"Avg outgoing arcs after simplification: {avgOutgoingAfterSimplify}");
-        }
-
-        private void generateLocationDHT() {
-            foreach (Location l1 in Instance.Locations) {
-                LocationDHT.Add([]);
-                foreach (Location l2 in Instance.Locations) {
-                    DeadheadTemplate? dht = Instance.DeadheadTemplates.Find((x) => x.From == l1 && x.To == l2);
-                    LocationDHT[l1.Index].Add(dht);
-                }
-            }
-        }
-
-        private void generateInitialTasks() {
-            for (int i = 0; i < Instance.Trips.Count; i++) {
-                Trip t = Instance.Trips[i];
-                DeadheadTemplate dhTo = AdjFull[Instance.DepotStartIndex][i]?.DeadheadTemplate ?? throw new InvalidDataException("No arc from depot to trip");
-                DeadheadTemplate dhFrom = AdjFull[i][Instance.DepotEndIndex]?.DeadheadTemplate ?? throw new InvalidDataException("No arc from trip to depot");
-
-                double currSoC = VehicleType.StartSoC;
-                VEDeadhead toTrip = new(dhTo, Instance.Trips[i].StartTime - dhTo.Duration, Instance.Trips[i].StartTime, VehicleType) {
-                    StartSoCInTask = currSoC,
-                    EndSoCInTask = currSoC - dhTo.Distance * VehicleType.DriveUsage
-                };
-                currSoC -= dhTo.Distance * VehicleType.DriveUsage;
-                VETrip trip = new(t, VehicleType) {
-                    StartSoCInTask = currSoC,
-                    EndSoCInTask = currSoC - t.Distance * VehicleType.DriveUsage
-                };
-                currSoC -= t.Distance * VehicleType.DriveUsage;
-                VEDeadhead fromTrip = new(dhFrom, Instance.Trips[i].EndTime, Instance.Trips[i].EndTime + dhFrom.Duration, VehicleType) {
-                    StartSoCInTask = currSoC,
-                    EndSoCInTask = currSoC - dhFrom.Distance * VehicleType.DriveUsage
-                };
-
-                VehicleTask vehicleTask = new([toTrip, trip, fromTrip]) {
-                    vehicleType = VehicleType,
-                    Index = i,
-                    Source = "Base cover",
-                };
-
-                Tasks.Add(vehicleTask);
-            }
+            Console.WriteLine(breakdown);
         }
     }
 }

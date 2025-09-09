@@ -15,8 +15,5 @@ namespace E_VCSP.Objects.ParsedData {
         public override string ToString() {
             return Id;
         }
-        public string ToLongString(bool showInfo) {
-            return $"{From} -> {To}" + (showInfo ? $"\n{Formatting.Time.HHMMSS(Duration)} ({Formatting.Distance.KM(Distance)})" : "");
-        }
     }
 }

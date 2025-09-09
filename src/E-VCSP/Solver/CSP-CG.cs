@@ -213,6 +213,7 @@ namespace E_VCSP.Solver {
                 int selectedMethodÍndex = sums.FindIndex(x => r <= x);
                 List<CrewColumnGen> selectedMethod = instances[selectedMethodÍndex];
                 Parallel.For(0, Config.CSP_INSTANCES_PER_IT, (i) => {
+                    Dictionary<string, double> crewConstrs = model.GetConstrs().ToDictionary(c => c.ConstrName, c => c.Pi);
                     selectedMethod[i].UpdateDualCosts(model.GetConstrs().ToDictionary(c => c.ConstrName, c => c.Pi), 1);
                     generatedDuties[i] = selectedMethod[i].GenerateDuties();
                 });
@@ -278,6 +279,7 @@ namespace E_VCSP.Solver {
 
             Config.CONSOLE_GUROBI = configState;
             css.SelectedDuties = getSelectedDuties();
+            css.PrintCostBreakdown();
 
             if (Config.DUMP_CSP) css.Dump();
             return succes;

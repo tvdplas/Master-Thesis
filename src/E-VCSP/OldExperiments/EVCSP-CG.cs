@@ -3,15 +3,16 @@ using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
+using E_VCSP.Utils;
 using Gurobi;
 
-namespace E_VCSP.Solver {
+namespace E_VCSP.OldExperiments {
     public class BlockWrapper {
         public required Block Block;
         public double CoveredCount;
     }
 
-    internal class EVCSPCG : Solver {
+    internal class EVCSPCG : Solver.Solver {
 
         #region DEBUG
         private void DEBUG_printDualCostsTripCovers(GRBModel model) {
@@ -274,12 +275,11 @@ namespace E_VCSP.Solver {
                 GRBVar v = dutyVars[i];
                 CrewDuty duty = css.Duties[i];
 
-                noExcessiveLength += Constants.CR_MAX_OVER_LONG_DUTY * v - (duty.IsLongDuty * v);
+                noExcessiveLength += Constants.CR_MAX_OVER_LONG_DUTY * v - duty.IsLongDuty * v;
                 limitedAverageLength += v * (duty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
-                maxBroken += v * Constants.CR_MAX_BROKEN_SHIFTS - (duty.IsBrokenDuty * v);
-                maxBetween += v * Constants.CR_MAX_BETWEEN_SHIFTS - (duty.IsBetweenDuty * v);
+                maxBroken += v * Constants.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty * v;
+                maxBetween += v * Constants.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty * v;
             }
-
 
             crewConstrs[Constants.CSTR_CR_LONG_DUTIES] =
                 model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, Constants.CSTR_CR_LONG_DUTIES);
@@ -328,7 +328,7 @@ namespace E_VCSP.Solver {
 
                     if (constr.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) {
                         string descriptor = name.Split("_")[^1];
-                        string descriptorStart = String.Join("#", descriptor.Split("#").Take(2));
+                        string descriptorStart = Descriptor.GetStart(descriptor);
                         blockDualCosts[descriptor] = constr.Pi;
                         if (blockDualCostsByStart.ContainsKey(descriptorStart)) blockDualCostsByStart[descriptorStart].Add(constr.Pi);
                         else blockDualCostsByStart[descriptorStart] = [constr.Pi];
@@ -337,7 +337,6 @@ namespace E_VCSP.Solver {
 
                 vspLabelingInstance.UpdateDualCosts(tripDualCosts, blockDualCosts, blockDualCostsByStart);
             }
-
 
             void processNewTask(double reducedCosts, VehicleTask newTask) {
                 // Determine the block coverage of the new column
@@ -379,7 +378,6 @@ namespace E_VCSP.Solver {
                 vss.CoverTaskMapping[newTask.ToBitArray(vss.Instance.Trips.Count)] = newTask;
             }
 
-
             for (int currIt = 0; currIt < maxIts; currIt++) {
                 updateDualCosts();
                 var newColumns = vspLabelingInstance.GenerateVehicleTasks();
@@ -403,7 +401,6 @@ namespace E_VCSP.Solver {
                 css.Duties.Add(newDuty);
                 newDuty.Index = index;
 
-
                 // overall schedule contributions
                 double excessiveLength = Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
                 double limitedAverageLength = newDuty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1;
@@ -426,7 +423,7 @@ namespace E_VCSP.Solver {
                 col.AddTerms([..constrs.Select(c => {
                     if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) return -1.0;
                     else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
-                    else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                    else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return newDuty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1;
                     else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
                     else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES) return Constants.CR_MAX_BETWEEN_SHIFTS - newDuty.IsBetweenDuty;
                     else throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
@@ -470,8 +467,6 @@ namespace E_VCSP.Solver {
 
             return (makeBinary && optimize ? taskVars.Sum(x => x.X) : -1, makeBinary && optimize ? model.MIPGap : -1);
         }
-
-
 
         private void swapCrewObjective(bool makeBinary, bool optimize = true) {
             if (model == null) throw new Exception("Cant switch vehicle objective if no model is found");
@@ -520,7 +515,6 @@ namespace E_VCSP.Solver {
             model.Optimize();
 
             Console.WriteLine($"Initializing solution.");
-
 
             // Properly initialize model
             runVehicleIts(true);
