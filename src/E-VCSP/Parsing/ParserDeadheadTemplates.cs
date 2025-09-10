@@ -19,7 +19,7 @@ namespace E_VCSP.Parsing {
             Location to = GetOrCreateLocation(line[attributeIndexMapping["ToId"]], locations);
 
             return new DeadheadTemplate() {
-                From = from,
+                StartLocation = from,
                 To = to,
                 Duration = ParseTime(line[attributeIndexMapping["Duration"]]) * 60,
                 Distance = (int)(1000 * double.Parse(line[attributeIndexMapping["Distance"]], CultureInfo.InvariantCulture)),

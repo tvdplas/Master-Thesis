@@ -5,12 +5,12 @@ namespace E_VCSP.Utils {
     internal static class Descriptor {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string Create(Location location, int time) {
-            return $"${location.Index}#{time}";
+            return $"{location.Index}#{time}";
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string Create(Location l1, int t1, Location l2, int t2) {
-            return $"${l1.Index}#{t1}#{l2.Index}#{t2}";
+            return $"{l1.Index}#{t1}#{l2.Index}#{t2}";
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -420,7 +420,6 @@ namespace E_VCSP.Solver {
                             [lambdaBlocks[bi]];
                 }
 
-                // TODO: validate if this is correct
                 vspLabelingInstance.UpdateDualCosts(
                     lambdaTrips,
                     blockDualCosts,
@@ -487,45 +486,96 @@ namespace E_VCSP.Solver {
             CSPLabeling[] cspLabelingInstances = [.. Enumerable.Range(0, Config.VCSP_CR_INSTANCES).Select(_ => new CSPLabeling(css))];
             for (int it = 0; it < maxIts; it++) {
                 int totalBlocks = updateBlockCount();
-                var dualCost = crewDualCost();
-                List<(double reducedCosts, CrewDuty newDuty)> newColumns = [];
 
-                // 
                 for (int i = 0; i < css.Blocks.Count; i++) {
                     // Block will be used as a basis for expanding
-                    if (css.BlockCount[i] == 0) continue;
-                    if (random.Next() >= Config.VSCP_BLOCK_ADD_CHANCE * css.BlockCount[i]) continue;
+                    if (random.NextDouble() >= Config.VSCP_BLOCK_ADD_CHANCE * css.BlockCount[i]) continue;
 
                     Block block = css.Blocks[i];
 
+                    List<(double cost, bool front, Location startLocation, int startTime)> candidateDescriptors = [];
+
                     // Check if first element of block can be expanded
-                    if (block.Elements[0].Type == BlockElementType.Trip) {
-                        // Get the corresponding trip in the vehicle graph, see if there are incoming deadheads/trips which we can drive
+                    // Expansion as trip: add trip in front/at back (for now)
+                    if (block.Elements[0].Type == BlockElementType.Trip || block.Elements[0].Type == BlockElementType.Deadhead) {
+                        // Check if there is a trip that can be used to extend the block backwards
+                        for (int ti = 0; ti < vss.Instance.Trips.Count; ti++) {
+                            Trip t = vss.Instance.Trips[ti];
+                            if (t.EndLocation != block.StartLocation || t.EndTime > block.StartTime) continue;
 
+                            // Block transition allowed; can only be done with short idle
+                            // as break / long idle start a new block
+                            int waitingTime = block.StartTime - t.EndTime;
+                            bool transitionAllowed = Constants.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime <= Constants.CR_MAX_SHORT_IDLE_TIME;
+                            bool overallTimeAllowed = t.Duration + waitingTime + block.Duration <= Constants.MAX_STEERING_TIME;
+                            if (!transitionAllowed || !overallTimeAllowed) continue;
 
+                            // Check if this block is already known
+                            string candidateDescriptor = Descriptor.Create(t.StartLocation, t.StartTime, block.EndLocation, block.EndTime);
+                            if (knownBlocks.ContainsKey(candidateDescriptor)) continue;
 
+                            candidateDescriptors.Add((-lambdaTrips[t.Index], true, t.StartLocation, t.StartTime));
+                        }
+                    }
+
+                    if (block.Elements[^1].Type == BlockElementType.Trip || block.Elements[^1].Type == BlockElementType.Deadhead) {
+                        // Same but forwards
+                        for (int ti = 0; ti < vss.Instance.Trips.Count; ti++) {
+                            Trip t = vss.Instance.Trips[ti];
+                            if (t.StartLocation != block.EndLocation || block.EndTime > t.StartTime) continue;
+
+                            // Block transition allowed; can only be done with short idle
+                            // as break / long idle start a new block
+                            int waitingTime = t.StartTime - block.EndTime;
+                            bool transitionAllowed = Constants.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime <= Constants.CR_MAX_SHORT_IDLE_TIME;
+                            bool overallTimeAllowed = t.Duration + waitingTime + block.Duration <= Constants.MAX_STEERING_TIME;
+                            if (!transitionAllowed || !overallTimeAllowed) continue;
+
+                            // Check if this block is already known
+                            string candidateDescriptor = Descriptor.Create(block.StartLocation, block.StartTime, t.EndLocation, t.EndTime);
+                            if (knownBlocks.ContainsKey(candidateDescriptor)) continue;
+
+                            candidateDescriptors.Add((-lambdaTrips[t.Index], false, t.EndLocation, t.EndTime));
+                        }
+                    }
+
+                    for (int ci = 0; ci < candidateDescriptors.Count; ci++) {
+                        (_, bool front, Location l, int t) = candidateDescriptors[ci];
+                        string desc = front ? Descriptor.Create(l, t, block.EndLocation, block.EndTime) : Descriptor.Create(block.StartLocation, block.StartTime, l, t);
+                        if (knownBlocks.ContainsKey(desc)) continue;
+                        Block newBlock = front ? Block.FromDescriptor(l, t, block.EndLocation, block.EndTime) : Block.FromDescriptor(block.StartLocation, block.StartTime, l, t);
+
+                        knownBlocks[desc] = css.Blocks.Count;
+                        css.AddBlock(newBlock, 1);
+                        Y.Add(false); //unit duty from block being added
+                        lambdaBlocks.Add(0); // New block multiplier
+                        break; // only add one
                     }
                 }
-
-                Parallel.For(0, cspLabelingInstances.Length, (i) => {
-                    cspLabelingInstances[i].UpdateDualCosts(dualCost, 1);
-                    var res = cspLabelingInstances[i].GenerateDuties();
-                    foreach (var resCol in res)
-                        if (resCol.crewDuty != null) {
-                            newColumns.Add(resCol);
-                        }
-                });
-
-                foreach ((double reducedCost, CrewDuty newDuty) in newColumns) {
-                    if (reducedCost >= 0) continue;
-
-                    newDuty.Index = css.Duties.Count;
-                    css.Duties.Add(newDuty);
-                    Y.Add(false);
-                }
-                gradientDescent();
-                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}\t{newColumns.Count}");
             }
+
+            var dualCost = crewDualCost();
+            List<(double reducedCosts, CrewDuty newDuty)> newColumns = [];
+
+            Parallel.For(0, cspLabelingInstances.Length, (i) => {
+                cspLabelingInstances[i].UpdateDualCosts(dualCost, 1);
+                var res = cspLabelingInstances[i].GenerateDuties();
+                foreach (var resCol in res)
+                    if (resCol.crewDuty != null) {
+                        newColumns.Add(resCol);
+                    }
+            });
+
+            foreach ((double reducedCost, CrewDuty newDuty) in newColumns) {
+                if (reducedCost >= 0) continue;
+
+                newDuty.Index = css.Duties.Count;
+                css.Duties.Add(newDuty);
+                Y.Add(false);
+            }
+            gradientDescent();
+            Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{objVal.converged}\t{X.Count(x => x)}\t{Y.Count(y => y)}\t{newColumns.Count}");
+        }
         }
 
         private void solveILP() {

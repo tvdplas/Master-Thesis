@@ -6,7 +6,7 @@ using E_VCSP.Solver.SolutionState;
 using Gurobi;
 
 namespace E_VCSP.OldExperiments {
-    public class EVSPCGLagrange : Solver {
+    public class EVSPCGLagrange : Solver.Solver {
         private GRBModel? model;
         public VehicleSolutionState vss;
         List<GRBVar> taskVars = [];

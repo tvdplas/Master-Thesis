@@ -157,7 +157,7 @@ namespace E_VCSP.Solver.SolutionState {
             // depot start -> trip arcs
             for (int i = 0; i < Nodes.Count - 2; i++) {
                 TripNode tn = (TripNode)Nodes[i];
-                DeadheadTemplate? dht = LocationDHT[Depot.Index][tn.Trip.From.Index] ?? throw new InvalidDataException("No travel possible from depot to trip");
+                DeadheadTemplate? dht = LocationDHT[Depot.Index][tn.Trip.StartLocation.Index] ?? throw new InvalidDataException("No travel possible from depot to trip");
                 VSPArc arc = new VSPArc() {
                     StartTime = tn.Trip.StartTime - dht.Duration,
                     EndTime = tn.Trip.StartTime,
@@ -171,7 +171,7 @@ namespace E_VCSP.Solver.SolutionState {
             // trip -> depot end arcs
             for (int i = 0; i < Nodes.Count - 2; i++) {
                 TripNode tn = (TripNode)Nodes[i];
-                DeadheadTemplate? dht = LocationDHT[tn.Trip.To.Index][Depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
+                DeadheadTemplate? dht = LocationDHT[tn.Trip.EndLocation.Index][Depot.Index] ?? throw new InvalidDataException("No travel possible from trip to depot");
                 VSPArc arc = new VSPArc() {
                     StartTime = tn.Trip.EndTime,
                     EndTime = tn.Trip.EndTime + dht.Duration,
@@ -206,7 +206,7 @@ namespace E_VCSP.Solver.SolutionState {
                     if (i == j) continue;
 
                     TripNode tn2 = (TripNode)Nodes[j];
-                    DeadheadTemplate? dht = LocationDHT[tn1.Trip.To.Index][tn2.Trip.From.Index];
+                    DeadheadTemplate? dht = LocationDHT[tn1.Trip.EndLocation.Index][tn2.Trip.StartLocation.Index];
                     if (dht == null) continue; // not a possible drive
                     if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
 
@@ -259,7 +259,7 @@ namespace E_VCSP.Solver.SolutionState {
             foreach (Location l1 in Instance.Locations) {
                 LocationDHT.Add([]);
                 foreach (Location l2 in Instance.Locations) {
-                    DeadheadTemplate? dht = Instance.DeadheadTemplates.Find((x) => x.From == l1 && x.To == l2);
+                    DeadheadTemplate? dht = Instance.DeadheadTemplates.Find((x) => x.StartLocation == l1 && x.To == l2);
                     LocationDHT[l1.Index].Add(dht);
                 }
             }
@@ -353,8 +353,8 @@ namespace E_VCSP.Solver.SolutionState {
                     List<VehicleElement> newElements = [];
 
 
-                    Location from = prevInteresting?.EndLocation ?? ((VETrip)ve).Trip.From;
-                    Location to = nextInteresting?.StartLocation ?? ((VETrip)ve).Trip.To;
+                    Location from = prevInteresting?.EndLocation ?? ((VETrip)ve).Trip.StartLocation;
+                    Location to = nextInteresting?.StartLocation ?? ((VETrip)ve).Trip.EndLocation;
                     int startIndex = prevInterestingIndex + 1;
                     int endIndex = nextInterestingIndex - 1;
 
@@ -401,7 +401,7 @@ namespace E_VCSP.Solver.SolutionState {
                 void replace() {
                     Location from = idles[0].ve.StartLocation!;
                     Location to = idles[^1].ve.EndLocation!;
-                    DeadheadTemplate dht = Instance.ExtendedTemplates.Find(x => x.From == from && x.To == to)!;
+                    DeadheadTemplate dht = Instance.ExtendedTemplates.Find(x => x.StartLocation == from && x.To == to)!;
                     double startSoC = idles[0].ve.StartSoCInTask;
                     double endSoC = idles[^1].ve.EndSoCInTask;
                     int startTime = idles[0].ve.StartTime;

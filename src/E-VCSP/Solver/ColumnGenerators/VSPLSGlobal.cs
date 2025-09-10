@@ -118,7 +118,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (arc == null) return (false, double.MinValue, null);
 
                 // Arc exists; check if results in invalid charge by temporarily replacing at tail with fa (with travel to glue)
-                Location from = additionTargetAsTrip?.Trip?.From ?? vss.Depot;
+                Location from = additionTargetAsTrip?.Trip?.StartLocation ?? vss.Depot;
 
                 VSPLSNode travel = new() {
                     Prev = additionTarget,

@@ -41,11 +41,11 @@ namespace E_VCSP.Objects.ParsedData {
                 Trips[i].Id = "t" + i;
 
                 // Create trip lookup based on start location + time, and end location + time
-                string startDesc = Utils.Descriptor.Create(Trips[i].From, Trips[i].StartTime);
+                string startDesc = Utils.Descriptor.Create(Trips[i].StartLocation, Trips[i].StartTime);
                 StartDescriptorToTripIndex.TryAdd(startDesc, []);
                 StartDescriptorToTripIndex[startDesc].Add(i);
 
-                string endDesc = Utils.Descriptor.Create(Trips[i].To, Trips[i].EndTime);
+                string endDesc = Utils.Descriptor.Create(Trips[i].EndLocation, Trips[i].EndTime);
                 EndDescriptorToTripIndex.TryAdd(endDesc, []);
                 EndDescriptorToTripIndex[endDesc].Add(i);
             }
@@ -57,8 +57,8 @@ namespace E_VCSP.Objects.ParsedData {
             DeadheadTemplates = new ParserDeadheadTemplates().Parse(path, Locations);
             // Add symetric deadheads to model drives back
             var sym = DeadheadTemplates.Select(dh => new DeadheadTemplate {
-                From = dh.To,
-                To = dh.From,
+                StartLocation = dh.To,
+                To = dh.StartLocation,
                 Distance = dh.Distance,
                 Duration = dh.Duration,
                 Id = $"dht-sym{dh.Id}"
@@ -68,7 +68,7 @@ namespace E_VCSP.Objects.ParsedData {
             // Add self-edges to model waiting time
             foreach (Location loc in Locations) {
                 DeadheadTemplates.Add(new DeadheadTemplate {
-                    From = loc,
+                    StartLocation = loc,
                     To = loc,
                     Distance = 0,
                     Duration = 0,
@@ -81,26 +81,26 @@ namespace E_VCSP.Objects.ParsedData {
             // take the minimum time / distance. 
             foreach (Location loc1 in Locations) {
                 foreach (Location loc2 in Locations) {
-                    if (ExtendedTemplates.Find(x => x.From == loc1 && x.To == loc2) != null) continue;
+                    if (ExtendedTemplates.Find(x => x.StartLocation == loc1 && x.To == loc2) != null) continue;
 
                     // Trip which has this route
-                    Trip? trip = Trips.Find(x => x.From == loc1 && x.To == loc2);
+                    Trip? trip = Trips.Find(x => x.StartLocation == loc1 && x.EndLocation == loc2);
                     int tripDistance = trip?.Distance ?? int.MaxValue;
                     int tripDuration = trip?.Duration ?? int.MaxValue;
 
                     // Via other point (probably depot)
                     Location? loc3 = Locations.Find(x =>
-                        ExtendedTemplates.Find(y => y.From == loc1 && y.To == x) != null
-                        && ExtendedTemplates.Find(y => y.From == x && y.To == loc2) != null
+                        ExtendedTemplates.Find(y => y.StartLocation == loc1 && y.To == x) != null
+                        && ExtendedTemplates.Find(y => y.StartLocation == x && y.To == loc2) != null
                     );
-                    DeadheadTemplate? dht1 = ExtendedTemplates.Find(y => y.From == loc1 && y.To == loc3);
-                    DeadheadTemplate? dht2 = ExtendedTemplates.Find(y => y.From == loc3 && y.To == loc2);
+                    DeadheadTemplate? dht1 = ExtendedTemplates.Find(y => y.StartLocation == loc1 && y.To == loc3);
+                    DeadheadTemplate? dht2 = ExtendedTemplates.Find(y => y.StartLocation == loc3 && y.To == loc2);
 
                     int detourDistance = (dht1 != null && dht2 != null) ? dht1.Distance + dht2.Distance : int.MaxValue;
                     int detourDuration = (dht1 != null && dht2 != null) ? dht1.Duration + dht2.Duration : int.MaxValue;
 
                     ExtendedTemplates.Add(new DeadheadTemplate() {
-                        From = loc1,
+                        StartLocation = loc1,
                         To = loc2,
                         Duration = Math.Min(tripDuration, detourDuration),
                         Distance = Math.Min(tripDistance, detourDistance),

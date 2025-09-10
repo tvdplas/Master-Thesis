@@ -38,8 +38,8 @@ namespace E_VCSP.Objects {
                     Trip = vet.Trip,
                     StartTime = vet.StartTime,
                     EndTime = vet.EndTime,
-                    StartLocation = vet.Trip.From,
-                    EndLocation = vet.Trip.To,
+                    StartLocation = vet.Trip.StartLocation,
+                    EndLocation = vet.Trip.EndLocation,
                 });
             }
             else if (ve is VEDeadhead ved) {
@@ -49,7 +49,7 @@ namespace E_VCSP.Objects {
                         DeadheadTemplate = ved.DeadheadTemplate,
                         EndTime = ved.EndTime,
                         StartTime = ved.StartTime,
-                        StartLocation = ved.DeadheadTemplate.From,
+                        StartLocation = ved.DeadheadTemplate.StartLocation,
                         EndLocation = ved.DeadheadTemplate.To,
                         Type = BlockElementType.Deadhead,
                     });
@@ -114,27 +114,22 @@ namespace E_VCSP.Objects {
         public int Index = -1;
 
         public Location StartLocation {
-            get {
-                return Elements[0].StartLocation;
-            }
+            get => Elements[0].StartLocation;
         }
         public Location EndLocation {
-            get {
-                return Elements[^1].EndLocation;
-            }
+            get => Elements[^1].EndLocation;
         }
 
         public int StartTime {
-            get {
-                return Elements[0].StartTime;
-            }
+            get => Elements[0].StartTime;
         }
         public int EndTime {
-            get {
-                return Elements[^1].EndTime;
-            }
+            get => Elements[^1].EndTime;
         }
 
+        public int Duration {
+            get => EndTime - StartTime;
+        }
         public string Descriptor {
             get => Utils.Descriptor.Create(StartLocation, StartTime, EndLocation, EndTime);
         }

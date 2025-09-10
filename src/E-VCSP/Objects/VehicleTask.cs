@@ -133,8 +133,8 @@ namespace E_VCSP.Objects {
             SoCDiff = -trip.Distance * vt.DriveUsage;
             StartTime = trip.StartTime;
             EndTime = trip.EndTime;
-            StartLocation = trip.From;
-            EndLocation = trip.To;
+            StartLocation = trip.StartLocation;
+            EndLocation = trip.EndLocation;
         }
 
         public override string ToString() {
@@ -180,7 +180,7 @@ namespace E_VCSP.Objects {
             StartTime = startTime;
             DeadheadTemplate = dht;
             EndTime = startTime + dht.Duration;
-            StartLocation = dht.From;
+            StartLocation = dht.StartLocation;
             EndLocation = dht.To;
 
             Cost = dht.Distance * Constants.VH_M_COST;

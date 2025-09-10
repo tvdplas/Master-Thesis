@@ -3,8 +3,8 @@
 namespace E_VCSP.Objects.ParsedData {
     public class Trip {
         public string Route = "unknown";
-        public Location From;
-        public Location To;
+        public Location StartLocation;
+        public Location EndLocation;
         public int StartTime; // unit: seconds
         public int EndTime; // unit: seconds
         public int Duration; // unit: seconds
@@ -19,7 +19,7 @@ namespace E_VCSP.Objects.ParsedData {
             return Id;
         }
         public string ToLongString(bool showTime) {
-            return $"{From} -> {To}" + (showTime ? $"\n{Formatting.Time.HHMMSS(StartTime)} - {Formatting.Time.HHMMSS(EndTime)}" : "");
+            return $"{StartLocation} -> {EndLocation}" + (showTime ? $"\n{Formatting.Time.HHMMSS(StartTime)} - {Formatting.Time.HHMMSS(EndTime)}" : "");
         }
     }
 }

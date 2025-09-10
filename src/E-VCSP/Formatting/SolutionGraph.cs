@@ -30,15 +30,15 @@ namespace E_VCSP.Formatting {
                     }
                     else if (element is VETrip vet) {
                         color = System.Drawing.Color.LightBlue;
-                        content = $"{vet.Trip.From}@{SoCAtStart}% -> {vet.Trip.To}@{SoCAtEnd}% ({vet.Trip.Route} / {vet.Trip.Id})";
+                        content = $"{vet.Trip.StartLocation}@{SoCAtStart}% -> {vet.Trip.EndLocation}@{SoCAtEnd}% ({vet.Trip.Route} / {vet.Trip.Id})";
                     }
                     else if (element is VEDeadhead ved) {
                         if (element.Postprocessed) {
-                            content = $"POST {ved.DeadheadTemplate.From}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
+                            content = $"POST {ved.DeadheadTemplate.StartLocation}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
                             color = System.Drawing.Color.Olive;
                         }
                         else {
-                            content = $"{ved.DeadheadTemplate.From}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
+                            content = $"{ved.DeadheadTemplate.StartLocation}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
                             color = System.Drawing.Color.LightGreen;
                         }
                     }

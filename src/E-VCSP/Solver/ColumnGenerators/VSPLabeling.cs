@@ -198,12 +198,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             : vss.Instance.Trips[targetIndex].StartTime - vss.Instance.Trips[expandingLabelIndex].EndTime - arc.DeadheadTemplate.Duration;
 
                         int canCharge = 0;
-                        if (idleTime > Constants.MIN_CHARGE_TIME && !depotStart && vss.Instance.Trips[expandingLabelIndex].To.CanCharge) canCharge += 1;
-                        if (idleTime > Constants.MIN_CHARGE_TIME && !depotEnd && vss.Instance.Trips[targetIndex].From.CanCharge) canCharge += 2;
+                        if (idleTime > Constants.MIN_CHARGE_TIME && !depotStart && vss.Instance.Trips[expandingLabelIndex].EndLocation.CanCharge) canCharge += 1;
+                        if (idleTime > Constants.MIN_CHARGE_TIME && !depotEnd && vss.Instance.Trips[targetIndex].StartLocation.CanCharge) canCharge += 2;
 
                         Location? chargeLocation = null;
                         if (canCharge > 0) {
-                            chargeLocation = canCharge >= 2 ? vss.Instance.Trips[targetIndex].From : vss.Instance.Trips[expandingLabelIndex].To;
+                            chargeLocation = canCharge >= 2 ? vss.Instance.Trips[targetIndex].StartLocation : vss.Instance.Trips[expandingLabelIndex].EndLocation;
                         }
 
                         int steeringTime = expandingLabel.SteeringTime;
@@ -257,25 +257,25 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             costs += res.Cost;
                             SoC = Math.Min(SoC + res.SoCGained, vss.VehicleType.MaxSoC);
                         }
-                        if (targetTrip != null && handoverAllowed(targetTrip.From, idleTime)) {
+                        if (targetTrip != null && handoverAllowed(targetTrip.StartLocation, idleTime)) {
                             steeringTime = 0;
 
                             // Finalize block dual costs by adding to actual costs
                             int idleStartTime = arc.StartTime + arc.DeadheadTemplate.Duration;
                             int idleEndTime = arc.EndTime;
-                            string descriptor = blockDescriptorStart + "#" + Descriptor.Create(targetTrip.From, idleStartTime);
+                            string descriptor = blockDescriptorStart + "#" + Descriptor.Create(targetTrip.StartLocation, idleStartTime);
                             costs -= blockDualCosts.GetValueOrDefault(descriptor);
 
                             // Initialize new range
-                            blockDescriptorStart = Descriptor.Create(targetTrip.From, idleEndTime);
+                            blockDescriptorStart = Descriptor.Create(targetTrip.StartLocation, idleEndTime);
                             minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                             maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
-                        if (targetTrip != null && targetTrip.From.CrewBase && idleTime >= targetTrip.From.MinHandoverTime) {
+                        if (targetTrip != null && targetTrip.StartLocation.CrewBase && idleTime >= targetTrip.StartLocation.MinHandoverTime) {
                             hubTime = 0;
                         }
 
-                        if (canCharge == 0 && targetTrip != null && !targetTrip.From.FreeIdle) {
+                        if (canCharge == 0 && targetTrip != null && !targetTrip.StartLocation.FreeIdle) {
                             // Idle is after adjust SoC
                             SoC -= idleTime * vss.VehicleType.IdleUsage;
                             if (SoC < vss.VehicleType.MinSoC) continue;
@@ -305,11 +305,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     for (int j = 0; j < vss.Instance.ChargingLocations.Count; j++) {
                         Location candidateLocation = vss.Instance.ChargingLocations[j];
                         // Dont allow detour to already visited location
-                        if (candidateLocation.Index == arc.DeadheadTemplate.From.Index ||
+                        if (candidateLocation.Index == arc.DeadheadTemplate.StartLocation.Index ||
                             candidateLocation.Index == arc.DeadheadTemplate.To.Index) continue;
 
                         // Check if detour is possible
-                        DeadheadTemplate? dht1 = vss.LocationDHT[arc.DeadheadTemplate.From.Index][candidateLocation.Index];
+                        DeadheadTemplate? dht1 = vss.LocationDHT[arc.DeadheadTemplate.StartLocation.Index][candidateLocation.Index];
                         DeadheadTemplate? dht2 = vss.LocationDHT[candidateLocation.Index][arc.DeadheadTemplate.To.Index];
 
                         // Not possible to do deadhead 
@@ -475,9 +475,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                     if (curr.label.ChargeTime == ChargeTime.Detour) {
                         int fromIndex = prev.nodeIndex < vss.Instance.Trips.Count
-                            ? vss.Instance.Trips[prev.nodeIndex].To.Index
+                            ? vss.Instance.Trips[prev.nodeIndex].EndLocation.Index
                             : vss.Instance.Locations.FindIndex(x => x.IsDepot);
-                        int toIndex = trip.From.Index;
+                        int toIndex = trip.StartLocation.Index;
                         DeadheadTemplate dht1 = vss.LocationDHT[fromIndex][curr.label.ChargeLocationIndex]!;
                         DeadheadTemplate dht2 = vss.LocationDHT[curr.label.ChargeLocationIndex][toIndex]!;
 
@@ -555,7 +555,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                         if (currTime != trip.StartTime) {
                             int timeIndIdle = trip.StartTime - currTime;
-                            taskElements.Add(new VEIdle(trip.From, currTime, trip.StartTime) {
+                            taskElements.Add(new VEIdle(trip.StartLocation, currTime, trip.StartTime) {
                                 StartSoCInTask = CurrSoC,
                                 EndSoCInTask = CurrSoC - timeIndIdle * vss.VehicleType.IdleUsage
                             });

@@ -25,8 +25,8 @@ namespace E_VCSP.Parsing {
 
             return new Trip() {
                 Route = line[attributeIndexMapping["Route"]],
-                From = from,
-                To = to,
+                StartLocation = from,
+                EndLocation = to,
                 StartTime = ParseTime(line[attributeIndexMapping["StartTime"]]),
                 EndTime = ParseTime(line[attributeIndexMapping["EndTime"]]),
                 Duration = ParseTime(line[attributeIndexMapping["Duration"]]),

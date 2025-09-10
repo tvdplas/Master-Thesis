@@ -81,8 +81,8 @@ namespace E_VCSP.Objects {
             SoCDiff = -trip.Distance * vt.DriveUsage;
             StartTime = trip.StartTime;
             EndTime = trip.EndTime;
-            StartLocation = trip.From;
-            EndLocation = trip.To;
+            StartLocation = trip.StartLocation;
+            EndLocation = trip.EndLocation;
         }
 
         public override string ToString() {
@@ -100,14 +100,14 @@ namespace E_VCSP.Objects {
         public bool IdleAtStart {
             get {
                 // Prioritize time at depot
-                bool fromDepot = DeadheadTemplate.From.IsDepot;
+                bool fromDepot = DeadheadTemplate.StartLocation.IsDepot;
                 if (fromDepot) return true;
 
                 bool toDepot = DeadheadTemplate.To.IsDepot;
                 if (toDepot) return false;
 
                 // Then prioritize time at handover
-                bool fromHandover = DeadheadTemplate.From.HandoverAllowed;
+                bool fromHandover = DeadheadTemplate.StartLocation.HandoverAllowed;
                 bool toHandover = DeadheadTemplate.To.HandoverAllowed;
                 return fromHandover || !fromHandover && !toHandover;
             }
@@ -128,10 +128,10 @@ namespace E_VCSP.Objects {
             StartTime = startTime;
             DeadheadTemplate = dht;
             EndTime = endTime;
-            StartLocation = dht.From;
+            StartLocation = dht.StartLocation;
             EndLocation = dht.To;
 
-            Location idleLocation = IdleAtStart ? DeadheadTemplate.From : DeadheadTemplate.To;
+            Location idleLocation = IdleAtStart ? DeadheadTemplate.StartLocation : DeadheadTemplate.To;
             bool idleAtGarage = idleLocation.BreakAllowed || idleLocation.IsDepot || idleLocation.CanCharge;
             double idleCost = idleAtGarage ? 0 : Constants.VH_IDLE_COST * IdleTime;
             double idleSoCDiff = idleAtGarage ? 0 : -vt.IdleUsage * IdleTime;

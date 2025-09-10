@@ -5,7 +5,7 @@ namespace E_VCSP.Objects.ParsedData {
     /// Non-time bound deadhead.
     /// </summary>
     public class DeadheadTemplate {
-        public Location From;
+        public Location StartLocation;
         public Location To;
         public int Duration;
         public int Distance;
