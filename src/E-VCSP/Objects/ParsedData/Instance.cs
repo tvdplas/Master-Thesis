@@ -57,8 +57,8 @@ namespace E_VCSP.Objects.ParsedData {
             DeadheadTemplates = new ParserDeadheadTemplates().Parse(path, Locations);
             // Add symetric deadheads to model drives back
             var sym = DeadheadTemplates.Select(dh => new DeadheadTemplate {
-                StartLocation = dh.To,
-                To = dh.StartLocation,
+                StartLocation = dh.EndLocation,
+                EndLocation = dh.StartLocation,
                 Distance = dh.Distance,
                 Duration = dh.Duration,
                 Id = $"dht-sym{dh.Id}"
@@ -69,7 +69,7 @@ namespace E_VCSP.Objects.ParsedData {
             foreach (Location loc in Locations) {
                 DeadheadTemplates.Add(new DeadheadTemplate {
                     StartLocation = loc,
-                    To = loc,
+                    EndLocation = loc,
                     Distance = 0,
                     Duration = 0,
                     Id = $"dht-self{DeadheadTemplates.Count}"
@@ -81,7 +81,7 @@ namespace E_VCSP.Objects.ParsedData {
             // take the minimum time / distance. 
             foreach (Location loc1 in Locations) {
                 foreach (Location loc2 in Locations) {
-                    if (ExtendedTemplates.Find(x => x.StartLocation == loc1 && x.To == loc2) != null) continue;
+                    if (ExtendedTemplates.Find(x => x.StartLocation == loc1 && x.EndLocation == loc2) != null) continue;
 
                     // Trip which has this route
                     Trip? trip = Trips.Find(x => x.StartLocation == loc1 && x.EndLocation == loc2);
@@ -90,18 +90,18 @@ namespace E_VCSP.Objects.ParsedData {
 
                     // Via other point (probably depot)
                     Location? loc3 = Locations.Find(x =>
-                        ExtendedTemplates.Find(y => y.StartLocation == loc1 && y.To == x) != null
-                        && ExtendedTemplates.Find(y => y.StartLocation == x && y.To == loc2) != null
+                        ExtendedTemplates.Find(y => y.StartLocation == loc1 && y.EndLocation == x) != null
+                        && ExtendedTemplates.Find(y => y.StartLocation == x && y.EndLocation == loc2) != null
                     );
-                    DeadheadTemplate? dht1 = ExtendedTemplates.Find(y => y.StartLocation == loc1 && y.To == loc3);
-                    DeadheadTemplate? dht2 = ExtendedTemplates.Find(y => y.StartLocation == loc3 && y.To == loc2);
+                    DeadheadTemplate? dht1 = ExtendedTemplates.Find(y => y.StartLocation == loc1 && y.EndLocation == loc3);
+                    DeadheadTemplate? dht2 = ExtendedTemplates.Find(y => y.StartLocation == loc3 && y.EndLocation == loc2);
 
                     int detourDistance = (dht1 != null && dht2 != null) ? dht1.Distance + dht2.Distance : int.MaxValue;
                     int detourDuration = (dht1 != null && dht2 != null) ? dht1.Duration + dht2.Duration : int.MaxValue;
 
                     ExtendedTemplates.Add(new DeadheadTemplate() {
                         StartLocation = loc1,
-                        To = loc2,
+                        EndLocation = loc2,
                         Duration = Math.Min(tripDuration, detourDuration),
                         Distance = Math.Min(tripDistance, detourDistance),
                         Id = $"dht-generated-{loc1}-{loc2}",

@@ -259,7 +259,7 @@ namespace E_VCSP.Solver.SolutionState {
             foreach (Location l1 in Instance.Locations) {
                 LocationDHT.Add([]);
                 foreach (Location l2 in Instance.Locations) {
-                    DeadheadTemplate? dht = Instance.DeadheadTemplates.Find((x) => x.StartLocation == l1 && x.To == l2);
+                    DeadheadTemplate? dht = Instance.DeadheadTemplates.Find((x) => x.StartLocation == l1 && x.EndLocation == l2);
                     LocationDHT[l1.Index].Add(dht);
                 }
             }
@@ -401,7 +401,7 @@ namespace E_VCSP.Solver.SolutionState {
                 void replace() {
                     Location from = idles[0].ve.StartLocation!;
                     Location to = idles[^1].ve.EndLocation!;
-                    DeadheadTemplate dht = Instance.ExtendedTemplates.Find(x => x.StartLocation == from && x.To == to)!;
+                    DeadheadTemplate dht = Instance.ExtendedTemplates.Find(x => x.StartLocation == from && x.EndLocation == to)!;
                     double startSoC = idles[0].ve.StartSoCInTask;
                     double endSoC = idles[^1].ve.EndSoCInTask;
                     int startTime = idles[0].ve.StartTime;

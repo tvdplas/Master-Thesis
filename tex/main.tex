@@ -1,6 +1,5 @@
 \documentclass[]{article}
 \input{preamble.tex}
-
 \input{tikz-setup.tex}
 
 \begin{document}
@@ -113,6 +112,24 @@ These vehicle handovers are often only possible at a predetermined set of locati
 As not all locations are suitable for handovers, a sequence of trips and deadheads which does not visit a relief point must be driven by a single driver. Such a sequence which starts and ends at a relief location is called a block, and represents the smallest unit of work that can be performed by a driver. Both vehicle and driver schedules can be seen as a collection of blocks, with possible idle time and break times to connect the blocks.
 
 Overall, the goal is to find a set of feasible vehicle and crew schedules that minimizes costs. In this, vehicle schedules must ensure that each trip is driven while minimizing deadhead and charging costs. These schedules must also ensure that enough charging takes place such that the vehicle state of charge is within acceptable levels. Crew schedules, on the other hand, must ensure that each driven block is covered. While doing so, local labor regulations must be taken into account.
+
+% \begin{table}[h]
+%   \centering
+%   \begin{tabular}{ll}
+%     \toprule
+%     \multicolumn{1}{l}{\textbf{Term}} & \multicolumn{1}{l}{\textbf{Definition}}               \\
+%     (Vehicle) Task & A schedule for a vehicle throughout the day. Includes driving, charging and idle time. \\
+%     Deadhead & A travel without passengers between two locations. \\
+%     (Crew) Duty & A schedule for a crew member throughout the day. Includes driving, breaks and idle time. \\
+%     Block & A sequence of trips and/or deadheads which must be driving by the same driver. \\
+%     Relief point & A location at which a crew member may perform a handover or break. \\
+%     Crew base & A location where a crew member may start/end their day. \\
+%     \addlinespace[0.2em]
+%     \bottomrule
+%   \end{tabular}
+%   \caption{Terminology used in the problem}
+%   \label{tab:terminology}
+% \end{table}
 
 \begin{table}[h]
   \centering
@@ -726,6 +743,6 @@ Checking for feasibility during propagation can however only be done for a subse
 Once propagation has completed, the duties described by the labels in $cb_e$ can be finalized. Only then can we do our full feasibility check, discarding any labels which are not valid given their state in $cb_e$. As with the E-VSP, what remains is a list of labels which describe feasible duties which can be sorted on non-decreasing reduced cost. We will then take at most $N_{\textit{CD,LB}}$ of these duties with negative reduced cost, prioritizing block-disjoint duties. Next, secondary columns are generated for the best $M_{\textit{CD,LB}} \leq N_{\textit{CD,LB}}$ of the found duties. After this, the complete set of duties is made available to the LP relaxation, before repeating the process with new values of $\tau$. 
 
 \section{Results}
-\todo{Hier iets zeggen over de instanties, het feit dat daar ook gelopen mag worden tussen locaties maar dat dit verwerkt is in signon/signoff/bruttonetto break tijden}.
+\todo{Hier iets zeggen over de instanties, het feit dat daar ook gelopen mag worden tussen locaæties maar dat dit verwerkt is in signon/signoff/bruttonetto break tijden}.
 \printbibliography
 \end{document}

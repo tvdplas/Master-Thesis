@@ -181,7 +181,7 @@ namespace E_VCSP.Objects {
             DeadheadTemplate = dht;
             EndTime = startTime + dht.Duration;
             StartLocation = dht.StartLocation;
-            EndLocation = dht.To;
+            EndLocation = dht.EndLocation;
 
             Cost = dht.Distance * Constants.VH_M_COST;
             SoCDiff = -(dht.Distance * vt.DriveUsage);

@@ -50,7 +50,7 @@ namespace E_VCSP.Objects {
                         EndTime = ved.EndTime,
                         StartTime = ved.StartTime,
                         StartLocation = ved.DeadheadTemplate.StartLocation,
-                        EndLocation = ved.DeadheadTemplate.To,
+                        EndLocation = ved.DeadheadTemplate.EndLocation,
                         Type = BlockElementType.Deadhead,
                     });
                 }
@@ -174,20 +174,21 @@ namespace E_VCSP.Objects {
         }
 
         public static List<(Block block, int count)> FromVehicleTasks(List<VehicleTask> vts) {
-            List<Block> selectedBlocks = vts.SelectMany(t => Block.FromVehicleTask(t))
-                .Select((b, i) => { b.Index = i; return b; })
-                .ToList();
+            List<Block> selectedBlocks = vts.SelectMany(t => Block.FromVehicleTask(t)).ToList();
             Dictionary<string, (Block firstRef, int count)> blockCounts = new();
             foreach (Block block in selectedBlocks) {
                 string descriptor = block.Descriptor;
-                if (!blockCounts.ContainsKey(descriptor)) blockCounts[descriptor] = (block, 1);
-                else {
-                    (Block firstRef, int count) = blockCounts[descriptor];
-                    blockCounts[descriptor] = (firstRef, count + 1);
-                }
+                blockCounts.TryAdd(descriptor, (block, 0));
+                var curr = blockCounts[descriptor];
+                blockCounts[descriptor] = (curr.firstRef, curr.count + 1);
             }
 
-            return blockCounts.Values.ToList();
+            // reindex after all blocks descriptors are unique
+            var blockCountVals = blockCounts.Values.ToList();
+            for (int i = 0; i < blockCountVals.Count; i++) {
+                blockCountVals[i].firstRef.Index = i;
+            }
+            return blockCountVals;
         }
 
         public override string ToString() {

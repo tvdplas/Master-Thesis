@@ -103,12 +103,12 @@ namespace E_VCSP.Objects {
                 bool fromDepot = DeadheadTemplate.StartLocation.IsDepot;
                 if (fromDepot) return true;
 
-                bool toDepot = DeadheadTemplate.To.IsDepot;
+                bool toDepot = DeadheadTemplate.EndLocation.IsDepot;
                 if (toDepot) return false;
 
                 // Then prioritize time at handover
                 bool fromHandover = DeadheadTemplate.StartLocation.HandoverAllowed;
-                bool toHandover = DeadheadTemplate.To.HandoverAllowed;
+                bool toHandover = DeadheadTemplate.EndLocation.HandoverAllowed;
                 return fromHandover || !fromHandover && !toHandover;
             }
         }
@@ -129,9 +129,9 @@ namespace E_VCSP.Objects {
             DeadheadTemplate = dht;
             EndTime = endTime;
             StartLocation = dht.StartLocation;
-            EndLocation = dht.To;
+            EndLocation = dht.EndLocation;
 
-            Location idleLocation = IdleAtStart ? DeadheadTemplate.StartLocation : DeadheadTemplate.To;
+            Location idleLocation = IdleAtStart ? DeadheadTemplate.StartLocation : DeadheadTemplate.EndLocation;
             bool idleAtGarage = idleLocation.BreakAllowed || idleLocation.IsDepot || idleLocation.CanCharge;
             double idleCost = idleAtGarage ? 0 : Constants.VH_IDLE_COST * IdleTime;
             double idleSoCDiff = idleAtGarage ? 0 : -vt.IdleUsage * IdleTime;

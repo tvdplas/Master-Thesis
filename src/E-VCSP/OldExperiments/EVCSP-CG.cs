@@ -103,16 +103,17 @@ namespace E_VCSP.OldExperiments {
             vss.RemoveOvercoverageFromTasks(selectedTasks);
             return selectedTasks;
         }
-        private List<CrewDuty> getSelectedDuties() {
+        private List<(CrewDuty duty, int count)> getSelectedDuties() {
             if (model == null) throw new InvalidOperationException("Cannot generate solution graph without model instance");
 
-            List<CrewDuty> duties = [];
+            List<(CrewDuty duty, int count)> duties = [];
             int[] covered = new int[css.Blocks.Count];
             foreach (GRBVar v in model.GetVars()) {
                 if (v.VarName.StartsWith("cd_") && v.X > 0) {
+                    int count = (int)v.X;
                     CrewDuty dvt = css.VarnameDutyMapping[v.VarName];
-                    duties.Add(dvt);
-                    foreach (int i in dvt.BlockIndexCover) covered[i]++;
+                    duties.Add((dvt, count));
+                    foreach (int i in dvt.BlockIndexCover) covered[i] += count;
                 }
             }
 
@@ -130,7 +131,7 @@ namespace E_VCSP.OldExperiments {
             return duties;
         }
 
-        private (List<VehicleTask>, List<(Block block, int count)>, List<CrewDuty>) finalizeResults(bool console) {
+        private (List<VehicleTask>, List<(Block block, int count)>, List<(CrewDuty duty, int count)>) finalizeResults(bool console) {
             var selectedTasks = getSelectedTasks(console);
             var selectedBlocksWithCount = Block.FromVehicleTasks(selectedTasks);
             var selectedDuties = getSelectedDuties();

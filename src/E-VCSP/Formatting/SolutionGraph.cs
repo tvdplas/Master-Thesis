@@ -3,9 +3,19 @@
 namespace E_VCSP.Formatting {
     public static class SolutionGraph {
         public static List<List<RosterNode>> GenerateVehicleTaskGraph(List<VehicleTask> tasks) {
-
             List<List<RosterNode>> rosterNodes = [];
             tasks = tasks.OrderBy(x => x.Elements[0].StartTime).ToList();
+            Dictionary<int, int> tripCount = [];
+            for (int i = 0; i < tasks.Count; i++) {
+                VehicleTask vt = tasks[i];
+                for (int j = 0; j < vt.Elements.Count; j++) {
+                    if (vt.Elements[j].Type == VEType.Trip) {
+                        int ti = ((VETrip)vt.Elements[j]).Trip.Index;
+                        tripCount.TryAdd(ti, 0);
+                        tripCount[ti]++;
+                    }
+                }
+            }
 
             for (int i = 0; i < tasks.Count; i++) {
                 var task = tasks[i];
@@ -29,16 +39,16 @@ namespace E_VCSP.Formatting {
                         }
                     }
                     else if (element is VETrip vet) {
-                        color = System.Drawing.Color.LightBlue;
+                        color = tripCount[vet.Trip.Index] == 1 ? System.Drawing.Color.LightBlue : Color.FromArgb(119, 166, 181);
                         content = $"{vet.Trip.StartLocation}@{SoCAtStart}% -> {vet.Trip.EndLocation}@{SoCAtEnd}% ({vet.Trip.Route} / {vet.Trip.Id})";
                     }
                     else if (element is VEDeadhead ved) {
                         if (element.Postprocessed) {
-                            content = $"POST {ved.DeadheadTemplate.StartLocation}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
+                            content = $"POST {ved.DeadheadTemplate.StartLocation}@{SoCAtStart}% -> {ved.DeadheadTemplate.EndLocation}@{SoCAtEnd}%";
                             color = System.Drawing.Color.Olive;
                         }
                         else {
-                            content = $"{ved.DeadheadTemplate.StartLocation}@{SoCAtStart}% -> {ved.DeadheadTemplate.To}@{SoCAtEnd}%";
+                            content = $"{ved.DeadheadTemplate.StartLocation}@{SoCAtStart}% -> {ved.DeadheadTemplate.EndLocation}@{SoCAtEnd}%";
                             color = System.Drawing.Color.LightGreen;
                         }
                     }
@@ -71,6 +81,16 @@ namespace E_VCSP.Formatting {
         public static List<List<RosterNode>> GenerateBlockGraph(List<List<Block>> blockRows) {
             blockRows = blockRows.OrderBy(x => x[0].StartTime).ToList();
 
+            Dictionary<int, int> blockCount = [];
+            for (int i = 0; i < blockRows.Count; i++) {
+                List<Block> blocks = blockRows[i];
+                for (int j = 0; j < blocks.Count; j++) {
+                    int bi = blocks[j].Index;
+                    blockCount.TryAdd(bi, 0);
+                    blockCount[bi]++;
+                }
+            }
+
             List<List<RosterNode>> taskNodes = [];
 
             for (int i = 0; i < blockRows.Count; i++) {
@@ -78,11 +98,15 @@ namespace E_VCSP.Formatting {
                 List<RosterNode> pathNodes = [];
                 for (int j = 0; j < task.Count; j++) {
                     Block block = task[j];
+                    Color blockColor = Color.LightBlue;
+                    if (block.Index != -1 && blockCount[block.Index] != 1) blockColor = Color.FromArgb(119, 166, 181);
+                    if (block.EndTime - block.StartTime > Constants.MAX_STEERING_TIME) blockColor = Color.Red;
+
                     pathNodes.Add(new RosterNode() {
                         StartTime = block.StartTime,
                         EndTime = block.EndTime,
                         Content = $"{block.StartLocation} -> {block.EndLocation} ({block.Index})",
-                        Color = block.EndTime - block.StartTime > Constants.MAX_STEERING_TIME ? Color.Red : Color.LightBlue
+                        Color = blockColor
                     });
 
                     if (j + 1 < task.Count && block.EndTime < task[j + 1].StartTime) {
@@ -108,8 +132,22 @@ namespace E_VCSP.Formatting {
             return taskNodes;
         }
 
-        public static List<List<RosterNode>> GenerateCrewDutyGraph(List<CrewDuty> duties) {
-            duties = duties.OrderBy(x => x.Elements[0].StartTime).ToList();
+        public static List<List<RosterNode>> GenerateCrewDutyGraph(List<(CrewDuty duty, int count)> dutiesWithCount) {
+            List<CrewDuty> duties = dutiesWithCount
+                .SelectMany(x => Enumerable.Repeat(x.duty, x.count))
+                .OrderBy(x => x.Elements[0].StartTime).ToList();
+
+            Dictionary<int, int> blockCount = [];
+            for (int i = 0; i < duties.Count; i++) {
+                var elems = duties[i].Elements;
+                for (int j = 0; j < elems.Count; j++) {
+                    if (elems[j] is CDEBlock cdeb) {
+                        int bi = cdeb.Block.Index;
+                        blockCount.TryAdd(bi, 0);
+                        blockCount[bi]++;
+                    }
+                }
+            }
 
             List<List<RosterNode>> taskNodes = [];
 
@@ -150,6 +188,7 @@ namespace E_VCSP.Formatting {
                         }
                         else if (element is CDEBlock cdebl) {
                             color = Color.LightBlue;
+                            color = blockCount[cdebl.Block.Index] == 1 ? Color.LightBlue : Color.FromArgb(119, 166, 181);
                             content = $"{cdebl.StartLocation} -> {cdebl.EndLocation} ({cdebl.Block.Index})";
                         }
                         else if (element is CDETravel cdet) {

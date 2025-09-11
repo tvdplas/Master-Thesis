@@ -71,31 +71,35 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         if (afterBreaks.Sum(x => x.breakTime) < 40 * 60 || afterBreaks.FindIndex(x => x.breakTime >= 20 * 60) == -1) return false;
                     }
                 }
-                // Continouos shift
+                // Continuos shift
                 else {
                     int duration = currEndTime - StartTime;
                     if (duration > 4 * 60 * 60 && duration <= 5.5 * 60 * 60) {
-                        // At least 1 of >= 15 min
+                        // At least 1 of >= 15 min, 15 min is already ensured due to break arc construction
                         if (Breaks.Count == 0) return false;
                     }
                     else if (duration > 5 * 60 * 60) {
+                        int breakSum = 0;
+                        bool longBreakIncluded = false;
+                        foreach ((_, int bt) in Breaks) {
+                            breakSum += bt;
+                            if (bt >= 20 * 60) longBreakIncluded = true;
+                        }
                         // >= 40 min, at least one >= 20 min
-                        if (Breaks.Sum(x => x.breakTime) < 40 * 60 || Breaks.FindIndex(x => x.breakTime >= 20 * 60) == -1) return false;
+                        if (breakSum < 40 * 60 || !longBreakIncluded) return false;
                     }
                 }
 
                 // Extra check for times for late
-                if (Type == DutyType.Late) {
-                    // must be 20 min break between 16:30 and 20:30 if starting before 15:00
-                    if (
-                        StartTime < 15 * 60 * 60
-                        && currEndTime >= 20.5 * 60 * 60
-                        && Breaks.FindIndex(
-                            x => x.breakTime >= 20 * 60
-                            && x.startTime >= 16.5 * 60 * 60
-                            && x.startTime <= 20.5 * 60 * 60 - x.breakTime
-                        ) == -1
-                    ) return false;
+                // must be 20 min break between 16:30 and 20:30 (used for dinner) if starting before 15:00
+                if (Type == DutyType.Late && StartTime < 15 * 60 * 60) {
+                    bool dinnerBreakIncluded = false;
+                    foreach ((int st, int bt) in Breaks) {
+                        if (st >= 16.5 * 60 * 60 && st + bt <= 20.5 * 60 * 60 && bt >= 20 * 60)
+                            dinnerBreakIncluded = true;
+                    }
+
+                    if (!dinnerBreakIncluded) return false;
                 }
 
                 return true;
@@ -108,11 +112,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
             int duration = currentEndTime - StartTime;
             // Max shift length (normal / broken)
             if (duration > Constants.CR_MAX_SHIFT_LENGTH && Type != DutyType.Broken) return false;
-            if (duration > Constants.CR_MAX_SHIFT_LENGTH + Constants.CR_MAX_LONG_IDLE_TIME) return false;
-            if (Idle.startTime != -1 && duration - Idle.longIdleTime > Constants.CR_MAX_SHIFT_LENGTH) return false;
+            if (duration > Constants.CR_MAX_SHIFT_LENGTH + Constants.CR_MAX_LONG_IDLE_TIME) return false; // upper bound
+            if (Idle.startTime != -1 && duration - Idle.longIdleTime > Constants.CR_MAX_SHIFT_LENGTH) return false; // idle already known
             // No long idles in non-broken shifts
-            if (Type != DutyType.Broken && Idle.startTime != -1)
-                return false;
+            if (Type != DutyType.Broken && Idle.startTime != -1) return false;
             // Shift start / end times
             if (Type == DutyType.Early && currentEndTime > 16.5 * 60 * 60) return false;
             if (Type == DutyType.Day && currentEndTime > 18.25 * 60 * 60) return false;
@@ -120,15 +123,20 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (Type == DutyType.Night && (duration > 7 * 60 * 60 || StartTime > 24 * 60 * 60)) return false;
             if (Type == DutyType.Between && StartTime > 13 * 60 * 60) return false;
             if (Type == DutyType.Broken && (StartTime < 5.5 * 60 * 60 || currentEndTime > 19.5 * 60 * 60)) return false;
+            // Additional check on Broken shifts: if we cant perform a reasonable amount of work anymore after not selected idle, 
+            // prematurely abort
+            if (Type == DutyType.Broken && Idle.startTime == -1) {
+                // No long idle selected yet, so check if we can still do at least one hour of work after a min-length long idle
+                if (currentEndTime + Constants.CR_MIN_LONG_IDLE_TIME + 1 * 60 * 60 > 19.5 * 60 * 60)
+                    return false;
+            }
 
             if (final) {
                 if (Type == DutyType.Broken) {
                     // not broken
-                    if (Idle.startTime == -1)
-                        return false;
+                    if (Idle.startTime == -1) return false;
                     // Too long
-                    if (duration - Idle.longIdleTime > Constants.CR_MAX_SHIFT_LENGTH)
-                        return false;
+                    if (duration - Idle.longIdleTime > Constants.CR_MAX_SHIFT_LENGTH) return false;
                 }
                 // End times in range
                 if (Type == DutyType.Day && !(currentEndTime >= 16.5 * 60 * 60 && currentEndTime <= 18.25 * 60 * 60)) return false;
@@ -136,9 +144,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (Type == DutyType.Night && currentEndTime < 26.5 * 60 * 60) return false;
 
             }
-            if (!breaksFeasible(currentEndTime, final)) return false;
 
-            return true;
+            return breaksFeasible(currentEndTime, final);
         }
 
         public override string ToString() {
@@ -156,7 +163,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         internal CSPLabeling(CrewSolutionState css) : base(css) { }
 
         private void reset() {
-            blockedBlock = [.. css.BlockCount.Select(x => x == 0), false, false]; // Only use blocks which are active
+            blockedBlock = [.. css.BlockCount.Select(x => x == 0), false, false]; // Only use blocks which are active, depot start/end always active
             allLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
             activeLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
         }
@@ -181,7 +188,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 int rho_broken = dt == DutyType.Broken ? 1 : 0;
                 int rho_between = dt == DutyType.Between ? 1 : 0;
 
-                double baseCost = Config.CR_SHIFT_COST + rho_broken * Constants.CR_BROKEN_SHIFT_COST;
+                double baseCost = Config.CR_SHIFT_COST;
+                baseCost += rho_broken * Constants.CR_BROKEN_SHIFT_COST;
                 baseCost -= maxBrokenDualCost * (Constants.CR_MAX_BROKEN_SHIFTS - rho_broken);
                 baseCost -= maxBetweenDualCost * (Constants.CR_MAX_BETWEEN_SHIFTS - rho_between);
 
@@ -208,15 +216,15 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             while (allLabels[^1].Count < Config.CSP_LB_MAX_LABELS_IN_END && activeLabelsWithContent.Count > 0) {
                 // Find node with active label
-                int xxx = LSShared.random.Next(0, activeLabelsWithContent.Count);
-                (List<CSPLabel> targetLabels, int currentNodeIndex) = activeLabelsWithContent[xxx];
+                int labelListIndex = LSShared.random.Next(activeLabelsWithContent.Count);
+                (List<CSPLabel> targetLabels, int currentNodeIndex) = activeLabelsWithContent[labelListIndex];
                 CSPLabel currentLabel = targetLabels[^1];
                 targetLabels.RemoveAt(targetLabels.Count - 1);
 
                 if (targetLabels.Count == 0) {
                     // Move last item in activeLabels to position which is now empty
-                    activeLabelsWithContent[xxx] = activeLabelsWithContent[^1];
-                    indexInWithContent[activeLabelsWithContent[xxx].nodeIndex] = xxx;
+                    activeLabelsWithContent[labelListIndex] = activeLabelsWithContent[^1];
+                    indexInWithContent[activeLabelsWithContent[labelListIndex].nodeIndex] = labelListIndex;
 
                     // Reset the now empty label collection, remove it 
                     indexInWithContent[currentNodeIndex] = -1;
@@ -225,6 +233,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 // Expand node if possible 
                 for (int targetBlockIndex = 0; targetBlockIndex < css.Blocks.Count + 2; targetBlockIndex++) {
+                    // Cant travel to blocked node / starting depot
                     if (targetBlockIndex == css.Blocks.Count || blockedBlock[targetBlockIndex]) continue;
 
                     BlockArc? arc = css.AdjFull[currentNodeIndex][targetBlockIndex];
@@ -260,8 +269,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     };
 
                     if (!newLabel.isFeasible(currentEndTime, false)) continue;
-
-                    // Dominated if feasible and less coverage (i think)
                     else addLabel(newLabel, targetBlockIndex);
                 }
             }

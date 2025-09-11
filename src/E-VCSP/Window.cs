@@ -92,8 +92,10 @@ namespace E_VCSP {
                     };
                     comboBox.Items.AddRange(Enum.GetNames(field.FieldType));
                     comboBox.SelectedItem = field.GetValue(null)?.ToString();
-                    comboBox.SelectedIndexChanged += (sender, e) =>
+                    comboBox.SelectedIndexChanged += (sender, e) => {
                         field.SetValue(null, Enum.Parse(field.FieldType, comboBox.SelectedItem?.ToString() ?? ""));
+                        Console.WriteLine($"Update {field.Name} to value {comboBox.SelectedItem?.ToString() ?? ""}");
+                    };
                     inputControl = comboBox;
                 }
                 else if (field.FieldType == typeof(bool)) {
@@ -101,7 +103,11 @@ namespace E_VCSP {
                         Checked = (bool)(field.GetValue(null) ?? false),
                         Location = new System.Drawing.Point(150, yOffset),
                     };
-                    check.CheckedChanged += (_, _) => field.SetValue(null, check.Checked);
+                    check.CheckedChanged += (_, _) => {
+                        field.SetValue(null, check.Checked);
+                        Console.WriteLine($"Update {field.Name} to {check.Checked}");
+                    };
+
                     inputControl = check;
                 }
                 else {
@@ -115,14 +121,21 @@ namespace E_VCSP {
         }
 
         private static void UpdateString(FieldInfo field, string text) {
-            if (field.FieldType == typeof(string))
+            bool succes = false;
+            if (field.FieldType == typeof(string)) {
                 field.SetValue(null, text);
+                Console.WriteLine($"Update {field.Name} to value {text}");
+            }
 
-            if (field.FieldType == typeof(int) && int.TryParse(text, out int i))
+            if (field.FieldType == typeof(int) && int.TryParse(text, out int i)) {
                 field.SetValue(null, i);
+                Console.WriteLine($"Update {field.Name} to value {i}");
+            }
 
-            if (field.FieldType == typeof(double) && double.TryParse(text, out double d))
+            if (field.FieldType == typeof(double) && double.TryParse(text, out double d)) {
                 field.SetValue(null, d);
+                Console.WriteLine($"Update {field.Name} to value {d}");
+            }
         }
 
         private void loadButtonClick(object sender, EventArgs e) {

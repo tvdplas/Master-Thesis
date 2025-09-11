@@ -11,7 +11,7 @@ namespace E_VCSP.Solver.SolutionState {
         [JsonInclude]
         public List<BlockDump> blocks = [];
         [JsonInclude]
-        public List<CrewDuty> selectedDuties = [];
+        public List<(CrewDuty duty, int count)> selectedDuties = [];
     }
 
     public enum BlockArcType {
@@ -44,7 +44,7 @@ namespace E_VCSP.Solver.SolutionState {
         public List<Block> Blocks = [];
         public List<int> BlockCount = [];
 
-        public List<CrewDuty> SelectedDuties = [];
+        public List<(CrewDuty duty, int count)> SelectedDuties = [];
         public List<CrewDuty> Duties = [];
         public Dictionary<string, CrewDuty> VarnameDutyMapping = [];
         public Dictionary<BitArray, CrewDuty> CoverDutyMapping = new(new Utils.BitArrayComparer());
@@ -78,7 +78,8 @@ namespace E_VCSP.Solver.SolutionState {
                 return Block.FromDescriptor(startLocation, b.StartTime, endLocation, b.EndTime);
             }).ToList();
 
-            List<CrewDuty> duties = dump.selectedDuties.Select((d, i) => {
+            List<CrewDuty> duties = dump.selectedDuties.Select((dc, i) => {
+                CrewDuty d = dc.duty;
                 d.BlockIndexCover = [];
                 d.Elements = d.Elements.Select(e => {
                     e.StartLocation = Instance.Locations.Find(l => l.Id == e.StartLocation.Id)!;
@@ -103,7 +104,7 @@ namespace E_VCSP.Solver.SolutionState {
             Blocks = blocks;
             ResetFromBlocks();
             Duties.AddRange(duties);
-            SelectedDuties = duties;
+            SelectedDuties = duties.Select((d, i) => (d, dump.selectedDuties[i].count)).ToList();
 
             PrintCostBreakdown();
         }
@@ -242,18 +243,44 @@ namespace E_VCSP.Solver.SolutionState {
             double brokenDutySlack = 0,
             double betweenDutySlack = 0
         ) {
-            double countPenalty = countSlack * Config.VH_OVER_MAX_COST;
+            double countPenalty = countSlack * Config.CR_OVER_MAX_COST;
             double avgPenalty = avgDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
             double longPenalty = longDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
             double maxBrokenPenalty = brokenDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
             double maxBetweenPenalty = betweenDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
             double totalPenalty = countPenalty + avgPenalty + longPenalty + maxBrokenPenalty + maxBetweenPenalty;
+
+            double workingHours = SelectedDuties.Sum(x => x.duty.Duration * x.count) / 60.0 / 60.0;
+            double blockHours = SelectedDuties.Sum(x => x.count * x.duty.Elements.Sum(y => {
+                if (y is CDEBlock) return y.EndTime - y.StartTime;
+                else return 0;
+            })) / 60.0 / 60.0;
+            double blockDrivingHours = SelectedDuties.Sum(x => x.count * x.duty.Elements.Sum(y => {
+                if (y is CDEBlock b) return b.Block.Elements.Sum(z => {
+                    if (z is BETrip) return z.EndTime - z.StartTime;
+                    else return 0;
+                });
+                else return 0;
+            })) / 60.0 / 60.0;
+            double breakHours = SelectedDuties.Sum(x => x.count * x.duty.Elements.Sum(y => {
+                if (y is CDEBreak) return y.EndTime - y.StartTime;
+                else return 0;
+            })) / 60.0 / 60.0;
+
             string breakdown =
             $"""
-            Overall crew costs: {SelectedDuties.Sum(x => x.Cost) + totalPenalty}
+            Overall crew costs: {SelectedDuties.Sum(x => x.count * x.duty.Cost) + totalPenalty}
             Cost breakdown:
-            Crew duties: {SelectedDuties.Sum(x => x.Cost)}
-                Single shifts: {SelectedDuties.Sum(x => x.Type == DutyType.Single ? 1 : 0) * Config.CR_SINGLE_SHIFT_COST} (included in duty costs)
+            Crew duties: {SelectedDuties.Sum(x => x.count * x.duty.Cost)}
+                Overall paid time: {workingHours * Constants.CR_HOURLY_COST} ({workingHours.ToString("0.##")}h)
+                    Block: {blockHours * Constants.CR_HOURLY_COST} ({blockHours.ToString("0.##")}h)
+                        Driving: {blockDrivingHours * Constants.CR_HOURLY_COST} ({blockDrivingHours.ToString("0.##")}h)
+                        Idle: {(blockHours - blockDrivingHours) * Constants.CR_HOURLY_COST} ({(blockHours - blockDrivingHours).ToString("0.##")}h)
+                    Break: {breakHours * Constants.CR_HOURLY_COST} ({blockHours.ToString("0.##")}h)
+                    Other: {(workingHours - blockHours - breakHours) * Constants.CR_HOURLY_COST} ({(workingHours - blockHours - breakHours).ToString("0.##")}h)
+                Base duty cost: {SelectedDuties.Count * Config.CR_SHIFT_COST}
+                Broken duty costs: {SelectedDuties.Count * Constants.CR_BROKEN_SHIFT_COST}
+                Single duties: {SelectedDuties.Sum(x => x.count * (x.duty.Type == DutyType.Single ? 1 : 0)) * Config.CR_SINGLE_SHIFT_COST}
             Penalties:
                 Duty slack: {countSlack * Config.CR_OVER_MAX_COST}
                 Avg duty length slack: {avgPenalty}

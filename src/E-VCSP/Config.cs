@@ -103,12 +103,12 @@
         public static int VCSP_ROUNDS = 10;
         public static int VCSP_VH_ITS_INIT = 20;
         public static int VCSP_VH_ITS_ROUND = 10;
-        public static int VCSP_CR_ITS_INIT = 3;
-        public static int VCSP_CR_ITS_ROUND = 3;
+        public static int VCSP_CR_ITS_INIT = 20;
+        public static int VCSP_CR_ITS_ROUND = 20;
         public static int VCSP_VH_INSTANCES = 1;
         public static int VCSP_CR_INSTANCES = 5;
-        public static int VCSP_MAX_TASKS_DURING_SOLVE = 20000;
-        public static int VCSP_MAX_DUTIES_DURING_SOLVE = 20000;
+        public static int VCSP_MAX_TASKS_DURING = 20000;
+        public static int VCSP_MAX_DUTIES_DURING = 20000;
         public static bool VCSP_VH_CSTR_SLACK = true;
         public static bool VCSP_CR_MAX_CSTR_SLACK = true;
         public static bool VCSP_CR_OTH_CSTR_SLACK = false;
@@ -120,5 +120,8 @@
         public static double LANGRANGE_THRS = 0.01; // % diff between two sequential solutions to be considered "done"
         public static int LANGRANGE_THRS_SEQ = 5; // number of sequential rounds within threshold to be considered done
         public static int LANGRANGE_MAX_ROUNDS = 5000; // number of sequential rounds within threshold to be considered done
+        public static bool LAGRANGE_APPLY_DISRUPTION = false;
+        public static double LAGRANGE_DISRUPT_LWR = 0.9;
+        public static double LAGRANGE_DISRUPT_UPR = 1.1;
     }
 }

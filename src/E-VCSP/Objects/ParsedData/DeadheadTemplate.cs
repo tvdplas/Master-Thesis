@@ -6,7 +6,7 @@ namespace E_VCSP.Objects.ParsedData {
     /// </summary>
     public class DeadheadTemplate {
         public Location StartLocation;
-        public Location To;
+        public Location EndLocation;
         public int Duration;
         public int Distance;
         [JsonInclude]

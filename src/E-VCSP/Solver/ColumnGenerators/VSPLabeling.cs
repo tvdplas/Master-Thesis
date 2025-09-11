@@ -306,11 +306,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         Location candidateLocation = vss.Instance.ChargingLocations[j];
                         // Dont allow detour to already visited location
                         if (candidateLocation.Index == arc.DeadheadTemplate.StartLocation.Index ||
-                            candidateLocation.Index == arc.DeadheadTemplate.To.Index) continue;
+                            candidateLocation.Index == arc.DeadheadTemplate.EndLocation.Index) continue;
 
                         // Check if detour is possible
                         DeadheadTemplate? dht1 = vss.LocationDHT[arc.DeadheadTemplate.StartLocation.Index][candidateLocation.Index];
-                        DeadheadTemplate? dht2 = vss.LocationDHT[candidateLocation.Index][arc.DeadheadTemplate.To.Index];
+                        DeadheadTemplate? dht2 = vss.LocationDHT[candidateLocation.Index][arc.DeadheadTemplate.EndLocation.Index];
 
                         // Not possible to do deadhead 
                         if (dht1 == null || dht2 == null) continue;

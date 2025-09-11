@@ -162,6 +162,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
         ];
 
         public bool IsFeasible(DutyType dt, bool final = false) {
+            if (dt == DutyType.Single) return false;
+
             if (final) {
                 if (!head!.CDE.StartLocation.CrewBase || !tail!.CDE.EndLocation.CrewBase) return false;
             }
@@ -278,6 +280,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 }
             }
 
+            feasibleTypes.Add(DutyType.Single);
             return feasibleTypes;
         }
 
