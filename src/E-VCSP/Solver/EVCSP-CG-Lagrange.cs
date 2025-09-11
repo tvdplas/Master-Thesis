@@ -94,19 +94,7 @@ namespace E_VCSP.Solver {
             // Add single duties if local search was not able to cover all blocks
             foreach (var b in css.Blocks) {
                 if (initialDutyCovering.Contains(b.Descriptor)) continue;
-                if (b.Descriptor == "1#24420#0#25020") {
-                    int x = 0;
-                    Console.WriteLine(x);
-                }
                 initialDuties.Add(new CrewDuty([new CDEBlock(b)]) { Type = DutyType.Single });
-            }
-
-            foreach (var vt in vss.Tasks) {
-                foreach (var s in vt.BlockDescriptorCover) {
-                    if (s == "1#24420#0#25020") {
-                        Console.WriteLine("huh");
-                    }
-                }
             }
 
             css.Duties = initialDuties.Select((x, i) => {
@@ -613,7 +601,7 @@ namespace E_VCSP.Solver {
                         }
                     }
 
-                    candidateDescriptors.Sort();
+                    candidateDescriptors = candidateDescriptors.OrderBy((x) => x.cost).ToList();
                     for (int ci = 0; ci < candidateDescriptors.Count; ci++) {
                         (_, bool front, Location l, int t) = candidateDescriptors[ci];
                         string desc = front ? Descriptor.Create(l, t, block.EndLocation, block.EndTime) : Descriptor.Create(block.StartLocation, block.StartTime, l, t);
