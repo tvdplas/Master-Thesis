@@ -86,10 +86,6 @@ namespace E_VCSP.Solver {
             cspGlobal.UpdateDualCosts(dummyDualCosts, 0);
             List<CrewDuty> initialDuties = cspGlobal.GenerateDuties().Select(x => x.crewDuty).ToList();
             HashSet<string> initialDutyCovering = [.. initialDuties.SelectMany(x => x.BlockDescriptorCover)];
-            HashSet<string> initialTaskCovering = [.. vss.Tasks.SelectMany(x => x.BlockDescriptorCover)];
-
-            HashSet<string> diff = initialTaskCovering.Except(initialDutyCovering).ToHashSet();
-            HashSet<string> diff2 = initialDutyCovering.Except(css.Blocks.Select(x => x.Descriptor)).ToHashSet();
 
             // Add single duties if local search was not able to cover all blocks
             foreach (var b in css.Blocks) {
@@ -114,7 +110,7 @@ namespace E_VCSP.Solver {
 
             // crew related costs
             foreach (var cd in css.Duties) costUpperBound += cd.Cost;
-            costUpperBound += Math.Max(0, vss.Tasks.Count - Config.MAX_DUTIES) * Config.VH_OVER_MAX_COST;
+            costUpperBound += Math.Max(0, css.Duties.Count - Config.MAX_DUTIES) * Config.CR_OVER_MAX_COST;
 
             objVal = (costUpperBound, true);
         }
@@ -421,13 +417,13 @@ namespace E_VCSP.Solver {
                 Dictionary<string, List<double>> blockDualCostsByStart = new();
 
                 // Get union of all selected block indexes to use as basis
-                HashSet<int> selectedBlocks = new();
-                for (int i = 0; i < Y.Count; i++) {
-                    if (!Y[i]) continue;
-                    foreach (int bi in css.Duties[i].BlockIndexCover) selectedBlocks.Add(bi);
-                }
+                //HashSet<int> selectedBlocks = new();
+                //for (int i = 0; i < Y.Count; i++) {
+                //    if (!Y[i]) continue;
+                //    foreach (int bi in css.Duties[i].BlockIndexCover) selectedBlocks.Add(bi);
+                //}
 
-                foreach (int bi in selectedBlocks) {
+                for (int bi = 0; bi < css.Blocks.Count; bi++) {
                     Block b = css.Blocks[bi];
                     string descriptor = b.Descriptor;
                     string descriptorStart = Descriptor.GetStart(descriptor);
@@ -698,9 +694,6 @@ namespace E_VCSP.Solver {
             // Block cover of selected tasks by duties
             for (int blockIndex = 0; blockIndex < css.Blocks.Count; blockIndex++) {
                 string blockDescriptor = css.Blocks[blockIndex].Descriptor;
-                if (blockDescriptor == "1#24420#0#25020") {
-                    int x = 0;
-                }
                 GRBLinExpr expr = new();
 
                 for (int vtIndex = 0; vtIndex < taskVars.Count; vtIndex++) {
@@ -775,7 +768,6 @@ namespace E_VCSP.Solver {
             Dictionary<string, int> vehicleBlockCover = [];
             Dictionary<string, int> crewBlockCover = [];
             HashSet<string> blockDescriptors = [];
-            int totalBlocksCoveredTasks = 0;
             for (int i = 0; i < vss.SelectedTasks.Count; i++) {
                 foreach (var elem in vss.SelectedTasks[i].Elements) {
                     if (elem is VETrip vet) {
@@ -788,18 +780,15 @@ namespace E_VCSP.Solver {
                     vehicleBlockCover.TryAdd(bi, 0);
                     vehicleBlockCover[bi]++;
                     blockDescriptors.Add(bi);
-                    totalBlocksCoveredTasks++;
                 }
             }
 
-            int totalBlocksCoveredDuties = 0;
             for (int i = 0; i < css.SelectedDuties.Count; i++) {
                 (CrewDuty duty, int count) = css.SelectedDuties[i];
                 foreach (var bi in duty.BlockDescriptorCover) {
                     crewBlockCover.TryAdd(bi, 0);
                     crewBlockCover[bi] += count;
                     blockDescriptors.Add(bi);
-                    totalBlocksCoveredDuties += count;
                 }
             }
 
@@ -815,8 +804,6 @@ namespace E_VCSP.Solver {
             foreach (var bi in blockDescriptors) {
                 if (!crewBlockCover.ContainsKey(bi) && vehicleBlockCover.ContainsKey(bi)) {
                     Console.WriteLine($"!!! Vehicle uses block {bi}, crew does not !!!");
-
-                    model.Write("invalid-model.mps");
                 }
                 else if (crewBlockCover.ContainsKey(bi) && !vehicleBlockCover.ContainsKey(bi)) {
                     Console.WriteLine($"\\/\\/ Crew uses block {bi}, vehicle does not \\/\\/");
@@ -847,11 +834,16 @@ namespace E_VCSP.Solver {
                 Console.WriteLine($"{round}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}");
             }
 
-            Console.WriteLine("Doing additional round with disrupted lambda");
 
-            // Disruption round
-            runVehicleIts(round, true);
-            runCrewIts(round, true);
+            if (Config.LAGRANGE_APPLY_DISRUPTION) {
+                // Disruption round
+                Console.WriteLine("Doing additional round with disrupted lambda");
+                runVehicleIts(round, true);
+                runCrewIts(round, true);
+            }
+            else {
+                Console.WriteLine("Skipping disruption round");
+            }
 
             // Actually solve
             solveILP();

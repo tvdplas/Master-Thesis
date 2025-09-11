@@ -162,8 +162,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
         ];
 
         public bool IsFeasible(DutyType dt, bool final = false) {
-            if (dt == DutyType.Single) return false;
-
             if (final) {
                 if (!head!.CDE.StartLocation.CrewBase || !tail!.CDE.EndLocation.CrewBase) return false;
             }
@@ -280,7 +278,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 }
             }
 
-            feasibleTypes.Add(DutyType.Single);
+            //feasibleTypes.Add(DutyType.Single);
             return feasibleTypes;
         }
 
@@ -322,7 +320,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         }
 
         public CrewDuty? ToCrewDuty() {
-            if (!IsFeasible(Type, true)) return null;
+            if (Type != DutyType.Single && !IsFeasible(Type, true)) return null;
 
             List<CrewDutyElement> cdes = [];
             var curr = head;
@@ -477,8 +475,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
             costDiff -= duty1.Cost;
             costDiff -= duty2.Cost;
 
-            if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
-
             // Change links, reevaluate heads
             if (prevIn1 != null) prevIn1.Next = linkPrev1ToRange;
             if (nextIn1 != null) nextIn1.Prev = linkNext1ToRange;
@@ -500,9 +496,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
             costDiff += duty2.Cost;
 
             // If the second duty is now empty, remove it
-            if (duty2.head == null) costDiff -= duty2.BaseCost;
-
-            if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
+            if (duty2.head == null) {
+                costDiff -= duty2.BaseCost;
+                if (duties.Count > Config.MAX_DUTIES)
+                    costDiff -= Config.CR_OVER_MAX_COST;
+            }
 
             // If infeasible or cost change not acceptable, revert  
             if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
@@ -515,8 +513,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 rangeEnd.Next = rangeEndNext;
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
-
-                if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
 
                 return (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0) ? LSOpResult.Invalid : LSOpResult.Decline;
             }
@@ -641,10 +637,16 @@ namespace E_VCSP.Solver.ColumnGenerators {
             costDiff += duty2.Cost;
 
             // If one of the two duties is empty, we can also additionally remove extra cost
-            if (duty1.head == null) costDiff -= duty1.BaseCost;
-            if (duty2.head == null) costDiff -= duty2.BaseCost;
-
-            if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
+            if (duty1.head == null) {
+                costDiff -= duty1.BaseCost;
+                if (duties.Count > Config.MAX_DUTIES)
+                    costDiff -= Config.CR_OVER_MAX_COST;
+            }
+            if (duty2.head == null) {
+                costDiff -= duty2.BaseCost;
+                if (duties.Count > Config.MAX_DUTIES)
+                    costDiff -= Config.CR_OVER_MAX_COST;
+            }
 
             // If either of the changes is not feasible or costs are not accepted, revert
             if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
@@ -655,16 +657,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
 
-                if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
-
                 return LSOpResult.Invalid;
             }
 
             // Finalize operation 
             duty1.Type = feasibleTypes1[0];
             duty2.Type = feasibleTypes2[0];
-
-            if (duties.Sum(x => x.CoveredBlocks().Count) != css.Blocks.Count) throw new Exception();
 
             if (duty1.head == null) duties.Remove(duty1);
             if (duty2.head == null) duties.Remove(duty2);
