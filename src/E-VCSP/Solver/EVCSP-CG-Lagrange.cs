@@ -412,11 +412,10 @@ namespace E_VCSP.Solver {
 
                 // Apply heuristic based on that of Marcel which attempts to rescale lambda s.t. 
                 // all currently known vehicle task columns do not have negative reduced cost.
-                taskReducedCosts.Sort();
                 List<(double C_i, int taskIndex)> tasksToUpdate = [];
                 for (int i = 0; i < taskReducedCosts.Count; i++) {
-                    if (taskReducedCosts[i].C_i < 0) tasksToUpdate.Add(taskReducedCosts[i]);
-                    else break;
+                    if (taskReducedCosts[i].C_i < 0 && X[i])
+                        tasksToUpdate.Add(taskReducedCosts[i]);
                 }
                 for (int i = 0; i < tasksToUpdate.Count; i++) {
                     (double C_i, int taskIndex) = tasksToUpdate[i];
@@ -517,11 +516,10 @@ namespace E_VCSP.Solver {
 
             void makeCDsNonNegativeRC() {
                 if (!Config.VCSP_NONNEGATIVE_RC_CSP) return;
-                dutyReducedCosts.Sort();
                 List<(double C_j, int dutyIndex)> dutiesToUpdate = [];
                 for (int j = 0; j < dutyReducedCosts.Count; j++) {
-                    if (dutyReducedCosts[j].C_j < 0) dutiesToUpdate.Add(dutyReducedCosts[j]);
-                    else break;
+                    if (dutyReducedCosts[j].C_j < 0 && Y[j])
+                        dutiesToUpdate.Add(dutyReducedCosts[j]);
                 }
                 for (int i = 0; i < dutiesToUpdate.Count; i++) {
                     (double C_j, int dutyIndex) = dutiesToUpdate[i];
