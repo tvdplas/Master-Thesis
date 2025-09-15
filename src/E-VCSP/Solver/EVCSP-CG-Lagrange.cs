@@ -15,8 +15,8 @@ namespace E_VCSP.Solver {
 
         private Dictionary<string, int> knownBlocks = [];
 
-        private List<(double C_i, int taskIndex)> taskReducedCosts;
-        private List<(double C_j, int dutyIndex)> dutyReducedCosts;
+        private List<(double C_i, int taskIndex)> taskReducedCosts = [];
+        private List<(double C_j, int dutyIndex)> dutyReducedCosts = [];
 
         private List<bool> X = []; // Select vt at index
         private int vehicleSlack = 0; // Amount of over slack we are going
@@ -139,12 +139,10 @@ namespace E_VCSP.Solver {
         }
         #endregion
 
-        private void updateReducedCosts()
-        {
+        private void updateReducedCosts() {
             // Cost for selection of vehicle task vt
             //threadPool.For(0, taskReducedCosts.Count, (i) =>
-            for (int i = 0; i < taskReducedCosts.Count; i++)
-            {
+            for (int i = 0; i < taskReducedCosts.Count; i++) {
                 int taskIndex = taskReducedCosts[i].taskIndex;
                 VehicleTask task = vss.Tasks[taskIndex];
                 double cost = task.Cost;
@@ -154,13 +152,12 @@ namespace E_VCSP.Solver {
                 for (int j = 0; j < task.BlockIndexCover.Count; j++)
                     cost -= lambdaBlocks[task.BlockIndexCover[j]];
 
-                    costByTaskIndex[i] = (cost, taskIndex);
-                }
+                taskReducedCosts[i] = (cost, taskIndex);
+            }
 
             // Cost for selection of crew task 
             //threadPool.For(0, dutyReducedCosts.Count, (i) =>
-            for (int i = 0; i < dutyReducedCosts.Count; i++)
-            {
+            for (int i = 0; i < dutyReducedCosts.Count; i++) {
                 int dutyIndex = dutyReducedCosts[i].dutyIndex;
                 CrewDuty duty = css.Duties[dutyIndex];
 
@@ -205,8 +202,8 @@ namespace E_VCSP.Solver {
                 taskReducedCosts.Sort();
                 int selectedTaskCount = 0;
                 double taskSlackPenalty = Config.VH_OVER_MAX_COST;
-                for (int i = 0; i < costByTaskIndex.Count; i++) {
-                    var targetTask = costByTaskIndex[i];
+                for (int i = 0; i < taskReducedCosts.Count; i++) {
+                    var targetTask = taskReducedCosts[i];
                     if (selectedTaskCount < Config.MAX_VEHICLES && targetTask.C_i < 0) {
                         // Select normally
                         X[targetTask.taskIndex] = true;
@@ -230,8 +227,8 @@ namespace E_VCSP.Solver {
                 dutyReducedCosts.Sort();
                 int selectedDutyCount = 0;
                 double crewSlackPenalty = Config.CR_OVER_MAX_COST;
-                for (int i = 0; i < costByDutyIndex.Count; i++) {
-                    var targetDuty = costByDutyIndex[i];
+                for (int i = 0; i < dutyReducedCosts.Count; i++) {
+                    var targetDuty = dutyReducedCosts[i];
 
                     if (selectedDutyCount < Config.MAX_DUTIES && targetDuty.C_j < 0) {
                         // Select normally
@@ -304,13 +301,11 @@ namespace E_VCSP.Solver {
                 for (int i = 0; i < lambdaTrips.Count; i++) {
                     lambdaTrips[i] = Math.Max(0, lambdaTrips[i] + T * GTrips[i]);
                 }
-                //lamdbaMaxVehicles = Math.Max(0, lamdbaMaxVehicles + T * GMaxVehicles);
 
                 for (int i = 0; i < lambdaBlocks.Count; i++) {
                     // == constraint
                     lambdaBlocks[i] = lambdaBlocks[i] + T * GBlocks[i];
                 }
-                //lamdbaMaxDuties = Math.Max(0, lamdbaMaxDuties + T * GMaxDuties);
 
                 lambdaAvgDutyLength = Math.Max(0, lambdaAvgDutyLength + T * GAvgDutyLength);
                 lambdaMaxLongDuty = Math.Max(0, lambdaMaxLongDuty + T * GMaxLongDuty);
@@ -354,7 +349,7 @@ namespace E_VCSP.Solver {
             updateReducedCosts();
 
             // throw away the worst vehicle tasks / crew duties
-            bool rcUpdateRequired = false; 
+            bool rcUpdateRequired = false;
 
             if (vss.Tasks.Count > Config.VCSP_MAX_TASKS_DURING) {
                 rcUpdateRequired = true;
@@ -381,7 +376,7 @@ namespace E_VCSP.Solver {
                 dutyReducedCosts = css.Duties.Select((x, i) => (double.MaxValue, i)).ToList();
             }
 
-            if (rcUpdateRequired) updateReducedCosts(); 
+            if (rcUpdateRequired) updateReducedCosts();
 
             return converged;
         }
@@ -411,32 +406,27 @@ namespace E_VCSP.Solver {
             int maxIts = round == 0 ? Config.VCSP_VH_ITS_INIT : Config.VCSP_VH_ITS_ROUND;
             VSPLabeling vspLabelingInstance = new(vss);
 
-            void makeVTsNonNegativeRC()
-            {
+            void makeVTsNonNegativeRC() {
                 if (!Config.VCSP_NONNEGATIVE_RC_VSP) return;
 
                 // Apply heuristic based on that of Marcel which attempts to rescale lambda s.t. 
                 // all currently known vehicle task columns do not have negative reduced cost.
                 taskReducedCosts.Sort();
                 List<(double C_i, int taskIndex)> tasksToUpdate = [];
-                for (int i = 0; i < taskReducedCosts.Count; i++)
-                {
+                for (int i = 0; i < taskReducedCosts.Count; i++) {
                     if (taskReducedCosts[i].C_i < 0) tasksToUpdate.Add(taskReducedCosts[i]);
                     else break;
                 }
-                for (int i = 0; i < tasksToUpdate.Count; i++)
-                {
+                for (int i = 0; i < tasksToUpdate.Count; i++) {
                     (double C_i, int taskIndex) = tasksToUpdate[i];
                     List<int> tripCover = vss.Tasks[taskIndex].TripCover;
                     List<int> blockCover = vss.Tasks[taskIndex].BlockIndexCover;
                     double delta = C_i / (tripCover.Count + blockCover.Count);
 
-                    for (int j = 0; j < tripCover.Count; j++)
-                    {
+                    for (int j = 0; j < tripCover.Count; j++) {
                         lambdaTrips[tripCover[j]] += delta;
                     }
-                    for (int j = 0; j < blockCover.Count; j++)
-                    {
+                    for (int j = 0; j < blockCover.Count; j++) {
                         lambdaBlocks[blockCover[j]] += delta;
                     }
                 }
@@ -467,7 +457,7 @@ namespace E_VCSP.Solver {
 
             for (int currIt = 0; currIt < maxIts; currIt++) {
                 makeVTsNonNegativeRC();
-                if (disrupt) 
+                if (disrupt)
                     disruptMultipliers();
                 updateDualCosts();
                 var newColumns = vspLabelingInstance.GenerateVehicleTasks();
@@ -524,34 +514,28 @@ namespace E_VCSP.Solver {
                 return total;
             }
 
-            void makeCDsNonNegativeRC()
-            {
+            void makeCDsNonNegativeRC() {
                 if (!Config.VCSP_NONNEGATIVE_RC_CSP) return;
                 dutyReducedCosts.Sort();
                 List<(double C_j, int dutyIndex)> dutiesToUpdate = [];
-                for (int j = 0; j < dutyReducedCosts.Count; j++)
-                {
+                for (int j = 0; j < dutyReducedCosts.Count; j++) {
                     if (dutyReducedCosts[j].C_j < 0) dutiesToUpdate.Add(dutyReducedCosts[j]);
                     else break;
                 }
-                for (int i = 0; i < dutiesToUpdate.Count; i++)
-                {
+                for (int i = 0; i < dutiesToUpdate.Count; i++) {
                     (double C_j, int dutyIndex) = dutiesToUpdate[i];
                     List<int> blockCover = css.Duties[dutyIndex].BlockIndexCover;
                     double delta = C_j / (blockCover.Count);
 
-                    for (int j = 0; j < blockCover.Count; j++)
-                    {
+                    for (int j = 0; j < blockCover.Count; j++) {
                         lambdaBlocks[blockCover[j]] -= delta;
                     }
                 }
             }
 
-            void addRandomBlocks()
-            {
+            void addRandomBlocks() {
                 // Add some random blocks 
-                for (int i = 0; i < css.Blocks.Count; i++)
-                {
+                for (int i = 0; i < css.Blocks.Count; i++) {
                     // Block will be used as a basis for expanding
                     if (random.NextDouble() >= Config.VSCP_BLOCK_ADD_CHANCE * css.BlockCount[i]) continue;
 
@@ -561,11 +545,9 @@ namespace E_VCSP.Solver {
 
                     // Check if first element of block can be expanded
                     // Expansion as trip: add trip in front/at back (for now)
-                    if (block.Elements[0].Type == BlockElementType.Trip || block.Elements[0].Type == BlockElementType.Deadhead)
-                    {
+                    if (block.Elements[0].Type == BlockElementType.Trip || block.Elements[0].Type == BlockElementType.Deadhead) {
                         // Check if there is a trip that can be used to extend the block backwards
-                        for (int ti = 0; ti < vss.Instance.Trips.Count; ti++)
-                        {
+                        for (int ti = 0; ti < vss.Instance.Trips.Count; ti++) {
                             Trip t = vss.Instance.Trips[ti];
                             if (t.EndLocation != block.StartLocation || t.EndTime > block.StartTime) continue;
 
@@ -585,11 +567,9 @@ namespace E_VCSP.Solver {
 
                         // Check if we can add an incoming deadhead; can only be done if were not directly followed
                         // by a deadhead (would be weird)
-                        if (block.Elements[0].Type == BlockElementType.Trip)
-                        {
+                        if (block.Elements[0].Type == BlockElementType.Trip) {
                             Location curr = block.Elements[0].StartLocation;
-                            for (int li = 0; li < vss.Instance.Locations.Count; li++)
-                            {
+                            for (int li = 0; li < vss.Instance.Locations.Count; li++) {
                                 DeadheadTemplate? dht = vss.LocationDHT[li][curr.Index];
                                 if (dht == null) continue;
 
@@ -606,11 +586,9 @@ namespace E_VCSP.Solver {
                         }
                     }
 
-                    if (block.Elements[^1].Type == BlockElementType.Trip || block.Elements[^1].Type == BlockElementType.Deadhead)
-                    {
+                    if (block.Elements[^1].Type == BlockElementType.Trip || block.Elements[^1].Type == BlockElementType.Deadhead) {
                         // Same but forwards
-                        for (int ti = 0; ti < vss.Instance.Trips.Count; ti++)
-                        {
+                        for (int ti = 0; ti < vss.Instance.Trips.Count; ti++) {
                             Trip t = vss.Instance.Trips[ti];
                             if (t.StartLocation != block.EndLocation || block.EndTime > t.StartTime) continue;
 
@@ -630,11 +608,9 @@ namespace E_VCSP.Solver {
 
                         // Check if we can add an incoming deadhead; can only be done if were not directly followed
                         // by a deadhead (would be weird)
-                        if (block.Elements[^1].Type == BlockElementType.Trip)
-                        {
+                        if (block.Elements[^1].Type == BlockElementType.Trip) {
                             Location curr = block.Elements[^1].StartLocation;
-                            for (int li = 0; li < vss.Instance.Locations.Count; li++)
-                            {
+                            for (int li = 0; li < vss.Instance.Locations.Count; li++) {
                                 DeadheadTemplate? dht = vss.LocationDHT[curr.Index][li];
                                 if (dht == null) continue;
 
@@ -652,8 +628,7 @@ namespace E_VCSP.Solver {
                     }
 
                     candidateDescriptors = candidateDescriptors.OrderBy((x) => x.cost).ToList();
-                    for (int ci = 0; ci < candidateDescriptors.Count; ci++)
-                    {
+                    for (int ci = 0; ci < candidateDescriptors.Count; ci++) {
                         (_, bool front, Location l, int t) = candidateDescriptors[ci];
                         string desc = front ? Descriptor.Create(l, t, block.EndLocation, block.EndTime) : Descriptor.Create(block.StartLocation, block.StartTime, l, t);
                         if (knownBlocks.ContainsKey(desc)) continue;
@@ -898,8 +873,7 @@ namespace E_VCSP.Solver {
                 Console.WriteLine($"{round}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}");
             }
 
-
-            if (Config.LAGRANGE_APPLY_DISRUPTION) {
+            if (Config.LAGRANGE_DISRUPTION_ROUNDS) {
                 // Disruption round
                 Console.WriteLine("Doing additional round with disrupted lambda");
                 runVehicleIts(round, true);

@@ -121,7 +121,6 @@ namespace E_VCSP {
         }
 
         private static void UpdateString(FieldInfo field, string text) {
-            bool succes = false;
             if (field.FieldType == typeof(string)) {
                 field.SetValue(null, text);
                 Console.WriteLine($"Update {field.Name} to value {text}");
