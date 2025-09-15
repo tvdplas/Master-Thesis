@@ -142,10 +142,10 @@ namespace E_VCSP.Solver {
         #endregion
 
         private async void updateReducedCosts() {
-            List<Task> tasks = new(20);
+            List<Task> tasks = new(2 * Config.THREAD_COUNT);
 
             int vtTotal = taskReducedCosts.Count;
-            int vtChunks = Math.Min(10, vtTotal);
+            int vtChunks = Math.Min(Config.THREAD_COUNT, vtTotal);
             int vtChunkSize = (vtTotal + vtChunks - 1) / vtChunks;
             for (int c = 0, start = 0; c < vtChunks; c++) {
                 int s = start;
@@ -173,7 +173,7 @@ namespace E_VCSP.Solver {
             }
 
             int cdTotal = dutyReducedCosts.Count;
-            int cdChunks = Math.Min(10, cdTotal);
+            int cdChunks = Math.Min(Config.THREAD_COUNT, cdTotal);
             int cdChunkSize = (cdTotal + cdChunks - 1) / cdChunks;
             for (int c = 0, start = 0; c < cdChunks; c++) {
                 int s = start;

@@ -6,6 +6,7 @@
         public static bool CONSOLE_GUROBI = false;
         public static bool DUMP_VSP = false;
         public static bool DUMP_CSP = false;
+        public static int THREAD_COUNT = 10;
 
         public static Header SOLVER_HINTS = new();
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
