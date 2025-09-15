@@ -885,14 +885,6 @@ namespace E_VCSP.Solver {
                 }
             }
 
-            if () {
-                // Disruption round
-
-            }
-            else {
-                Console.WriteLine("Skipping disruption round");
-            }
-
             // Actually solve
             solveILP();
 
