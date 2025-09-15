@@ -122,7 +122,7 @@
         public static double LANGRANGE_THRS = 0.01; // % diff between two sequential solutions to be considered "done"
         public static int LANGRANGE_THRS_SEQ = 5; // number of sequential rounds within threshold to be considered done
         public static int LANGRANGE_MAX_ROUNDS = 5000; // number of sequential rounds within threshold to be considered done
-        public static bool LAGRANGE_DISRUPTION_ROUNDS = 1;
+        public static int LAGRANGE_DISRUPTION_ROUNDS = 1;
         public static double LAGRANGE_DISRUPT_LWR = 0.9;
         public static double LAGRANGE_DISRUPT_UPR = 1.1;
     }

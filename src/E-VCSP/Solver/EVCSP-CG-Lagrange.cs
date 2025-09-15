@@ -176,7 +176,7 @@ namespace E_VCSP.Solver {
             //});
         }
 
-        private bool gradientDescent() {
+        private bool gradientDescent(bool allowDiscard = true) {
             if (!objVal.converged) resetLamdba(false);
 
             double alpha = Math.Pow(Config.LAGRANGE_PI_END / Config.LAGRANGE_PI_START, 1.0 / Config.LANGRANGE_MAX_ROUNDS);
@@ -349,34 +349,35 @@ namespace E_VCSP.Solver {
             updateReducedCosts();
 
             // throw away the worst vehicle tasks / crew duties
-            bool rcUpdateRequired = false;
+            if (allowDiscard) {
+                bool rcUpdateRequired = false;
 
-            if (vss.Tasks.Count > Config.VCSP_MAX_TASKS_DURING) {
-                rcUpdateRequired = true;
-                taskReducedCosts.Sort();
-                HashSet<int> taskIndexesToRemove = new();
-                for (int j = Config.VCSP_MAX_TASKS_DURING; j < taskReducedCosts.Count; j++) {
-                    if (!vss.Tasks[taskReducedCosts[j].taskIndex].IsUnit)
-                        taskIndexesToRemove.Add(taskReducedCosts[j].taskIndex);
+                if (vss.Tasks.Count > Config.VCSP_MAX_TASKS_DURING) {
+                    rcUpdateRequired = true;
+                    taskReducedCosts.Sort();
+                    HashSet<int> taskIndexesToRemove = new();
+                    for (int j = Config.VCSP_MAX_TASKS_DURING; j < taskReducedCosts.Count; j++) {
+                        if (!vss.Tasks[taskReducedCosts[j].taskIndex].IsUnit)
+                            taskIndexesToRemove.Add(taskReducedCosts[j].taskIndex);
+                    }
+                    vss.Tasks = vss.Tasks.Where((vt, i) => !taskIndexesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
+                    X = X.Where((_, i) => !taskIndexesToRemove.Contains(i)).ToList();
+                    taskReducedCosts = vss.Tasks.Select((x, i) => (double.MaxValue, i)).ToList();
                 }
-                vss.Tasks = vss.Tasks.Where((vt, i) => !taskIndexesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
-                X = X.Where((_, i) => !taskIndexesToRemove.Contains(i)).ToList();
-                taskReducedCosts = vss.Tasks.Select((x, i) => (double.MaxValue, i)).ToList();
-            }
-            if (css.Duties.Count > Config.VCSP_MAX_DUTIES_DURING) {
-                rcUpdateRequired = true;
-                dutyReducedCosts.Sort();
-                HashSet<int> dutyIndexesToRemove = new();
-                for (int j = Config.VCSP_MAX_DUTIES_DURING; j < dutyReducedCosts.Count; j++) {
-                    if (!css.Duties[dutyReducedCosts[j].dutyIndex].IsUnit)
-                        dutyIndexesToRemove.Add(dutyReducedCosts[j].dutyIndex);
+                if (css.Duties.Count > Config.VCSP_MAX_DUTIES_DURING) {
+                    rcUpdateRequired = true;
+                    dutyReducedCosts.Sort();
+                    HashSet<int> dutyIndexesToRemove = new();
+                    for (int j = Config.VCSP_MAX_DUTIES_DURING; j < dutyReducedCosts.Count; j++) {
+                        if (!css.Duties[dutyReducedCosts[j].dutyIndex].IsUnit)
+                            dutyIndexesToRemove.Add(dutyReducedCosts[j].dutyIndex);
+                    }
+                    css.Duties = css.Duties.Where((cd, i) => !dutyIndexesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
+                    Y = Y.Where((_, i) => !dutyIndexesToRemove.Contains(i)).ToList();
+                    dutyReducedCosts = css.Duties.Select((x, i) => (double.MaxValue, i)).ToList();
                 }
-                css.Duties = css.Duties.Where((cd, i) => !dutyIndexesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
-                Y = Y.Where((_, i) => !dutyIndexesToRemove.Contains(i)).ToList();
-                dutyReducedCosts = css.Duties.Select((x, i) => (double.MaxValue, i)).ToList();
+                if (rcUpdateRequired) updateReducedCosts();
             }
-
-            if (rcUpdateRequired) updateReducedCosts();
 
             return converged;
         }
@@ -486,7 +487,7 @@ namespace E_VCSP.Solver {
                     X.Add(false);
                 }
 
-                gradientDescent();
+                gradientDescent(disrupt);
                 Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}\t{newColumns.Count}");
             }
         }
@@ -670,7 +671,7 @@ namespace E_VCSP.Solver {
                     css.Duties.Add(newDuty);
                     Y.Add(false);
                 }
-                gradientDescent();
+                gradientDescent(disrupt);
                 Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}\t{newColumns.Count}");
             }
         }
@@ -873,11 +874,20 @@ namespace E_VCSP.Solver {
                 Console.WriteLine($"{round}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}");
             }
 
-            if (Config.LAGRANGE_DISRUPTION_ROUNDS) {
+            if (Config.LAGRANGE_DISRUPTION_ROUNDS < 1) {
+                Console.WriteLine("Skipping disruption rounds");
+            }
+            else {
+                Console.WriteLine($"Doing {Config.LAGRANGE_DISRUPTION_ROUNDS} additional round{((Config.LAGRANGE_DISRUPTION_ROUNDS > 1) ? "s" : "")} with disrupted lambda");
+                for (int i = 0; i < Config.LAGRANGE_DISRUPTION_ROUNDS; i++) {
+                    runVehicleIts(round + i, true);
+                    runCrewIts(round + i, true);
+                }
+            }
+
+            if () {
                 // Disruption round
-                Console.WriteLine("Doing additional round with disrupted lambda");
-                runVehicleIts(round, true);
-                runCrewIts(round, true);
+
             }
             else {
                 Console.WriteLine("Skipping disruption round");
