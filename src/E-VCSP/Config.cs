@@ -113,6 +113,8 @@
         public static bool VCSP_CR_MAX_CSTR_SLACK = true;
         public static bool VCSP_CR_OTH_CSTR_SLACK = false;
         public static double VSCP_BLOCK_ADD_CHANCE = 0.1;
+        public static bool VCSP_NONNEGATIVE_RC_VSP = true;
+        public static bool VCSP_NONNEGATIVE_RC_CSP = true;
 
         public static Header LAGRANGE = new();
         public static double LAGRANGE_PI_START = 1; // (0, 2]
