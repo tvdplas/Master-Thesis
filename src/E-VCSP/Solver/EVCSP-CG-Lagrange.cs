@@ -42,6 +42,8 @@ namespace E_VCSP.Solver {
         public EVCSPCGLagrange(VehicleSolutionState vss, CrewSolutionState css) {
             this.vss = vss;
             this.css = css;
+
+            ThreadPool.SetMaxThreads(10, 10);
         }
 
         #region Init
@@ -139,41 +141,70 @@ namespace E_VCSP.Solver {
         }
         #endregion
 
-        private void updateReducedCosts() {
-            // Cost for selection of vehicle task vt
-            //threadPool.For(0, taskReducedCosts.Count, (i) =>
-            for (int i = 0; i < taskReducedCosts.Count; i++) {
-                int taskIndex = taskReducedCosts[i].taskIndex;
-                VehicleTask task = vss.Tasks[taskIndex];
-                double cost = task.Cost;
+        private async void updateReducedCosts() {
+            List<Task> tasks = new(20);
 
-                for (int j = 0; j < task.TripCover.Count; j++)
-                    cost -= lambdaTrips[task.TripCover[j]];
-                for (int j = 0; j < task.BlockIndexCover.Count; j++)
-                    cost -= lambdaBlocks[task.BlockIndexCover[j]];
+            int vtTotal = taskReducedCosts.Count;
+            int vtChunks = Math.Min(10, vtTotal);
+            int vtChunkSize = (vtTotal + vtChunks - 1) / vtChunks;
+            for (int c = 0, start = 0; c < vtChunks; c++) {
+                int s = start;
+                int end = s + vtChunkSize;
+                if (end > vtTotal) end = vtTotal;
+                if (s >= end) break;
+                else {
+                    tasks.Add(Task.Run(() => {
+                        for (int i = s; i < end; i++) {
+                            int taskIndex = taskReducedCosts[i].taskIndex;
+                            VehicleTask task = vss.Tasks[taskIndex];
+                            double cost = task.Cost;
 
-                taskReducedCosts[i] = (cost, taskIndex);
+                            for (int j = 0; j < task.TripCover.Count; j++)
+                                cost -= lambdaTrips[task.TripCover[j]];
+                            for (int j = 0; j < task.BlockIndexCover.Count; j++)
+                                cost -= lambdaBlocks[task.BlockIndexCover[j]];
+
+                            taskReducedCosts[i] = (cost, taskIndex);
+                        }
+                    }));
+                }
+                start = end;
+                if (start >= vtTotal) break;
             }
 
-            // Cost for selection of crew task 
-            //threadPool.For(0, dutyReducedCosts.Count, (i) =>
-            for (int i = 0; i < dutyReducedCosts.Count; i++) {
-                int dutyIndex = dutyReducedCosts[i].dutyIndex;
-                CrewDuty duty = css.Duties[dutyIndex];
+            int cdTotal = dutyReducedCosts.Count;
+            int cdChunks = Math.Min(10, cdTotal);
+            int cdChunkSize = (cdTotal + cdChunks - 1) / cdChunks;
+            for (int c = 0, start = 0; c < cdChunks; c++) {
+                int s = start;
+                int end = s + cdChunkSize;
+                if (end > cdTotal) end = cdTotal;
+                if (s >= end) break;
+                else {
+                    tasks.Add(Task.Run(() => {
+                        for (int i = s; i < end; i++) {
+                            int dutyIndex = dutyReducedCosts[i].dutyIndex;
+                            CrewDuty duty = css.Duties[dutyIndex];
 
-                double cost = duty.Cost;
+                            double cost = duty.Cost;
 
-                for (int j = 0; j < duty.BlockIndexCover.Count; j++)
-                    cost += lambdaBlocks[duty.BlockIndexCover[j]];
+                            for (int j = 0; j < duty.BlockIndexCover.Count; j++)
+                                cost += lambdaBlocks[duty.BlockIndexCover[j]];
 
-                cost += lambdaAvgDutyLength * ((double)duty.Duration / Constants.CR_TARGET_SHIFT_LENGTH - 1);
-                cost -= lambdaMaxLongDuty * (Constants.CR_MAX_OVER_LONG_DUTY - duty.IsLongDuty);
-                cost -= lambdaMaxBroken * (Constants.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty);
-                cost -= lambdaMaxBetween * (Constants.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty);
+                            cost += lambdaAvgDutyLength * ((double)duty.Duration / Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                            cost -= lambdaMaxLongDuty * (Constants.CR_MAX_OVER_LONG_DUTY - duty.IsLongDuty);
+                            cost -= lambdaMaxBroken * (Constants.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty);
+                            cost -= lambdaMaxBetween * (Constants.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty);
 
-                dutyReducedCosts[i] = (cost, dutyIndex);
+                            dutyReducedCosts[i] = (cost, dutyIndex);
+                        }
+                    }));
+                }
+                start = end;
+                if (start >= cdTotal) break;
             }
-            //});
+
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
         private bool gradientDescent(bool allowDiscard = true) {
@@ -486,6 +517,7 @@ namespace E_VCSP.Solver {
                     X.Add(false);
                 }
 
+                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}\t{newColumns.Count}");
                 gradientDescent(disrupt);
                 Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}\t{newColumns.Count}");
             }
