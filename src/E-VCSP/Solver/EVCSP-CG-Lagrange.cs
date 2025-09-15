@@ -25,10 +25,6 @@ namespace E_VCSP.Solver {
         /// <summary> \in R \forall j </summary>
         private List<double> lambdaBlocks = [];
         /// <summary> >= 0 </summary>
-        private double lamdbaMaxVehicles = 0;
-        /// <summary> >= 0 </summary>
-        private double lamdbaMaxDuties = 0;
-        /// <summary> >= 0 </summary>
         private double lambdaAvgDutyLength = 0;
         /// <summary> >= 0 </summary>
         private double lambdaMaxLongDuty = 0;
@@ -122,9 +118,7 @@ namespace E_VCSP.Solver {
             }
 
             for (int i = 0; i < vss.Instance.Trips.Count; i++) lambdaTrips[i] = 0;
-            lamdbaMaxVehicles = 0;
             for (int i = 0; i < css.Blocks.Count; i++) lambdaBlocks[css.Blocks[i].Index] = 0;
-            lamdbaMaxDuties = 0;
 
             lambdaAvgDutyLength = 0;
             lambdaMaxLongDuty = 0;
@@ -165,8 +159,6 @@ namespace E_VCSP.Solver {
                     for (int j = 0; j < task.BlockIndexCover.Count; j++)
                         cost -= lambdaBlocks[task.BlockIndexCover[j]];
 
-                    cost += lamdbaMaxVehicles;
-
                     costByTaskIndex[i] = (cost, taskIndex);
                 }
 
@@ -205,7 +197,7 @@ namespace E_VCSP.Solver {
                 // Vehicles
                 costByTaskIndex.Sort();
                 int selectedTaskCount = 0;
-                double taskSlackPenalty = Config.VH_OVER_MAX_COST - lamdbaMaxVehicles;
+                double taskSlackPenalty = Config.VH_OVER_MAX_COST;
                 for (int i = 0; i < costByTaskIndex.Count; i++) {
                     var targetTask = costByTaskIndex[i];
                     if (selectedTaskCount < Config.MAX_VEHICLES && targetTask.C_i < 0) {
@@ -230,7 +222,7 @@ namespace E_VCSP.Solver {
                 // Crew
                 costByDutyIndex.Sort();
                 int selectedDutyCount = 0;
-                double crewSlackPenalty = Config.CR_OVER_MAX_COST - lamdbaMaxDuties;
+                double crewSlackPenalty = Config.CR_OVER_MAX_COST;
                 for (int i = 0; i < costByDutyIndex.Count; i++) {
                     var targetDuty = costByDutyIndex[i];
 
@@ -265,15 +257,8 @@ namespace E_VCSP.Solver {
                         GTrips[tripIndex] -= 1;
                 }
 
-                // Vehicle slack
-                double GMaxVehicles = -vehicleSlack - Config.MAX_VEHICLES;
-                for (int taskIndex = 0; taskIndex < X.Count; taskIndex++) {
-                    GMaxVehicles += X[taskIndex] ? 1 : 0;
-                }
-
                 // Blocks / duties
                 double[] GBlocks = new double[lambdaBlocks.Count]; // b == 0
-                double GMaxDuties = -maxDutiesSlack - Config.MAX_DUTIES;
                 double GAvgDutyLength = 0;
                 double GMaxLongDuty = 0;
                 double GMaxBroken = 0;
@@ -287,7 +272,6 @@ namespace E_VCSP.Solver {
                 }
                 for (int dutyIndex = 0; dutyIndex < Y.Count; dutyIndex++) {
                     if (!Y[dutyIndex]) continue;
-                    GMaxDuties++;
                     var duty = css.Duties[dutyIndex];
                     foreach (var blockIndex in duty.BlockIndexCover) {
                         GBlocks[blockIndex] += 1;
@@ -301,9 +285,7 @@ namespace E_VCSP.Solver {
 
                 double GSquaredSum = 0;
                 for (int i = 0; i < GTrips.Length; i++) GSquaredSum += GTrips[i] * GTrips[i];
-                GSquaredSum += GMaxVehicles * GMaxVehicles;
                 for (int i = 0; i < GBlocks.Length; i++) GSquaredSum += GBlocks[i] * GBlocks[i];
-                GSquaredSum += GMaxDuties * GMaxDuties;
                 GSquaredSum += GAvgDutyLength * GAvgDutyLength;
                 GSquaredSum += GMaxLongDuty * GMaxLongDuty;
                 GSquaredSum += GMaxBroken * GMaxBroken;
@@ -315,13 +297,13 @@ namespace E_VCSP.Solver {
                 for (int i = 0; i < lambdaTrips.Count; i++) {
                     lambdaTrips[i] = Math.Max(0, lambdaTrips[i] + T * GTrips[i]);
                 }
-                lamdbaMaxVehicles = Math.Max(0, lamdbaMaxVehicles + T * GMaxVehicles);
+                //lamdbaMaxVehicles = Math.Max(0, lamdbaMaxVehicles + T * GMaxVehicles);
 
                 for (int i = 0; i < lambdaBlocks.Count; i++) {
                     // == constraint
                     lambdaBlocks[i] = lambdaBlocks[i] + T * GBlocks[i];
                 }
-                lamdbaMaxDuties = Math.Max(0, lamdbaMaxDuties + T * GMaxDuties);
+                //lamdbaMaxDuties = Math.Max(0, lamdbaMaxDuties + T * GMaxDuties);
 
                 lambdaAvgDutyLength = Math.Max(0, lambdaAvgDutyLength + T * GAvgDutyLength);
                 lambdaMaxLongDuty = Math.Max(0, lambdaMaxLongDuty + T * GMaxLongDuty);
@@ -755,12 +737,12 @@ namespace E_VCSP.Solver {
             vss.SelectedTasks = [];
             css.SelectedDuties = [];
             for (int i = 0; i < taskVars.Count; i++) {
-                if (taskVars[i].X != 1) continue;
+                if (Math.Round(taskVars[i].X) < 1) continue;
                 vss.SelectedTasks.Add(vss.Tasks[i]);
             }
             for (int i = 0; i < dutyVars.Count; i++) {
-                if (dutyVars[i].X < 1) continue;
-                css.SelectedDuties.Add((css.Duties[i], (int)dutyVars[i].X));
+                if (Math.Round(dutyVars[i].X) < 1) continue;
+                css.SelectedDuties.Add((css.Duties[i], (int)Math.Round(dutyVars[i].X)));
             }
 
             Console.WriteLine($"Solution found with {vss.SelectedTasks.Count} vehicles, {css.SelectedDuties.Count} duties, overall costs {model.ObjVal}");
