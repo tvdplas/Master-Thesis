@@ -45,7 +45,7 @@ namespace E_VCSP.Solver {
             List<GRBVar> dutyVars = [];
             for (int i = 0; i < css.Duties.Count; i++) {
                 string name = $"cd_{i}";
-                GRBVar v = model.AddVar(0, GRB.INFINITY, css.Duties[i].Cost + 1_000, GRB.CONTINUOUS, name);
+                GRBVar v = model.AddVar(0, GRB.INFINITY, css.Duties[i].Cost, GRB.CONTINUOUS, name);
 
                 // Bookkeeping to find variable based on name / cover easily
                 dutyVars.Add(v);
@@ -105,8 +105,8 @@ namespace E_VCSP.Solver {
             List<(CrewDuty duty, int count)> duties = [];
             int[] covered = new int[css.Blocks.Count];
             foreach (GRBVar v in model.GetVars()) {
-                if (v.VarName.StartsWith("cd_") && v.X >= 1) {
-                    int count = (int)v.X;
+                if (v.VarName.StartsWith("cd_") && Math.Round(v.X) >= 1) {
+                    int count = (int)Math.Round(v.X);
                     CrewDuty dvt = css.VarnameDutyMapping[v.VarName];
                     duties.Add((dvt, count));
                     foreach (int i in dvt.BlockIndexCover) covered[i] += count;
@@ -120,7 +120,7 @@ namespace E_VCSP.Solver {
                 if (val >= 2) Console.WriteLine($"(!) Block {css.Blocks[i]} covered {val} times");
             }
 
-            Console.WriteLine($"Covered {coveredTotal}/{css.Blocks.Count} blocks using {duties.Count} duties");
+            Console.WriteLine($"Covered {coveredTotal}/{css.Blocks.Count} blocks using {duties.Sum(x => x.count)} duties");
             if (coveredTotal < css.Blocks.Count)
                 Console.WriteLine("(!) Not all blocks covered");
 

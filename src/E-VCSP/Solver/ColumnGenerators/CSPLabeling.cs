@@ -252,7 +252,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                     int timeDiff = currentEndTime - prevEndTime;
 
-                    int addedTime = arc.Type != BlockArcType.LongIdle ? timeDiff : timeDiff - arc.IdleTime;
+                    int addedTime = arc.Type != BlockArcType.LongIdle
+                        ? timeDiff
+                        : timeDiff - arc.IdleTime - arc.FromBlock.EndLocation.SignOffTime - arc.FromBlock.EndLocation.SignOnTime;
 
                     double costFromTime = addedTime / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
                     double costFromRc = targetBlockIndex < css.Blocks.Count ? -blockDualCosts[targetBlockIndex] : 0;
@@ -260,7 +262,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     CSPLabel newLabel = new() {
                         CoveredBlockIds = newCoverage,
                         Breaks = arc.BreakTime == 0 ? currentLabel.Breaks : [.. currentLabel.Breaks, (arc.FromBlock!.EndTime, arc.BreakTime)],
-                        Idle = arc.Type == BlockArcType.LongIdle ? (arc.FromBlock!.EndTime, arc.IdleTime) : currentLabel.Idle,
+                        Idle = arc.Type == BlockArcType.LongIdle ? (arc.FromBlock!.EndTime + arc.FromBlock.EndLocation.SignOffTime, arc.IdleTime) : currentLabel.Idle,
                         PrevBlockId = currentNodeIndex,
                         Cost = currentLabel.Cost + costFromTime + costFromRc,
                         PrevLabelId = currentLabel.Id,
@@ -276,7 +278,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Adjust costs to include finalized duration
             for (int i = 0; i < allLabels[^1].Count; i++) {
                 CSPLabel l = allLabels[^1][i];
-                int duration = css.Blocks[l.PrevBlockId].EndTime - l.StartTime;
+                int duration = css.Blocks[l.PrevBlockId].EndTime + css.Blocks[l.PrevBlockId].EndLocation.SignOffTime - l.StartTime;
                 if (l.Type == DutyType.Broken && l.Idle.startTime != -1) duration -= l.Idle.longIdleTime;
 
                 l.Cost -= maxAvgDurationDualCost * ((duration / (double)Constants.CR_TARGET_SHIFT_LENGTH) - 1);
@@ -287,7 +289,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private List<(double reducedCost, CrewDuty crewDuty)> extractDuties(string source) {
             // Walk back through in order to get the minimum costs
             var feasibleEnds = allLabels[^1]
-                .Where(x => x.isFeasible(css.Blocks[x.PrevBlockId].EndTime, true) && x.Cost < 0)
+                .Where(x =>
+                    x.Cost < 0
+                    && x.isFeasible(css.Blocks[x.PrevBlockId].EndTime + css.Blocks[x.PrevBlockId].EndLocation.SignOffTime, true)
+                )
                 .OrderBy(x => x.Cost).ToList();
 
             List<CSPLabel> validTargets = [];
