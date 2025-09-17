@@ -98,8 +98,8 @@ namespace E_VCSP.Solver {
                 lambdaBlocks = css.Blocks.Select(x => 0.0).ToList();
             }
 
-            for (int i = 0; i < vss.Instance.Trips.Count; i++) lambdaTrips[i] = 0;
-            for (int i = 0; i < css.Blocks.Count; i++) lambdaBlocks[css.Blocks[i].Index] = 0;
+            for (int i = 0; i < lambdaTrips.Count; i++) lambdaTrips[i] = 0;
+            for (int i = 0; i < lambdaBlocks.Count; i++) lambdaBlocks[i] = 0;
 
             lambdaAvgDutyLength = 0;
             lambdaMaxLongDuty = 0;
@@ -184,7 +184,7 @@ namespace E_VCSP.Solver {
         }
 
         private bool gradientDescent(bool allowDiscard = true) {
-            if (!objVal.converged)
+            if (!objVal.converged || objVal.val > costUpperBound || objVal.val < 0)
                 resetLamdba(false);
 
             int roundsWithoutImprovement = 0;
