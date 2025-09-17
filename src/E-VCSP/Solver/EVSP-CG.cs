@@ -80,8 +80,16 @@ namespace E_VCSP.Solver {
             // Model
             GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.VSP_SOLVER_TIMEOUT_SEC;
-            model.Parameters.MIPFocus = 3; // upper bound
-            model.Parameters.Presolve = 2; // aggresive presolve
+            model.Parameters.MIPFocus = 1; // upper bound
+            model.Parameters.Heuristics = 0.8;
+            model.Parameters.RINS = 10;
+            model.Parameters.SubMIPNodes = 5000;
+            model.Parameters.PumpPasses = 20;
+            model.Parameters.NoRelHeurTime = Config.VSP_SOLVER_TIMEOUT_SEC / 4;
+            model.Parameters.ImproveStartTime = Config.VSP_SOLVER_TIMEOUT_SEC / 4;
+            model.Parameters.Cuts = 1;
+            model.Parameters.Presolve = 2;
+            model.Parameters.Symmetry = 2;
             model.SetCallback(new CustomGRBCallback());
             ct.Register(() => {
                 Console.WriteLine("Cancellation requested. Terminating Gurobi model...");

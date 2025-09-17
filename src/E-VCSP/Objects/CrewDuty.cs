@@ -229,7 +229,8 @@ namespace E_VCSP.Objects {
                 }
 
                 cachedDuration = duration;
-                if (duration > Constants.CR_MAX_SHIFT_LENGTH + 1000) throw new InvalidOperationException("Heh");
+                if (duration > Constants.CR_MAX_SHIFT_LENGTH + 1000)
+                    Console.WriteLine("Duty of type " + Type + " has duration " + duration);
                 return cachedDuration;
             }
         }

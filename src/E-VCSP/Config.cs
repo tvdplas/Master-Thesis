@@ -19,7 +19,7 @@
 
         public static Header VSP = new();
         public static bool VSP_DETERMINE_IIS = false;
-        public static int VSP_SOLVER_TIMEOUT_SEC = 60;
+        public static int VSP_SOLVER_TIMEOUT_SEC = 300;
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static bool VSP_ALLOW_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
         public static int VSP_PRE_DIRECT_TIME = 0;
