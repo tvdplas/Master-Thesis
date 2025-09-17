@@ -85,7 +85,7 @@
         public static int CSP_LB_MAX_LABELS_IN_END = 100_000;
         public static int CSP_LB_MAX_COLS = 50;
         public static bool CSP_LB_ATTEMPT_DISJOINT = true; // try to find disjoint paths; if none can be found, return any arbitrary path
-        public static double CSP_LB_SEC_COL_COUNT = 0; // Number of primary columns to generate secondary columns for 
+        public static double CSP_LB_SEC_COL_COUNT = 2; // Number of primary columns to generate secondary columns for 
         public static double CSP_LB_SEC_COL_ATTEMPTS = 2; // Number of attempts per secondary column
 
         public static Header CSP_LS_GLOBAL = new();
@@ -100,16 +100,16 @@
         public static double CSP_LS_G_CREWHUB_PENALTY = 10_000;
 
         public static Header VCSP = new();
-        public static int VCSP_SOLVER_TIMEOUT_SEC = 300;
+        public static int VCSP_SOLVER_TIMEOUT_SEC = 900;
         public static int VCSP_ROUNDS = 10;
         public static int VCSP_VH_ITS_INIT = 20;
         public static int VCSP_VH_ITS_ROUND = 10;
-        public static int VCSP_CR_ITS_INIT = 20;
-        public static int VCSP_CR_ITS_ROUND = 20;
+        public static int VCSP_CR_ITS_INIT = 10;
+        public static int VCSP_CR_ITS_ROUND = 10;
         public static int VCSP_VH_INSTANCES = 1;
-        public static int VCSP_CR_INSTANCES = 5;
-        public static int VCSP_MAX_TASKS_DURING = 20000;
-        public static int VCSP_MAX_DUTIES_DURING = 20000;
+        public static int VCSP_CR_INSTANCES = 2;
+        public static int VCSP_MAX_TASKS_DURING = 40000;
+        public static int VCSP_MAX_DUTIES_DURING = 40000;
         public static bool VCSP_VH_CSTR_SLACK = true;
         public static bool VCSP_CR_MAX_CSTR_SLACK = true;
         public static bool VCSP_CR_OTH_CSTR_SLACK = false;
@@ -118,13 +118,12 @@
         public static bool VCSP_NONNEGATIVE_RC_CSP = true;
 
         public static Header LAGRANGE = new();
-        public static double LAGRANGE_PI_START = 1; // (0, 2]
+        public static double LAGRANGE_PI_START = 2;
         public static double LAGRANGE_PI_END = 0.001; // (0, 2]
-        public static double LANGRANGE_THRS = 0.01; // % diff between two sequential solutions to be considered "done"
-        public static int LANGRANGE_THRS_SEQ = 5; // number of sequential rounds within threshold to be considered done
-        public static int LANGRANGE_MAX_ROUNDS = 5000; // number of sequential rounds within threshold to be considered done
-        public static int LAGRANGE_DISRUPTION_ROUNDS = 1;
-        public static double LAGRANGE_DISRUPT_LWR = 0.9;
-        public static double LAGRANGE_DISRUPT_UPR = 1.1;
+        public static double LAGRANGE_PI_COOLING = 0.5; // [0, 1)
+        public static double LAGRANGE_N = 30;
+        public static int LAGRANGE_DISRUPTION_ROUNDS = 2;
+        public static double LAGRANGE_DISRUPT_LWR = 0.8;
+        public static double LAGRANGE_DISRUPT_UPR = 1.25;
     }
 }

@@ -194,7 +194,7 @@ namespace E_VCSP.OldExperiments {
             double lastSolutionVal = upperBoundValue;
             int roundsInThreshold = 0;
 
-            for (int round = 0; round < Config.LANGRANGE_MAX_ROUNDS; round++) {
+            for (int round = 0; round < 5000; round++) {
                 updateTaskCostsWithMultipliers();
                 double z_curr = solve();
 
@@ -215,7 +215,7 @@ namespace E_VCSP.OldExperiments {
 
                 // Solution might have stabelized
                 double percentageDiff = Math.Abs(Math.Abs(z_curr - lastSolutionVal) / lastSolutionVal);
-                bool diffInThreshold = percentageDiff < Config.LANGRANGE_THRS;
+                bool diffInThreshold = percentageDiff < 0.001;
                 lastSolutionVal = z_curr;
 
                 if (diffInThreshold) {
@@ -225,7 +225,7 @@ namespace E_VCSP.OldExperiments {
                     roundsInThreshold = 0;
                 }
 
-                if (roundsInThreshold >= Config.LANGRANGE_THRS_SEQ) break;
+                if (roundsInThreshold >= 5) break;
             }
 
             return (lastSolutionVal, X);

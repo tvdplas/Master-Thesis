@@ -208,9 +208,18 @@ namespace E_VCSP.Solver {
         }
 
         private bool gradientDescent(bool allowDiscard = true) {
-            if (!objVal.converged) resetLamdba(false);
+            if (!objVal.converged)
+                resetLamdba(false);
 
-            double alpha = Math.Pow(Config.LAGRANGE_PI_END / Config.LAGRANGE_PI_START, 1.0 / Config.LANGRANGE_MAX_ROUNDS);
+            int roundsWithoutImprovement = 0;
+            double z_best = double.NegativeInfinity;
+            List<double> bestLambdaTrips = [.. lambdaTrips];
+            List<double> bestLambdaBlocks = [.. lambdaBlocks];
+            double bestLambdaAvgDutyLength = lambdaAvgDutyLength;
+            double bestLambdaMaxLongDuty = lambdaMaxLongDuty;
+            double bestLambdaMaxBroken = lambdaMaxBroken;
+            double bestLambdaMaxBetween = lambdaMaxBetween;
+
             double pi = Config.LAGRANGE_PI_START;
 
             taskReducedCosts = vss.Tasks.Select((x, i) => (double.MaxValue, i)).ToList();
@@ -344,43 +353,7 @@ namespace E_VCSP.Solver {
                 lambdaMaxBetween = Math.Max(0, lambdaMaxBetween + T * GMaxBetween);
             }
 
-            double lastSolutionVal = costUpperBound;
-            int roundsInThreshold = 0;
-            bool converged = false;
-
-            int round = 0;
-            for (; round < Config.LANGRANGE_MAX_ROUNDS && !converged; round++) {
-                updateReducedCosts();
-                double z_curr = solve();
-                if (double.IsNaN(z_curr)) {
-                    Console.WriteLine("Divergeert");
-                    throw new InvalidOperationException();
-                }
-                updateMultipliers(z_curr);
-                pi *= alpha;
-
-                // Solution might have stabelized
-                double percentageDiff = Math.Abs(Math.Abs(z_curr - lastSolutionVal) / lastSolutionVal);
-                bool diffInThreshold = percentageDiff < Config.LANGRANGE_THRS;
-                lastSolutionVal = z_curr;
-
-                if (diffInThreshold) {
-                    roundsInThreshold++;
-                }
-                else {
-                    roundsInThreshold = 0;
-                }
-
-                if (roundsInThreshold >= Config.LANGRANGE_THRS_SEQ) converged = true;
-            }
-
-            objVal = (lastSolutionVal, converged);
-
-            // Finalize reduced costs given the current set of lamdba parameters
-            updateReducedCosts();
-
-            // throw away the worst vehicle tasks / crew duties
-            if (allowDiscard) {
+            void discardWorstColumns() {
                 bool rcUpdateRequired = false;
 
                 if (vss.Tasks.Count > Config.VCSP_MAX_TASKS_DURING) {
@@ -410,7 +383,47 @@ namespace E_VCSP.Solver {
                 if (rcUpdateRequired) updateReducedCosts();
             }
 
-            return converged;
+            while (pi >= Config.LAGRANGE_PI_END) {
+                updateReducedCosts();
+                double z_curr = solve();
+                updateMultipliers(z_curr);
+
+                if (z_curr > z_best) {
+                    z_best = z_curr;
+                    // Expensive!
+                    bestLambdaTrips = [.. lambdaTrips];
+                    bestLambdaBlocks = [.. lambdaBlocks];
+                    bestLambdaAvgDutyLength = lambdaAvgDutyLength;
+                    bestLambdaMaxLongDuty = lambdaMaxLongDuty;
+                    bestLambdaMaxBroken = lambdaMaxBroken;
+                    bestLambdaMaxBetween = lambdaMaxBetween;
+                }
+                else if (roundsWithoutImprovement >= Config.LAGRANGE_N) {
+                    roundsWithoutImprovement = 0;
+                    pi *= Config.LAGRANGE_PI_COOLING;
+                }
+                else {
+                    roundsWithoutImprovement++;
+                }
+            }
+
+
+            // Get back best solution
+            lambdaTrips = [.. bestLambdaTrips];
+            lambdaBlocks = [.. bestLambdaBlocks];
+            lambdaAvgDutyLength = bestLambdaAvgDutyLength;
+            lambdaMaxLongDuty = bestLambdaMaxLongDuty;
+            lambdaMaxBroken = bestLambdaMaxBroken;
+            lambdaMaxBetween = bestLambdaMaxBetween;
+            objVal = (z_best, true);
+
+            // Finalize reduced costs given the current set of lamdba parameters
+            updateReducedCosts();
+
+            // throw away the worst vehicle tasks / crew duties
+            if (allowDiscard) discardWorstColumns();
+
+            return true;
         }
 
         private void disruptMultipliers() {
@@ -517,7 +530,6 @@ namespace E_VCSP.Solver {
                     X.Add(false);
                 }
 
-                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}\t{newColumns.Count}");
                 gradientDescent(disrupt);
                 Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}\t{newColumns.Count}");
             }
