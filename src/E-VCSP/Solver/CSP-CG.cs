@@ -124,16 +124,16 @@ namespace E_VCSP.Solver {
             // Assume all blocks are active
             css.BlockCount = css.Blocks.Select(_ => 1).ToList();
 
+            double z_prev = double.PositiveInfinity;
+            int itsWithoutImprovement = 0;
+
             // Tracking generated columns
             int maxColumns = Config.CSP_INSTANCES_PER_IT * Config.CSP_MAX_COL_GEN_ITS,
                 lastReportedPercent = 0,    // Percentage of total reporting
                 currIts = 1,                // Number of CG / solution rounds had
                 totalGenerated = 0,         // Total number of columns generated
                 lbGenerated = 0,            // Generated with labeling
-                lsGenerated = 0,            // Generated with labeling
-                seqWithoutRC = 0,           // Number of sequential columns without reduced cost found
-                totWithoutRC = 0,           // Total columns generated with no RC
-                notFound = 0;               // Number of columns that could not be generated
+                lsGenerated = 0;            // Generated with labeling
 
             // Multithreaded shortestpath searching
             List<List<CrewColumnGen>> instances = [
@@ -151,11 +151,6 @@ namespace E_VCSP.Solver {
 
             // Process a collection of generated css.duties
             void processDuties(List<(double reducedCost, CrewDuty cd)> dutySet) {
-                if (dutySet.Count == 0) {
-                    notFound++;
-                    return;
-                }
-
                 foreach (var task in dutySet) {
                     (double reducedCost, CrewDuty newDuty) = ((double, CrewDuty))task;
 
@@ -180,7 +175,7 @@ namespace E_VCSP.Solver {
                         col.AddTerms([.. constrs.Select(c => {
                             if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) return 1.0;
                             else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
-                            else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                            else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.PaidDuration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
                             else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
                             else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES) return Constants.CR_MAX_BETWEEN_SHIFTS - newDuty.IsBetweenDuty;
                             else throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
@@ -190,10 +185,6 @@ namespace E_VCSP.Solver {
                         dutyVars.Add(model.AddVar(0, GRB.INFINITY, newDuty.Cost, GRB.CONTINUOUS, col, name));
                         css.VarnameDutyMapping[name] = css.Duties[^1];
                         css.CoverDutyMapping[ba] = css.Duties[^1];
-                    }
-                    else {
-                        seqWithoutRC++;
-                        totWithoutRC++;
                     }
                 }
             }
@@ -205,14 +196,14 @@ namespace E_VCSP.Solver {
                 int percent = (int)((totalGenerated / (double)maxColumns) * 100);
                 if (percent >= lastReportedPercent + 10) {
                     lastReportedPercent = percent - (percent % 10);
-                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{notFound}\t{totWithoutRC}\t{model.ObjVal}");
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{model.ObjVal}");
                 }
 
                 // Select solution strategy, generate new css.css.duties
                 List<(double, CrewDuty)>[] generatedDuties = new List<(double, CrewDuty)>[Config.CSP_INSTANCES_PER_IT];
                 double r = rnd.NextDouble() * sums[^1];
-                int selectedMethodÍndex = sums.FindIndex(x => r <= x);
-                List<CrewColumnGen> selectedMethod = instances[selectedMethodÍndex];
+                int selectedMethodIndex = sums.FindIndex(x => r <= x);
+                List<CrewColumnGen> selectedMethod = instances[selectedMethodIndex];
                 Parallel.For(0, Config.CSP_INSTANCES_PER_IT, (i) => {
                     Dictionary<string, double> crewConstrs = model.GetConstrs().ToDictionary(c => c.ConstrName, c => c.Pi);
                     selectedMethod[i].UpdateDualCosts(model.GetConstrs().ToDictionary(c => c.ConstrName, c => c.Pi), 1);
@@ -222,7 +213,7 @@ namespace E_VCSP.Solver {
                 // Update generated totals
                 totalGenerated += generatedDuties.Length;
                 int colsGenerated = generatedDuties.Sum(t => t.Count);
-                switch (selectedMethodÍndex) {
+                switch (selectedMethodIndex) {
                     case 0: lbGenerated += colsGenerated; break;
                     case 1: lsGenerated += colsGenerated; break;
                     default: throw new InvalidOperationException("You forgot to add a case");
@@ -235,13 +226,18 @@ namespace E_VCSP.Solver {
                 model.Update();
                 model.Set(GRB.IntParam.Presolve, 0);
                 model.Optimize();
-                currIts++;
-
-                // Stop model solving if no improvements are found
-                if (seqWithoutRC >= Config.CSP_OPT_IT_THRESHOLD) {
-                    Console.WriteLine($"Stopped due to RC > 0 for {Config.CSP_OPT_IT_THRESHOLD} consecutive css.css.duties");
-                    break;
+                if (model.ObjVal < z_prev) {
+                    itsWithoutImprovement = 0;
                 }
+                else {
+                    itsWithoutImprovement++;
+                    if (itsWithoutImprovement > Config.CSP_OPT_IT_THRESHOLD) {
+                        Console.WriteLine($"Stopped due to no improvement for {Config.CSP_OPT_IT_THRESHOLD} consecutive rounds");
+                        break;
+                    }
+                }
+                z_prev = model.ObjVal;
+                currIts++;
             }
 
             if (model.Status == GRB.Status.INFEASIBLE || model.Status == GRB.Status.INTERRUPTED) {
@@ -252,10 +248,9 @@ namespace E_VCSP.Solver {
             }
 
             // Info dump
-            Console.WriteLine($"100%\t{totalGenerated}\t{lbGenerated}\t{notFound}\t{totWithoutRC}\t{model.ObjVal}");
+            Console.WriteLine($"100%\t{totalGenerated}\t{lbGenerated}\t{model.ObjVal}");
             Console.WriteLine($"Value of relaxation: {model.ObjVal}");
             Console.WriteLine($"Total generation attempts: ${totalGenerated}");
-            Console.WriteLine($"{totWithoutRC} columns were not added due to positive reduced costs.");
             Console.WriteLine($"Solving non-relaxed model with total of {css.Duties.Count} columns");
 
             // Make model binary again

@@ -27,7 +27,7 @@
         public static Header VSP_CG = new();
         public static int VSP_INSTANCES_PER_IT = 1;
         public static int VSP_MAX_COL_GEN_ITS = 25;
-        public static int VSP_OPT_IT_THRESHOLD = 1000; // Amount of columns sequentially generated without rc before cg is stopped
+        public static int VSP_OPT_IT_THRESHOLD = 2; // Amount of columns sequentially generated without rc before cg is stopped
         public static string VSP_OPERATION_SEQUENCE = "-"; // Defines an initial operation sequence
 
         public static Header VSP_LABELING = new();
@@ -75,7 +75,7 @@
         public static Header CSP = new();
         public static bool CSP_DETERMINE_IIS = false;
         public static int CSP_SOLVER_TIMEOUT_SEC = 300;
-        public static int CSP_OPT_IT_THRESHOLD = 10; // Amount of columns sequentially generated without rc before cg is stopped
+        public static int CSP_OPT_IT_THRESHOLD = 2; // Amount of columns sequentially generated without rc before cg is stopped
         public static bool CSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static int CSP_INSTANCES_PER_IT = 1;
         public static int CSP_MAX_COL_GEN_ITS = 100;

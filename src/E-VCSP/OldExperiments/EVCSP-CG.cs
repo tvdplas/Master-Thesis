@@ -277,7 +277,7 @@ namespace E_VCSP.OldExperiments {
                 CrewDuty duty = css.Duties[i];
 
                 noExcessiveLength += Constants.CR_MAX_OVER_LONG_DUTY * v - duty.IsLongDuty * v;
-                limitedAverageLength += v * (duty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                limitedAverageLength += v * (duty.PaidDuration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
                 maxBroken += v * Constants.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty * v;
                 maxBetween += v * Constants.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty * v;
             }
@@ -404,7 +404,7 @@ namespace E_VCSP.OldExperiments {
 
                 // overall schedule contributions
                 double excessiveLength = Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
-                double limitedAverageLength = newDuty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1;
+                double limitedAverageLength = newDuty.PaidDuration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1;
                 double maxBroken = Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
                 double maxBetween = Constants.CR_MAX_BETWEEN_SHIFTS - newDuty.IsBetweenDuty;
 
@@ -424,7 +424,7 @@ namespace E_VCSP.OldExperiments {
                 col.AddTerms([..constrs.Select(c => {
                     if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) return -1.0;
                     else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
-                    else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return newDuty.Duration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1;
+                    else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return newDuty.PaidDuration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1;
                     else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
                     else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES) return Constants.CR_MAX_BETWEEN_SHIFTS - newDuty.IsBetweenDuty;
                     else throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");

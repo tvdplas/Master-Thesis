@@ -130,6 +130,9 @@ namespace E_VCSP.Solver {
             (GRBModel model, List<GRBVar> taskVars) = InitModel(ct);
             model.Optimize();
 
+            int roundsWithoutImprovement = 0;
+            double z_prev = double.MaxValue;
+
             // Tracking generated columns
             int maxColumns = Config.VSP_INSTANCES_PER_IT * Config.VSP_MAX_COL_GEN_ITS,
                 lastReportedPercent = 0,    // Percentage of total reporting
@@ -138,8 +141,6 @@ namespace E_VCSP.Solver {
                 singleGenerated = 0,
                 globalGenerated = 0,
                 lbGenerated = 0,
-                seqWithoutRC = 0,           // Number of sequential columns without reduced cost found
-                totWithoutRC = 0,           // Total columns generated with no RC
                 addedNew = 0,               // Total columns added to model (not initial)
                 notFound = 0,               // Number of columns that could not be generated
                 discardedNewColumns = 0,    // Number of columns discarded due to better one in model
@@ -209,7 +210,7 @@ namespace E_VCSP.Solver {
                 int percent = (int)((totalGenerated / (double)maxColumns) * 100);
                 if (percent >= lastReportedPercent + 10) {
                     lastReportedPercent = percent - (percent % 10);
-                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{totWithoutRC}\t{model.ObjVal}");
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{model.ObjVal}");
                 }
 
                 foreach (var taskSet in generatedTasks) {
@@ -231,15 +232,7 @@ namespace E_VCSP.Solver {
                             continue;
                         }
 
-                        // Do not add column to model
-                        if (reducedCost > 0) {
-                            seqWithoutRC++;
-                            totWithoutRC++;
-                        }
-                        else {
-                            // Reset non-reduced costs iterations
-                            seqWithoutRC = 0;
-
+                        if (reducedCost <= 0) {
                             // Replace existing column with this task, as it has lower costs
                             if (coverExists) {
                                 VehicleTask toBeReplaced = vss.CoverTaskMapping[ba];
@@ -287,10 +280,18 @@ namespace E_VCSP.Solver {
                 model.Optimize();
                 currIts++;
 
-                if (seqWithoutRC >= Config.VSP_OPT_IT_THRESHOLD) {
-                    Console.WriteLine($"Stopped due to RC > 0 for {Config.VSP_OPT_IT_THRESHOLD} consecutive tasks");
-                    break;
+                if (model.ObjVal < z_prev) {
+                    roundsWithoutImprovement = 0;
                 }
+                else {
+                    roundsWithoutImprovement++;
+                    if (roundsWithoutImprovement > Config.VSP_OPT_IT_THRESHOLD) {
+                        Console.WriteLine($"Stopped due to no improvement for {Config.VSP_OPT_IT_THRESHOLD} consecutive rounds");
+                        break;
+                    }
+                }
+
+                z_prev = model.ObjVal;
             }
 
             Console.WriteLine($"Value of relaxation: {model.ObjVal}");
@@ -309,7 +310,6 @@ namespace E_VCSP.Solver {
             Console.WriteLine($"Total generation attempts: ${totalGenerated}");
             Console.WriteLine($"LS failed to generate charge-feasible trip {notFound} times during generation");
             Console.WriteLine($"Discarded {discardedOldColumns} old, {discardedNewColumns} new columns during generation");
-            Console.WriteLine($"{totWithoutRC} columns were not added due to positive reduced costs.");
             Console.WriteLine($"Solving non-relaxed model with total of {vss.Tasks.Count} columns");
             model.Update();
             bool configState = Config.CONSOLE_GUROBI;
@@ -329,7 +329,7 @@ namespace E_VCSP.Solver {
 
             Console.WriteLine($"Solution found with {taskVars.Where(x => x.X == 1).Count()} vehicles, overall costs {model.ObjVal}");
 
-            (var selectedTasks, var blocks) = finalizeResults(true);
+            (var selectedTasks, _) = finalizeResults(true);
             vss.SelectedTasks = selectedTasks;
 
 

@@ -59,6 +59,7 @@ namespace E_VCSP.Solver.SolutionState {
             }
         }
 
+        #region dump
         public void Dump() {
             File.WriteAllText(Path.Join(Constants.RUN_LOG_FOLDER, "css-result.json"),
             System.Text.Json.JsonSerializer.Serialize(new CrewSolutionStateDump {
@@ -108,6 +109,7 @@ namespace E_VCSP.Solver.SolutionState {
 
             PrintCostBreakdown();
         }
+        #endregion
 
         public void ResetFromBlocks() {
             SelectedDuties.Clear();
@@ -124,6 +126,21 @@ namespace E_VCSP.Solver.SolutionState {
 
             for (int i = 0; i < oldBlocks.Count; i++) {
                 AddBlock(oldBlocks[i], oldCounts[i]);
+            }
+        }
+
+        /// <summary>
+        /// Resets the block and adjacency, removes all unit block tasks
+        /// </summary>
+        public void ResetBlocks() {
+            Adj = [[], []];
+            AdjFull = [[null, null], [null, null]];
+            Blocks = [];
+            BlockCount = [];
+
+            // Remove all unit duties as well
+            for (int i = Duties.Count - 1; i >= 0; i--) {
+                if (Duties[i].IsUnit) Duties.RemoveAt(i);
             }
         }
 
@@ -250,7 +267,7 @@ namespace E_VCSP.Solver.SolutionState {
             double maxBetweenPenalty = betweenDutySlack * Constants.CR_HARD_CONSTR_PENALTY;
             double totalPenalty = countPenalty + avgPenalty + longPenalty + maxBrokenPenalty + maxBetweenPenalty;
 
-            double workingHours = SelectedDuties.Sum(x => x.duty.Duration * x.count) / 60.0 / 60.0;
+            double workingHours = SelectedDuties.Sum(x => x.duty.PaidDuration * x.count) / 60.0 / 60.0;
             double blockHours = SelectedDuties.Sum(x => x.count * x.duty.Elements.Sum(y => {
                 if (y is CDEBlock) return y.EndTime - y.StartTime;
                 else return 0;

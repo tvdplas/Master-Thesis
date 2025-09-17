@@ -48,72 +48,48 @@ namespace E_VCSP.Solver {
 
         #region Init
         private void initializeCover() {
-            // Create initial set of vehicle tasks 
-            vss.Reset(false);
-            VSPLSGlobal vspGlobal = new(vss);
-            vspGlobal.UpdateDualCosts(vss.Instance.Trips.Select(_ => 0.0).ToList(), [], []);
-
-            bool initialPenaltyState = Config.VSP_LS_SHR_ALLOW_PENALTY;
-            Config.VSP_LS_SHR_ALLOW_PENALTY = false;
-            var initialTasks = vspGlobal.GenerateVehicleTasks();
-            Config.VSP_LS_SHR_ALLOW_PENALTY = initialPenaltyState;
-
-            vss.Tasks = initialTasks.Select(x => x.vehicleTask).ToList();
-
-            // Process blocks in the initial tasks
-            css.Blocks = [];
-            css.BlockCount = [];
-            css.ResetFromBlocks();
-            var blocksWithCount = Block.FromVehicleTasks(vss.Tasks);
-            Dictionary<string, double> dummyDualCosts = [];
-            foreach ((Block b, int c) in blocksWithCount) {
-                knownBlocks.Add(b.Descriptor, css.Blocks.Count);
+            EVSPCG vspSolver = new(vss);
+            vspSolver.Solve(new());
+            List<(Block block, int count)> initialBlocks = Block.FromVehicleTasks(vss.SelectedTasks);
+            foreach ((var b, int c) in initialBlocks)
                 css.AddBlock(b, c);
-                dummyDualCosts[Constants.CSTR_BLOCK_COVER + b.Descriptor] = 0;
-            }
-            dummyDualCosts[Constants.CSTR_CR_AVG_TIME] = 0;
-            dummyDualCosts[Constants.CSTR_CR_LONG_DUTIES] = 0;
-            dummyDualCosts[Constants.CSTR_CR_BROKEN_DUTIES] = 0;
-            dummyDualCosts[Constants.CSTR_CR_BETWEEN_DUTIES] = 0;
-            foreach (var task in vss.Tasks) {
-                // Ensure block index mapping for tasks
-                foreach (string desc in task.BlockDescriptorCover)
-                    task.BlockIndexCover.Add(knownBlocks[desc]);
-                task.IsUnit = true;
-            }
+            CSPCG cspSolver = new(css);
+            cspSolver.Solve(new());
 
-            // Create initial set of crew duties
-            CSPLSGlobal cspGlobal = new(css);
-            cspGlobal.UpdateDualCosts(dummyDualCosts, 0);
-            List<CrewDuty> initialDuties = cspGlobal.GenerateDuties().Select(x => x.crewDuty).ToList();
-            HashSet<string> initialDutyCovering = [.. initialDuties.SelectMany(x => x.BlockDescriptorCover)];
-
-            // Add single duties if local search was not able to cover all blocks
-            foreach (var b in css.Blocks) {
-                if (initialDutyCovering.Contains(b.Descriptor)) continue;
-                initialDuties.Add(new CrewDuty([new CDEBlock(b)]) { Type = DutyType.Single });
-            }
-
-            css.Duties = initialDuties.Select((x, i) => {
-                x.Index = i;
-                x.IsUnit = true;
-                return x;
-            }).ToList();
-        }
-
-        private void initializeUpperBound() {
-            // Determine upper bound
+            // Initial solution is (vss.SelectedTasks, css.SelectedDuties)
             costUpperBound = 0;
+            foreach (var vt in vss.SelectedTasks) costUpperBound += vt.Cost;
+            costUpperBound += Math.Max(0, vss.SelectedTasks.Count - Config.MAX_VEHICLES) * Config.VH_OVER_MAX_COST;
+            foreach (var cd in css.SelectedDuties) costUpperBound += cd.duty.Cost * cd.count;
+            costUpperBound += Math.Max(0, css.SelectedDuties.Sum(x => x.count) - Config.MAX_DUTIES) * Config.CR_OVER_MAX_COST;
 
-            // vehicle related costs
-            foreach (var vt in vss.Tasks) costUpperBound += vt.Cost;
-            costUpperBound += Math.Max(0, vss.Tasks.Count - Config.MAX_VEHICLES) * Config.VH_OVER_MAX_COST;
+            // Index blocks in both tasks and duties; allows reuse of generated columns in integrated approach
+            List<(Block b, int c)> allBlocks = Block.FromVehicleTasks(vss.Tasks);
+            css.ResetBlocks();
+            for (int bi = 0; bi < allBlocks.Count; bi++) {
+                css.AddBlock(allBlocks[bi].b, 1);
+                knownBlocks[allBlocks[bi].b.Descriptor] = bi;
+            }
 
-            // crew related costs
-            foreach (var cd in css.Duties) costUpperBound += cd.Cost;
-            costUpperBound += Math.Max(0, css.Duties.Count - Config.MAX_DUTIES) * Config.CR_OVER_MAX_COST;
+            // reindex tasks
+            for (int i = 0; i < vss.Tasks.Count; i++) {
+                var task = vss.Tasks[i];
+                task.BlockIndexCover = [];
+                foreach (string desc in task.BlockDescriptorCover) {
+                    task.BlockIndexCover.Add(knownBlocks[desc]);
+                }
+            }
+            // reindex dutie
+            for (int i = 0; i < css.Duties.Count; i++) {
+                var duty = css.Duties[i];
+                duty.BlockIndexCover = [];
+                foreach (string desc in duty.BlockDescriptorCover) {
+                    duty.BlockIndexCover.Add(knownBlocks[desc]);
+                }
+            }
 
-            objVal = (costUpperBound, true);
+            foreach (var task in vss.SelectedTasks) task.IsUnit = true;
+            foreach ((var duty, _) in css.SelectedDuties) duty.IsUnit = true;
         }
 
         private void resetLamdba(bool clear) {
@@ -191,7 +167,7 @@ namespace E_VCSP.Solver {
                             for (int j = 0; j < duty.BlockIndexCover.Count; j++)
                                 cost += lambdaBlocks[duty.BlockIndexCover[j]];
 
-                            cost += lambdaAvgDutyLength * ((double)duty.Duration / Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                            cost += lambdaAvgDutyLength * ((double)duty.PaidDuration / Constants.CR_TARGET_SHIFT_LENGTH - 1);
                             cost -= lambdaMaxLongDuty * (Constants.CR_MAX_OVER_LONG_DUTY - duty.IsLongDuty);
                             cost -= lambdaMaxBroken * (Constants.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty);
                             cost -= lambdaMaxBetween * (Constants.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty);
@@ -321,7 +297,7 @@ namespace E_VCSP.Solver {
                         GBlocks[blockIndex] += 1;
                     }
 
-                    GAvgDutyLength += ((double)duty.Duration / Constants.CR_TARGET_SHIFT_LENGTH - 1.0);
+                    GAvgDutyLength += ((double)duty.PaidDuration / Constants.CR_TARGET_SHIFT_LENGTH - 1.0);
                     GMaxLongDuty -= (Constants.CR_MAX_OVER_LONG_DUTY - duty.IsLongDuty);
                     GMaxBroken -= (Constants.CR_MAX_BROKEN_SHIFTS - duty.IsBrokenDuty);
                     GMaxBetween -= (Constants.CR_MAX_BETWEEN_SHIFTS - duty.IsBetweenDuty);
@@ -901,7 +877,6 @@ namespace E_VCSP.Solver {
 
         public override bool Solve(CancellationToken ct) {
             initializeCover();
-            initializeUpperBound();
             initializeLagrangeModel();
 
             // Initialize dual cost

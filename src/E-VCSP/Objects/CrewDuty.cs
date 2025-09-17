@@ -193,26 +193,13 @@ namespace E_VCSP.Objects {
             get {
                 if (cachedCost != -1) return cachedCost;
                 double cost = Config.CR_SHIFT_COST; // base
-                                                    // Driven time
-                cost += Elements.Sum(e => (e.EndTime - e.StartTime) / (60.0 * 60.0) * Constants.CR_HOURLY_COST);
+
+                // Driven time
+                cost += PaidDuration / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
                 // Special type
                 if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;
                 // Special type + remove largest idle
-                if (Type == DutyType.Broken) {
-                    var largestIdle = Elements
-                        .Where(e => e.Type == CrewDutyElementType.Idle)
-                        .OrderByDescending(e => e.EndTime - e.StartTime)
-                        .FirstOrDefault();
-
-                    if (largestIdle == null) {
-                        //throw new InvalidDataException("Broken shift with no idle");
-                    }
-                    else {
-                        cost -= (largestIdle.EndTime - largestIdle.StartTime) / (60.0 * 60.0) * Constants.CR_HOURLY_COST; // remove largest idle
-                    }
-
-                    cost += Constants.CR_BROKEN_SHIFT_COST;
-                }
+                if (Type == DutyType.Broken) cost += Constants.CR_BROKEN_SHIFT_COST;
 
                 cachedCost = cost;
                 return cost;
@@ -220,7 +207,7 @@ namespace E_VCSP.Objects {
         }
 
         private int cachedDuration = -1;
-        public int Duration {
+        public int PaidDuration {
             get {
                 if (cachedDuration != -1) return cachedDuration;
 
@@ -232,16 +219,22 @@ namespace E_VCSP.Objects {
                         .FirstOrDefault();
 
                     if (largestIdle != null) {
-                        duration -= largestIdle.EndTime - largestIdle.StartTime;
+                        int longestIdleTime = largestIdle.EndTime - largestIdle.StartTime;
+                        if (Constants.CR_MIN_LONG_IDLE_TIME <= longestIdleTime
+                            && longestIdleTime <= Constants.CR_MAX_LONG_IDLE_TIME
+                        ) {
+                            duration -= largestIdle.EndTime - largestIdle.StartTime;
+                        }
                     }
                 }
 
                 cachedDuration = duration;
+                if (duration > Constants.CR_MAX_SHIFT_LENGTH + 1000) throw new InvalidOperationException("Heh");
                 return cachedDuration;
             }
         }
 
-        public int IsLongDuty => Duration > Constants.CR_LONG_SHIFT_LENGTH ? 1 : 0;
+        public int IsLongDuty => PaidDuration > Constants.CR_LONG_SHIFT_LENGTH ? 1 : 0;
         public int IsBrokenDuty => Type == DutyType.Broken ? 1 : 0;
         public int IsBetweenDuty => Type == DutyType.Between ? 1 : 0;
 
