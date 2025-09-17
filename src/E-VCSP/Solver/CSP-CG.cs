@@ -43,9 +43,13 @@ namespace E_VCSP.Solver {
             });
 
             List<GRBVar> dutyVars = [];
+            GRBLinExpr maxDuties = new();
+
             for (int i = 0; i < css.Duties.Count; i++) {
                 string name = $"cd_{i}";
                 GRBVar v = model.AddVar(0, GRB.INFINITY, css.Duties[i].Cost, GRB.CONTINUOUS, name);
+
+                maxDuties += v;
 
                 // Bookkeeping to find variable based on name / cover easily
                 dutyVars.Add(v);
@@ -72,8 +76,8 @@ namespace E_VCSP.Solver {
             GRBLinExpr limitedAverageLength = new(); // avg 8 hours
             GRBLinExpr maxBroken = new(); // max 30% broken
             GRBLinExpr maxBetween = new(); // max 10% between
-            GRBLinExpr maxSingle = new(); // Use singles at a cost
 
+            GRBVar maxDutySlack = model.AddVar(0, GRB.INFINITY, Config.CR_OVER_MAX_COST, GRB.CONTINUOUS, "maxDutySlack");
             GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "noExcessiveLengthSlack");
             GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "limitedAverageLengthSlack");
             GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "maxBrokenSlack");
@@ -90,6 +94,7 @@ namespace E_VCSP.Solver {
                 maxBetween += v * Constants.CR_MAX_BETWEEN_SHIFTS - (duty.Type == DutyType.Between ? v : 0);
             }
 
+            model.AddConstr(maxDuties - maxDutySlack <= Config.MAX_DUTIES, Constants.CSTR_MAX_DUTIES);
             model.AddConstr(noExcessiveLength + noExcessiveLengthSlack >= 0, Constants.CSTR_CR_LONG_DUTIES);
             model.AddConstr(limitedAverageLength - limitedAverageLengthSlack <= 0, Constants.CSTR_CR_AVG_TIME);
             model.AddConstr(maxBroken + maxBrokenSlack >= 0, Constants.CSTR_CR_BROKEN_DUTIES);
@@ -285,7 +290,13 @@ namespace E_VCSP.Solver {
 
             Config.CONSOLE_GUROBI = configState;
             css.SelectedDuties = getSelectedDuties();
-            css.PrintCostBreakdown();
+            css.PrintCostBreakdown(
+                (int)model.GetVarByName("maxDutySlack").X,
+                model.GetVarByName("limitedAverageLengthSlack").X,
+                model.GetVarByName("noExcessiveLengthSlack").X,
+                model.GetVarByName("maxBrokenSlack").X,
+                model.GetVarByName("maxBetweenSlack").X
+            );
 
             if (Config.DUMP_CSP) css.Dump();
             return succes;
