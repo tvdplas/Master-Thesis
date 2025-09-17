@@ -304,11 +304,21 @@ namespace E_VCSP.Solver {
                 }
 
                 double GSquaredSum = 0;
-                for (int i = 0; i < GTrips.Length; i++) GSquaredSum += GTrips[i] * GTrips[i];
-                for (int i = 0; i < GBlocks.Length; i++) GSquaredSum += GBlocks[i] * GBlocks[i];
+                for (int i = 0; i < GTrips.Length; i++) {
+                    if (lambdaTrips[i] == 0 && GTrips[i] < 0) GTrips[i] = 0;
+                    GSquaredSum += GTrips[i] * GTrips[i];
+                }
+                for (int i = 0; i < GBlocks.Length; i++) {
+                    // No g = 0 as blocks are an == constraint
+                    GSquaredSum += GBlocks[i] * GBlocks[i];
+                }
+                if (GAvgDutyLength < 0 && lambdaAvgDutyLength == 0) GAvgDutyLength = 0;
                 GSquaredSum += GAvgDutyLength * GAvgDutyLength;
+                if (GMaxLongDuty < 0 && lambdaMaxLongDuty == 0) GMaxLongDuty = 0;
                 GSquaredSum += GMaxLongDuty * GMaxLongDuty;
+                if (GMaxBroken < 0 && lambdaMaxBroken == 0) GMaxBroken = 0;
                 GSquaredSum += GMaxBroken * GMaxBroken;
+                if (GMaxBetween < 0 && lambdaMaxBetween == 0) GMaxBetween = 0;
                 GSquaredSum += GMaxBetween * GMaxBetween;
 
                 double T = pi * (costUpperBound - z_curr) / GSquaredSum;

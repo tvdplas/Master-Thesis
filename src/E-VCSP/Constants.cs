@@ -39,7 +39,7 @@
         public static int CR_MAX_BREAK_TIME = 1 * 60 * 60; // Max break length
         public static int CR_MIN_SHORT_IDLE_TIME = 0; // Min idle time which is not part of a split shift
         public static int CR_MAX_SHORT_IDLE_TIME = 15 * 60; // Max idle time which is not part of a split shift
-        public static int CR_MIN_LONG_IDLE_TIME = 2 * 60 * 60; // Min idle time which is part of a split shift
+        public static int CR_MIN_LONG_IDLE_TIME = (int)(1.5 * 60 * 60); // Min idle time which is part of a split shift
         public static int CR_MAX_LONG_IDLE_TIME = 5 * 60 * 60; // Max idle time which is part of a split shift
 
         public static string DATA_FOLDER = "";

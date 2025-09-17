@@ -198,7 +198,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     BlockArc? arc = css.AdjFull[^2][targetBlockIndex];
                     if (arc == null || blockedBlock[targetBlockIndex]) continue;
                     CSPLabel l = new() {
-                        StartTime = css.Blocks[targetBlockIndex].StartTime - arc.TravelTime, // signon
+                        StartTime = css.Blocks[targetBlockIndex].StartTime
+                                    - css.Blocks[targetBlockIndex].StartLocation.SignOnTime, // signon
                         CoveredBlockIds = new BitArray(css.Blocks.Count, false),
                         PrevLabelId = -1,
                         PrevBlockId = -1,
@@ -252,9 +253,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                     int timeDiff = currentEndTime - prevEndTime;
 
+                    int longActualIdleTime = arc.IdleTime - arc.FromBlock!.EndLocation.SignOffTime - arc.FromBlock.EndLocation.SignOnTime;
                     int addedTime = arc.Type != BlockArcType.LongIdle
                         ? timeDiff
-                        : timeDiff - arc.IdleTime - arc.FromBlock.EndLocation.SignOffTime - arc.FromBlock.EndLocation.SignOnTime;
+                        : timeDiff - longActualIdleTime;
+
 
                     double costFromTime = addedTime / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
                     double costFromRc = targetBlockIndex < css.Blocks.Count ? -blockDualCosts[targetBlockIndex] : 0;
@@ -262,7 +265,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     CSPLabel newLabel = new() {
                         CoveredBlockIds = newCoverage,
                         Breaks = arc.BreakTime == 0 ? currentLabel.Breaks : [.. currentLabel.Breaks, (arc.FromBlock!.EndTime, arc.BreakTime)],
-                        Idle = arc.Type == BlockArcType.LongIdle ? (arc.FromBlock!.EndTime + arc.FromBlock.EndLocation.SignOffTime, arc.IdleTime) : currentLabel.Idle,
+                        Idle = arc.Type == BlockArcType.LongIdle ? (arc.FromBlock!.EndTime + arc.FromBlock.EndLocation.SignOffTime, longActualIdleTime) : currentLabel.Idle,
                         PrevBlockId = currentNodeIndex,
                         Cost = currentLabel.Cost + costFromTime + costFromRc,
                         PrevLabelId = currentLabel.Id,
@@ -368,6 +371,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 CrewDuty cd = new CrewDuty(cdes) {
                     Type = type,
                 };
+                if (cd.PaidDuration > Constants.CR_MAX_SHIFT_LENGTH) {
+                    Console.WriteLine("Incorrect duty duration");
+                }
                 duties.Add((reducedCost, cd));
             }
 

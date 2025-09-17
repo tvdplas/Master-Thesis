@@ -170,8 +170,12 @@ namespace E_VCSP.Solver.SolutionState {
                 blockArcType = BlockArcType.ShortIdle;
 
             // Long idle used for split shifts
-            else if (idleLocation.CrewBase && Constants.CR_MIN_LONG_IDLE_TIME <= idleTime && idleTime <= Constants.CR_MAX_LONG_IDLE_TIME)
-                blockArcType = BlockArcType.LongIdle;
+            else if (idleLocation.CrewBase) {
+                int nettoRestTime = idleTime - idleLocation.SignOnTime - idleLocation.SignOffTime;
+                if (Constants.CR_MIN_LONG_IDLE_TIME <= nettoRestTime && nettoRestTime <= Constants.CR_MAX_LONG_IDLE_TIME) {
+                    blockArcType = BlockArcType.LongIdle;
+                }
+            }
 
             if (blockArcType != BlockArcType.Invalid) {
                 arc = new() {
