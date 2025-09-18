@@ -762,7 +762,7 @@ In order to solve the E-VCSP, we will apply a combination of the techniques used
 In order to have a baseline solution for the E-VCSP, we first solve the E-VSP and CSP sequentially using the techniques discussed in Sections \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}. During the solving process, a set of columns $VT_{init}$ and $CD_{init}$ representing vehicle tasks and crew duties respectively are generated. Let $VT_{init}^* \subseteq VT_{init}$ and $CD_{init}^* \subseteq CD_{init}$ be the selected subsets that form the solution to the sequential problem. Let $z_{init}$ be the total cost of this solution, representing an upper bound for the cost of the integrated problem.
 
 \subsubsection{Solving}
-Let us once again define an ILP in order to solve the E-VCSP. In this, let $VT$ and $CD$ be the sets of available vehicle tasks and crew duties respectively. Let $x_i$ and $y_j$ be binary decision variables indicating the usage of vehicle task $vt_i \in VT$ and crew duty $cd_j \in CD$ respectively. Let $k_{i,t}$, $l_{i,b}$ and $m_{j,b}$ be parameters indicating that $vt_i$ covers $t$, $vt_i$ covers $b$ and $cd_j$ covers $b$ respectively. Additionally, let $d_j$ be the duration of $cd_j$, let $d_{j,\textit{long}}$ indicate that $d_j$ is longer than 8.5 hours, and let $\rho_{j,\textit{broken}}$ and $\rho_{j,\textit{between}}$ indicate that $cd_j$ is of duty type \textit{broken} or \textit{between}, respectively. Lastly, let $cost(vt_i)$ and $cost(cd_j)$ be the costs of vehicle task $vt_i$ and crew duty $cd_j$ respectively. Our ILP is then defined as follows:
+Let us once again define an ILP in order to solve the E-VCSP. We will continue to use the same notation as in Sections \ref{sec:problem_def}, \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}; that is, let $VT$ and $CD$ be the sets of available vehicle tasks and crew duties respectively. Let $x_i$ and $y_j$ be binary decision variables indicating the usage of vehicle task $vt_i \in VT$ and crew duty $cd_j \in CD$ respectively. Let $k_{i,t}$, $l_{i,b}$ and $m_{j,b}$ be parameters indicating that $vt_i$ covers $t$, $vt_i$ covers $b$ and $cd_j$ covers $b$ respectively. Additionally, let $d_j$ be the duration of $cd_j$, let $d_{j,\textit{long}}$ indicate that $d_j$ is longer than 8.5 hours, and let $\rho_{j,\textit{broken}}$ and $\rho_{j,\textit{between}}$ indicate that $cd_j$ is of duty type \textit{broken} or \textit{between}, respectively. Lastly, let $cost(vt_i)$ and $cost(cd_j)$ be the costs of vehicle task $vt_i$ and crew duty $cd_j$ respectively. Our ILP is then defined as follows:
 
 \begin{align}
 \min \quad
@@ -770,15 +770,17 @@ Let us once again define an ILP in order to solve the E-VCSP. In this, let $VT$ 
 \end{align}
 Subject to:
 \begin{align}
-\sum_{1 \leq i \leq |V|} x_{i}k_{i,t} &= 1 && \forall t = 1,\:\dots,\:|T| \label{form:methods-integrated-all-trips-covered} \\
-\sum_{1 \leq i \leq |V|}x_i l_{i,b} - \sum_{1 \leq j \leq |C|}y_j m_{j,b} &= 0 && \forall b \in B \label{form:methods-integrated-all-blocks-covered} \\
+\sum_{1 \leq i \leq |V|} x_{i}k_{i,t} &>= 1 && \forall t = 1,\:\dots,\:|T| \label{form:methods-integrated-all-trips-covered} \\
+\sum_{1 \leq i \leq |V|}x_i l_{i,b} - \sum_{1 \leq j \leq |C|}y_j m_{j,b} &<= 0 && \forall b \in B \label{form:methods-integrated-all-blocks-covered} \\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (\frac{d_{j}}{\textit{8 hours}} - 1) &\leq 0 && \label{form:methods-integrated-max-avg-shift-length}\\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.15 - d_{j,\textit{long}}) &\geq 0 && \label{form:methods-integrated-max-long-shifts}\\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.3 - \rho_{j,\textit{broken}}) &\geq 0 && \label{form:methods-integrated-max-broken-shifts}\\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.1 - \rho_{j,\textit{between}}) &\geq 0 && \label{form:methods-integrated-max-between-shifts}\\
 x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|VT| \\
-y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|CD|
+y_{j} &\in \mathcal{N} && \forall j = 1,\:\dots,\:|CD|
 \end{align}
+In this, constraint (\ref{form:methods-integrated-all-trips-covered}) ensures that all trips are covered by at least one vehicle task, while constraint (\ref{form:methods-integrated-all-blocks-covered}) ensures that all blocks are covered by exactly one vehicle task and one crew duty. Constraints (\ref{form:methods-integrated-max-avg-shift-length}-\ref{form:methods-integrated-max-between-shifts}) are identical to those previously defined in the CSP section, ensuring that the overall set of duties satisfies the labor regulations.
+
 \section{Results}
 \todo{Hier iets zeggen over de instanties, het feit dat daar ook gelopen mag worden tussen locaæties maar dat dit verwerkt is in signon/signoff/bruttonetto break tijden}.
 \printbibliography

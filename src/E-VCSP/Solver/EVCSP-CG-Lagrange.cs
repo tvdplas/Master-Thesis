@@ -738,17 +738,24 @@ namespace E_VCSP.Solver {
 
             List<GRBVar> taskVars = [], dutyVars = [];
             for (int i = 0; i < vss.Tasks.Count; i++) {
+                if (vss.Tasks[i].Index != i) Console.WriteLine("Vehicle task index mismatch");
                 string name = $"vt_{i}";
                 GRBVar v = model.AddVar(0, GRB.INFINITY, vss.Tasks[i].Cost, GRB.BINARY, name);
                 v.Set(GRB.DoubleAttr.Start, 0);
                 taskVars.Add(v);
             }
             for (int i = 0; i < css.Duties.Count; i++) {
+                if (css.Duties[i].Index != i) Console.WriteLine("Warning: Vehicle task index mismatch");
                 string name = $"cd_{i}";
                 GRBVar v = model.AddVar(0, GRB.INFINITY, css.Duties[i].Cost, GRB.INTEGER, name);
                 v.Set(GRB.DoubleAttr.Start, 0);
                 dutyVars.Add(v);
             }
+
+            foreach (var task in vss.SelectedTasks)
+                taskVars[task.Index].Set(GRB.DoubleAttr.Start, 1.0);
+            foreach ((var duty, int count) in css.SelectedDuties)
+                dutyVars[duty.Index].Set(GRB.DoubleAttr.Start, count);
 
             // Max selected vehicle tasks
             GRBLinExpr maxVehiclesExpr = new();
@@ -759,6 +766,7 @@ namespace E_VCSP.Solver {
                 maxVehiclesExpr += v;
             }
             model.AddConstr(maxVehiclesExpr - maxVehiclesSlack <= Config.MAX_VEHICLES, Constants.CSTR_MAX_VEHICLES);
+
 
             // Trip cover by vehicle tasks
             foreach (Trip t in vss.Instance.Trips) {
@@ -904,8 +912,8 @@ namespace E_VCSP.Solver {
             initializeLagrangeModel();
 
             // Initialize dual cost
+            Console.WriteLine($"I\t{costUpperBound:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}");
             gradientDescent();
-            Console.WriteLine($"I\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}");
 
             int round = 0;
             for (; round < Config.VCSP_ROUNDS; round++) {
