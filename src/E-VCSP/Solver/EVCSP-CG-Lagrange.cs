@@ -74,22 +74,28 @@ namespace E_VCSP.Solver {
             // reindex tasks
             for (int i = 0; i < vss.Tasks.Count; i++) {
                 var task = vss.Tasks[i];
+                if (task.Index != i) throw new InvalidDataException("Task indexing in initial solution is wrong");
                 task.BlockIndexCover = [];
                 foreach (string desc in task.BlockDescriptorCover) {
                     task.BlockIndexCover.Add(knownBlocks[desc]);
                 }
             }
-            // reindex dutie
+            // reindex duties
             for (int i = 0; i < css.Duties.Count; i++) {
                 var duty = css.Duties[i];
+                if (duty.Index != i) throw new InvalidDataException("Duty indexing in initial solution is wrong");
                 duty.BlockIndexCover = [];
                 foreach (string desc in duty.BlockDescriptorCover) {
                     duty.BlockIndexCover.Add(knownBlocks[desc]);
                 }
             }
 
-            foreach (var task in vss.SelectedTasks) task.IsUnit = true;
-            foreach ((var duty, _) in css.SelectedDuties) duty.IsUnit = true;
+            foreach (var task in vss.SelectedTasks) {
+                task.IsUnit = true;
+            }
+            foreach ((var duty, _) in css.SelectedDuties) {
+                duty.IsUnit = true;
+            }
         }
 
         private void resetLamdba(bool clear) {
@@ -117,6 +123,7 @@ namespace E_VCSP.Solver {
         }
         #endregion
 
+        #region Lagrangean Updates
         private async void updateReducedCosts() {
             List<Task> tasks = new(2 * Config.THREAD_COUNT);
 
@@ -423,16 +430,9 @@ namespace E_VCSP.Solver {
                 lambdaBlocks[i] *= disruption;
             }
         }
+        #endregion
 
-        private Dictionary<string, double> crewDualCost() {
-            Dictionary<string, double> res = lambdaBlocks.Select((l, i) => (Constants.CSTR_BLOCK_COVER + css.Blocks[i].Descriptor, -l)).ToDictionary();
-            res[Constants.CSTR_CR_AVG_TIME] = lambdaAvgDutyLength;
-            res[Constants.CSTR_CR_LONG_DUTIES] = lambdaMaxLongDuty;
-            res[Constants.CSTR_CR_BROKEN_DUTIES] = lambdaMaxBroken;
-            res[Constants.CSTR_CR_BETWEEN_DUTIES] = lambdaMaxBetween;
-            return res;
-        }
-
+        #region Vehicle its 
         private void runVehicleIts(int round, bool disrupt = false) {
             int maxIts = round == 0 ? Config.VCSP_VH_ITS_INIT : Config.VCSP_VH_ITS_ROUND;
             VSPLabeling vspLabelingInstance = new(vss);
@@ -520,7 +520,17 @@ namespace E_VCSP.Solver {
                 Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}\t{newColumns.Count}");
             }
         }
+        #endregion
 
+        #region Crew its
+        private Dictionary<string, double> crewDualCost() {
+            Dictionary<string, double> res = lambdaBlocks.Select((l, i) => (Constants.CSTR_BLOCK_COVER + css.Blocks[i].Descriptor, -l)).ToDictionary();
+            res[Constants.CSTR_CR_AVG_TIME] = lambdaAvgDutyLength;
+            res[Constants.CSTR_CR_LONG_DUTIES] = lambdaMaxLongDuty;
+            res[Constants.CSTR_CR_BROKEN_DUTIES] = lambdaMaxBroken;
+            res[Constants.CSTR_CR_BETWEEN_DUTIES] = lambdaMaxBetween;
+            return res;
+        }
         private void runCrewIts(int round, bool disrupt = false) {
             int maxIts = round == 0 ? Config.VCSP_CR_ITS_INIT : Config.VCSP_CR_ITS_ROUND;
 
@@ -704,6 +714,8 @@ namespace E_VCSP.Solver {
             }
         }
 
+        #endregion
+
         private void solveILP() {
             // Solve using ILP
             GRBEnv env = new() {
@@ -728,11 +740,13 @@ namespace E_VCSP.Solver {
             for (int i = 0; i < vss.Tasks.Count; i++) {
                 string name = $"vt_{i}";
                 GRBVar v = model.AddVar(0, GRB.INFINITY, vss.Tasks[i].Cost, GRB.BINARY, name);
+                v.Set(GRB.DoubleAttr.Start, 0);
                 taskVars.Add(v);
             }
             for (int i = 0; i < css.Duties.Count; i++) {
                 string name = $"cd_{i}";
                 GRBVar v = model.AddVar(0, GRB.INFINITY, css.Duties[i].Cost, GRB.INTEGER, name);
+                v.Set(GRB.DoubleAttr.Start, 0);
                 dutyVars.Add(v);
             }
 
@@ -765,12 +779,12 @@ namespace E_VCSP.Solver {
                 GRBLinExpr expr = new();
 
                 for (int vtIndex = 0; vtIndex < taskVars.Count; vtIndex++) {
-                    if (vss.Tasks[vtIndex].BlockIndexCover.Contains(blockIndex))
+                    if (vss.Tasks[vtIndex].BlockDescriptorCover.Contains(blockDescriptor))
                         expr += taskVars[vtIndex];
                 }
 
                 for (int cdIndex = 0; cdIndex < dutyVars.Count; cdIndex++) {
-                    if (css.Duties[cdIndex].BlockIndexCover.Contains(blockIndex))
+                    if (css.Duties[cdIndex].BlockDescriptorCover.Contains(blockDescriptor))
                         expr -= dutyVars[cdIndex];
                 }
 
@@ -901,12 +915,12 @@ namespace E_VCSP.Solver {
                 Console.WriteLine($"{round}\t{objVal.val:0.##}\t{X.Count(x => x)}\t{X.Count}\t{Y.Count(y => y)}\t{Y.Count}");
             }
 
-            if (Config.LAGRANGE_DISRUPTION_ROUNDS < 1) {
+            if (Config.LAGRANGE_DISRUPT_ROUNDS < 1) {
                 Console.WriteLine("Skipping disruption rounds");
             }
             else {
-                Console.WriteLine($"Doing {Config.LAGRANGE_DISRUPTION_ROUNDS} additional round{((Config.LAGRANGE_DISRUPTION_ROUNDS > 1) ? "s" : "")} with disrupted lambda");
-                for (int i = 0; i < Config.LAGRANGE_DISRUPTION_ROUNDS; i++) {
+                Console.WriteLine($"Doing {Config.LAGRANGE_DISRUPT_ROUNDS} additional round{((Config.LAGRANGE_DISRUPT_ROUNDS > 1) ? "s" : "")} with disrupted lambda");
+                for (int i = 0; i < Config.LAGRANGE_DISRUPT_ROUNDS; i++) {
                     runVehicleIts(round + i, true);
                     runCrewIts(round + i, true);
                 }

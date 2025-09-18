@@ -208,7 +208,7 @@ Let the set of all feasible blocks be $B$. A schedule for a vehicle throughout t
   \item Sequential pairs of blocks must be compatible; that is, for each sequential pair of blocks $b$ and $b'$, $b$ must either end in a deadhead whose target is the starting trip of $b'$, or $b$ must end in a trip which is the origin of the starting deadhead of $b'$.
   \item Given an SoC $\sigma_{start}$ at the beginning of the task, the SoC of the vehicle should always remain within $[ \sigma_{min}, \sigma_{max} ]$ during all blocks.
 \end{itemize}
-Let the set of all feasible vehicle tasks be $V$. For a vehicle task $v$, let us define its cost as being $cost(v) = \gamma_1 + \gamma_2 \cdot km(v) + \gamma_3 \cdot chg(v) + \gamma_4 \cdot chl(v)$, where $km(v)$, $chg(v)$ and $chl(v)$ represent kilometers traveled, charge gained and charge lost during $v$ respectively and $\gamma$ is a vector of cost scalars.
+Let the set of all feasible vehicle tasks be $VT$. For a vehicle task $v$, let us define its cost as being $cost(v) = \gamma_1 + \gamma_2 \cdot km(v) + \gamma_3 \cdot chg(v) + \gamma_4 \cdot chl(v)$, where $km(v)$, $chg(v)$ and $chl(v)$ represent kilometers traveled, charge gained and charge lost during $v$ respectively and $\gamma$ is a vector of cost scalars.
 
 Next, let us consider crew schedules. As with vehicle tasks, crew schedule primarily consist of blocks that need to be driven throughout the day. Crew members are however bound by labor regulations; in most cases, this means that we will need to include break times and a maximum overall duration in the schedule. Additionally, idle time at handover locations may be required in order to wait for an arriving vehicle, and crew members may travel to different locations through means other than driving a vehicle. A \textit{crew duty} therefore consists of a sequence of blocks and idle/break times. As with vehicle tasks, we will refer to individual parts of this sequence as elements. Exact feasibility constraints for crew duties will differ per country and region based on local labor regulations, however in general the following conditions must always be met: 
 \begin{itemize}
@@ -241,23 +241,23 @@ Constraints are also placed on the shifts which are eventually selected in order
   \item At most 10\% of all selected duties are of type \textit{between}.
 \end{itemize} 
 
-Let the set of all crew duties that match these conditions be $C$. For a crew duty $c$ let us define its cost as being $cost(c) = \beta_1 + \beta_2 \cdot br(c) + \beta_3 \cdot dur(c)$, where $br(c)$ and $dur(c)$ represent the total break time in and duration of $c$ respectively and $\beta$ is a vector of cost scalars. \\
+Let the set of all crew duties that match these conditions be $CD$. For a crew duty $c$ let us define its cost as being $cost(c) = \beta_1 + \beta_2 \cdot br(c) + \beta_3 \cdot dur(c)$, where $br(c)$ and $dur(c)$ represent the total break time in and duration of $c$ respectively and $\beta$ is a vector of cost scalars. \\
 
-Using the definitions of the blocks $B$, vehicle tasks $V$ and crew duties $C$, we can formulate a linear program to describe our integrated problem. In this, let $x_i$ and $y_j$ be binary variables indicating the usage of $v_i \in V$ and $c_j \in C$ respectively. Additionally, let $k_{i,t}$ indicate that $v_i$ covers trip $t \in \mathcal{T}$, let $l_{i,b}$ indicate that $v_i$ contains block $b \in B$, and let with $m_{j,b} $ indicate that $c_j$ includes block $b \in B$. Let $\rho_{j,\text{broken}}$ and $\rho_{j,\text{between}}$ indicate whether a duty $c_j$ is of type \textit{broken} or \textit{between} respectively. In this, $k_{i,t}$, $l_{i,b}$, $m_{j,b}$ and $\rho_{j,\chi}$  are all be binary parameters. Lastly, let and let $d_j$ be a parameter indicating the duration of duty $c_j$, and let $d_{j,\textit{long}}$ be a binary parameter indicating whether $d_j > 8.5$ hours. Our cost minimization can then be formulated as follows:
+Using the definitions of the blocks $B$, vehicle tasks $VT$ and crew duties $CD$, we can formulate a linear program to describe our integrated problem. In this, let $x_i$ and $y_j$ be binary variables indicating the usage of $v_i \in VT$ and $c_j \in CD$ respectively. Additionally, let $k_{i,t}$ indicate that $v_i$ covers trip $t \in \mathcal{T}$, let $l_{i,b}$ indicate that $v_i$ contains block $b \in B$, and let with $m_{j,b} $ indicate that $c_j$ includes block $b \in B$. Let $\rho_{j,\text{broken}}$ and $\rho_{j,\text{between}}$ indicate whether a duty $c_j$ is of type \textit{broken} or \textit{between} respectively. In this, $k_{i,t}$, $l_{i,b}$, $m_{j,b}$ and $\rho_{j,\chi}$  are all be binary parameters. Lastly, let and let $d_j$ be a parameter indicating the duration of duty $c_j$, and let $d_{j,\textit{long}}$ be a binary parameter indicating whether $d_j > 8.5$ hours. Our cost minimization can then be formulated as follows:
 \begin{align}
 \min \quad
-& \sum_{1 \leq i \leq |V|} x_{i} \cdot cost(v_i) + \sum_{1 \leq j \leq |C|} y_{j} \cdot cost(c_j)  
+& \sum_{1 \leq i \leq |VT|} x_{i} \cdot cost(v_i) + \sum_{1 \leq j \leq |CD|} y_{j} \cdot cost(c_j)  
 \end{align}
 Subject to:
 \begin{align}
-\sum_{1 \leq i \leq |V|} x_{i}k_{i,t} &= 1 && \forall t = 1,\:\dots,\:|T| \label{form:pd-all-trips-covered} \\
-\sum_{1 \leq i \leq |V|}x_i l_{i,b} - \sum_{1 \leq j \leq |C|}y_j m_{j,b} &= 0 && \forall b \in B \label{form:pd-all-blocks-covered} \\
+\sum_{1 \leq i \leq |VT|} x_{i}k_{i,t} &= 1 && \forall t = 1,\:\dots,\:|T| \label{form:pd-all-trips-covered} \\
+\sum_{1 \leq i \leq |VT|}x_i l_{i,b} - \sum_{1 \leq j \leq |CD|}y_j m_{j,b} &= 0 && \forall b \in B \label{form:pd-all-blocks-covered} \\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (\frac{d_{j}}{\textit{8 hours}} - 1) &\leq 0 && \label{form:pd-max-avg-shift-length}\\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.15 - d_{j,\textit{long}}) &\geq 0 && \label{form:pd-max-long-shifts}\\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.3 - \rho_{j,\textit{broken}}) &\geq 0 && \label{form:pd-max-broken-shifts}\\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.1 - \rho_{j,\textit{between}}) &\geq 0 && \label{form:pd-max-between-shifts}\\
-x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|V| \\
-y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|C|
+x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|VT| \\
+y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|CD|
 \end{align}
 Here, constraint (\ref{form:pd-all-trips-covered}) ensures that all trips are covered by a vehicle, and constraint (\ref{form:pd-all-blocks-covered}) ensures that for each block, the number of assigned drivers is equal to the number of assigned vehicles. Constraint (\ref{form:pd-max-avg-shift-length}) ensures a maximum average duty length, and constraints (\ref{form:pd-max-long-shifts}-\ref{form:pd-max-between-shifts}) ensure that the number of duties which are longer than 8.5 hours / of a certain type are within limits. This integrated formulation minimizes the costs for both vehicle and crew duties simultaneously. For comparison, when the E-VSP and CSP are solved sequentially, the formulation becomes the following. First, vehicle tasks are selected such that their costs are minimized:
 \begin{align}
@@ -418,6 +418,10 @@ In order to increase the amount of charging options, let us consider the existin
 For all detour arcs, we assume that the time at the charging location is maximized. This means that we we always perform the deadhead towards the charging location at the earliest possible time, and the deadhead to the next trip at the latest possible time. For base arcs, let us also uniquely define where we will spend our idle time by maximizing time at a charging location; if the start and end location of a base arc are both non-charging or both charging locations, time at the start location is maximized as a tiebreaker. Knowing this, we can define the costs of each arc based on driving costs of the deadhead(s) and target trip, as well as SoC usage. 
 
 Any feasible vehicle task can now be described as a path in $G$ from $d_s$ to $d_e$. The costs for a task can be defined as a base cost of using a vehicle plus the sum of all used arc costs and a KWh costs. In this, we assume that the cost of energy remains constant throughout the day and at different charging locations, and that vehicles will be fully recharged overnight for the same KWh cost as during the day. Additionally note that not every path from  $d_s$ to $d_e$ describes a feasible vehicle task; depending on the arcs used, the amount of time that a vehicle has to charge may not be sufficient in order to keep it within SoC bounds during the task. As we previously defined how much time is spent at a charging location during an arc, this information can be used to determine whether a task is feasible or not.
+
+
+
+
 
 \subsubsection{Solving}
 In order to now solve the E-VSP, a collection of feasible vehicle tasks that cover the trips $\mathcal{T}$ must be found. In order to do this, we use a column generation approach; this has previously been shown to be an effective solution method for the E-VSP by works such as \citet{vanKootenNiekerk2017}, \citet{Zhang2021} and \citet{deVos2024}. The ILP used to model this is based on a set covering formulation. In this let $VT$ represent the available set of vehicle tasks, let $x_{i}$ be a binary decision variable indicating the use of vehicle task $vt_i \in VT$, and let $k_{i,t}$ be a parameter defining whether vehicle task $vt_i$ includes the trip $t \in \mathcal{T}$.
@@ -662,7 +666,7 @@ These two problems can be resolved in one of two ways: reevaluating vehicle task
 
 In the labeling algorithm, these values are simply included in the label; they are not considered for domination rules, however they are included in the feasibility check. In both local searches, the maximum times are considered a hard constraint: going over either maximum time will revert the chosen operation.
 
-\subsection{CSP} \label{sec:csp-method}
+\subsection{CSP} \label{sec:csp-methodology}
 For the CSP, a similar approach is taken to that of the E-VSP: column generation in order to solve a set covering ILP. The set to be covered consists of the the blocks present in the selected vehicle tasks. As in Section \ref{sec:evsp-methodology}, this process is broken up into steps: 
 \begin{itemize}
   \item \textit{Preprocessing}, in which vehicle tasks are transformed into a set of blocks, and these blocks are in turn used to generate a graph. 
@@ -751,6 +755,30 @@ Checking for feasibility during propagation can however only be done for a subse
 
 Once propagation has completed, the duties described by the labels in $cb_e$ can be finalized. Only then can we do our full feasibility check, discarding any labels which are not valid given their state in $cb_e$. As with the E-VSP, what remains is a list of labels which describe feasible duties which can be sorted on non-decreasing reduced cost. We will then take at most $N_{\textit{CD,LB}}$ of these duties with negative reduced cost, prioritizing block-disjoint duties. Next, secondary columns are generated for the best $M_{\textit{CD,LB}} \leq N_{\textit{CD,LB}}$ of the found duties. After this, the complete set of duties is made available to the LP relaxation, before repeating the process with new values of $\tau$. 
 
+\subsection{E-VCSP}
+In order to solve the E-VCSP, we will apply a combination of the techniques used to solve the E-VSP and CSP sequentially. In addition to these previously used techniques, we will create a link based on individual blocks in the vehicle tasks and crew duties in order to ensure that the two solutions are optimally connected.
+
+\subsubsection{Preprocessing}
+In order to have a baseline solution for the E-VCSP, we first solve the E-VSP and CSP sequentially using the techniques discussed in Sections \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}. During the solving process, a set of columns $VT_{init}$ and $CD_{init}$ representing vehicle tasks and crew duties respectively are generated. Let $VT_{init}^* \subseteq VT_{init}$ and $CD_{init}^* \subseteq CD_{init}$ be the selected subsets that form the solution to the sequential problem. Let $z_{init}$ be the total cost of this solution, representing an upper bound for the cost of the integrated problem.
+
+\subsubsection{Solving}
+Let us once again define an ILP in order to solve the E-VCSP. In this, let $VT$ and $CD$ be the sets of available vehicle tasks and crew duties respectively. Let $x_i$ and $y_j$ be binary decision variables indicating the usage of vehicle task $vt_i \in VT$ and crew duty $cd_j \in CD$ respectively. Let $k_{i,t}$, $l_{i,b}$ and $m_{j,b}$ be parameters indicating that $vt_i$ covers $t$, $vt_i$ covers $b$ and $cd_j$ covers $b$ respectively. Additionally, let $d_j$ be the duration of $cd_j$, let $d_{j,\textit{long}}$ indicate that $d_j$ is longer than 8.5 hours, and let $\rho_{j,\textit{broken}}$ and $\rho_{j,\textit{between}}$ indicate that $cd_j$ is of duty type \textit{broken} or \textit{between}, respectively. Lastly, let $cost(vt_i)$ and $cost(cd_j)$ be the costs of vehicle task $vt_i$ and crew duty $cd_j$ respectively. Our ILP is then defined as follows:
+
+\begin{align}
+\min \quad
+& \sum_{1 \leq i \leq |V|} x_{i} \cdot cost(v_i) + \sum_{1 \leq j \leq |C|} y_{j} \cdot cost(c_j)  
+\end{align}
+Subject to:
+\begin{align}
+\sum_{1 \leq i \leq |V|} x_{i}k_{i,t} &= 1 && \forall t = 1,\:\dots,\:|T| \label{form:methods-integrated-all-trips-covered} \\
+\sum_{1 \leq i \leq |V|}x_i l_{i,b} - \sum_{1 \leq j \leq |C|}y_j m_{j,b} &= 0 && \forall b \in B \label{form:methods-integrated-all-blocks-covered} \\
+\sum_{cd_j \in \textit{CD}} y_{j} \cdot (\frac{d_{j}}{\textit{8 hours}} - 1) &\leq 0 && \label{form:methods-integrated-max-avg-shift-length}\\
+\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.15 - d_{j,\textit{long}}) &\geq 0 && \label{form:methods-integrated-max-long-shifts}\\
+\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.3 - \rho_{j,\textit{broken}}) &\geq 0 && \label{form:methods-integrated-max-broken-shifts}\\
+\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.1 - \rho_{j,\textit{between}}) &\geq 0 && \label{form:methods-integrated-max-between-shifts}\\
+x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|VT| \\
+y_{j} &\in \{ 0, 1 \} && \forall j = 1,\:\dots,\:|CD|
+\end{align}
 \section{Results}
 \todo{Hier iets zeggen over de instanties, het feit dat daar ook gelopen mag worden tussen locaæties maar dat dit verwerkt is in signon/signoff/bruttonetto break tijden}.
 \printbibliography

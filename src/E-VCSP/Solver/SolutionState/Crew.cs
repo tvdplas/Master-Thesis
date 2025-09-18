@@ -41,6 +41,7 @@ namespace E_VCSP.Solver.SolutionState {
         public List<List<BlockArc>> Adj = [[], []];
         public List<List<BlockArc?>> AdjFull = [[null, null], [null, null]];
 
+        public HashSet<string> KnownBlocks = [];
         public List<Block> Blocks = [];
         public List<int> BlockCount = [];
 
@@ -119,10 +120,12 @@ namespace E_VCSP.Solver.SolutionState {
             Adj = [[], []];
             AdjFull = [[null, null], [null, null]];
 
+            HashSet<string> oldKnownBlocks = [.. KnownBlocks];
             List<Block> oldBlocks = [.. Blocks];
             List<int> oldCounts = [.. BlockCount];
             Blocks.Clear();
             BlockCount.Clear();
+            oldKnownBlocks.Clear();
 
             for (int i = 0; i < oldBlocks.Count; i++) {
                 AddBlock(oldBlocks[i], oldCounts[i]);
@@ -137,11 +140,7 @@ namespace E_VCSP.Solver.SolutionState {
             AdjFull = [[null, null], [null, null]];
             Blocks = [];
             BlockCount = [];
-
-            // Remove all unit duties as well
-            for (int i = Duties.Count - 1; i >= 0; i--) {
-                if (Duties[i].IsUnit) Duties.RemoveAt(i);
-            }
+            KnownBlocks = [];
         }
 
         private BlockArc? LinkBlocks(Block from, Block to) {
@@ -192,19 +191,35 @@ namespace E_VCSP.Solver.SolutionState {
             return arc;
         }
 
-        public CrewDuty AddBlock(Block b, int count) {
+        public CrewDuty? AddBlock(Block b, int count) {
+            string desc = b.Descriptor;
+            if (KnownBlocks.Contains(desc))
+                return null;
+
             int newBlockIndex = Blocks.Count;
             b.Index = newBlockIndex;
             Blocks.Add(b);
             BlockCount.Add(count);
+            KnownBlocks.Add(desc);
 
-            // Create a unit duty in order to process the block
-            var duty = new CrewDuty([new CDEBlock(b)]) {
-                Index = Duties.Count,
-                Type = DutyType.Single,
-                IsUnit = true,
-            };
-            Duties.Add(duty);
+            // Check if we already have a unit duty available
+            bool addUnit = true;
+            for (int i = 0; i < Duties.Count; i++) {
+                CrewDuty cd = Duties[i];
+                if (cd.IsUnit && cd.BlockDescriptorCover.Count == 1 && cd.BlockDescriptorCover[0] == desc) {
+                    addUnit = false;
+                    break;
+                }
+            }
+            // If not, add it
+            if (addUnit) {
+                var duty = new CrewDuty([new CDEBlock(b)]) {
+                    Index = Duties.Count,
+                    Type = DutyType.Single,
+                    IsUnit = true,
+                };
+                Duties.Add(duty);
+            }
 
             // Process the block in the adjacency matrixes
             AdjFull.Insert(newBlockIndex, []);
@@ -254,7 +269,7 @@ namespace E_VCSP.Solver.SolutionState {
             AdjFull[^1].Add(null);
 
             // Return the unit duty used to cover the new block
-            return duty;
+            return addUnit ? Duties[^1] : null;
         }
 
         public void PrintCostBreakdown(

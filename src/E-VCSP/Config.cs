@@ -13,20 +13,20 @@
         public static double CR_SHIFT_COST = 100; // Minimum price to pay a crew member
         public static double CR_SINGLE_SHIFT_COST = 1_000; // penalty for use of initial shifts
         public static int MAX_VEHICLES = 18; // Maximum number of vehicles that can be used in the solution.
-        public static double VH_OVER_MAX_COST = 5000; // Cost per vehicle of going over. only used as penalty
+        public static double VH_OVER_MAX_COST = 0; // Cost per vehicle of going over. only used as penalty
         public static int MAX_DUTIES = 38; // Maximum number of vehicles that can be used in the solution.
-        public static double CR_OVER_MAX_COST = 2000; // Cost per vehicle of going over. only used as penalty
+        public static double CR_OVER_MAX_COST = 0; // Cost per vehicle of going over. only used as penalty
 
         public static Header VSP = new();
         public static bool VSP_DETERMINE_IIS = false;
-        public static int VSP_SOLVER_TIMEOUT_SEC = 300;
+        public static int VSP_SOLVER_TIMEOUT_SEC = 30;
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static bool VSP_ALLOW_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
         public static int VSP_PRE_DIRECT_TIME = 0;
 
         public static Header VSP_CG = new();
         public static int VSP_INSTANCES_PER_IT = 1;
-        public static int VSP_MAX_COL_GEN_ITS = 25;
+        public static int VSP_MAX_COL_GEN_ITS = 20;
         public static int VSP_OPT_IT_THRESHOLD = 2; // Amount of columns sequentially generated without rc before cg is stopped
         public static string VSP_OPERATION_SEQUENCE = "-"; // Defines an initial operation sequence
 
@@ -74,11 +74,11 @@
 
         public static Header CSP = new();
         public static bool CSP_DETERMINE_IIS = false;
-        public static int CSP_SOLVER_TIMEOUT_SEC = 300;
+        public static int CSP_SOLVER_TIMEOUT_SEC = 30;
         public static int CSP_OPT_IT_THRESHOLD = 2; // Amount of columns sequentially generated without rc before cg is stopped
         public static bool CSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static int CSP_INSTANCES_PER_IT = 1;
-        public static int CSP_MAX_COL_GEN_ITS = 100;
+        public static int CSP_MAX_COL_GEN_ITS = 20;
 
         public static Header CSP_LABELING = new();
         public static double CSP_LABELING_WEIGHT = 0;
@@ -100,8 +100,8 @@
         public static double CSP_LS_G_CREWHUB_PENALTY = 10_000;
 
         public static Header VCSP = new();
-        public static int VCSP_SOLVER_TIMEOUT_SEC = 900;
-        public static int VCSP_ROUNDS = 10;
+        public static int VCSP_SOLVER_TIMEOUT_SEC = 5;
+        public static int VCSP_ROUNDS = 0;
         public static int VCSP_VH_ITS_INIT = 20;
         public static int VCSP_VH_ITS_ROUND = 10;
         public static int VCSP_CR_ITS_INIT = 10;
@@ -122,7 +122,7 @@
         public static double LAGRANGE_PI_END = 0.001; // (0, 2]
         public static double LAGRANGE_PI_COOLING = 0.5; // [0, 1)
         public static double LAGRANGE_N = 30;
-        public static int LAGRANGE_DISRUPTION_ROUNDS = 2;
+        public static int LAGRANGE_DISRUPT_ROUNDS = 0;
         public static double LAGRANGE_DISRUPT_LWR = 0.8;
         public static double LAGRANGE_DISRUPT_UPR = 1.25;
     }

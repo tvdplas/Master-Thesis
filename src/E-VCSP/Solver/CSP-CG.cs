@@ -78,10 +78,10 @@ namespace E_VCSP.Solver {
             GRBLinExpr maxBetween = new(); // max 10% between
 
             GRBVar maxDutySlack = model.AddVar(0, GRB.INFINITY, Config.CR_OVER_MAX_COST, GRB.CONTINUOUS, "maxDutySlack");
-            GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "noExcessiveLengthSlack");
-            GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "limitedAverageLengthSlack");
-            GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "maxBrokenSlack");
-            GRBVar maxBetweenSlack = model.AddVar(0, GRB.INFINITY, 10000, GRB.CONTINUOUS, "maxBetweenSlack");
+            GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "noExcessiveLengthSlack");
+            GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "limitedAverageLengthSlack");
+            GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "maxBrokenSlack");
+            GRBVar maxBetweenSlack = model.AddVar(0, GRB.INFINITY, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "maxBetweenSlack");
 
             for (int i = 0; i < dutyVars.Count; i++) {
                 GRBVar v = dutyVars[i];
@@ -136,9 +136,6 @@ namespace E_VCSP.Solver {
             (var model, var dutyVars) = InitModel(cancellationToken);
             model.Optimize();
 
-            // Assume all blocks are active
-            css.BlockCount = css.Blocks.Select(_ => 1).ToList();
-
             double z_prev = double.PositiveInfinity;
             int itsWithoutImprovement = 0;
 
@@ -189,6 +186,7 @@ namespace E_VCSP.Solver {
                         GRBColumn col = new();
                         col.AddTerms([.. constrs.Select(c => {
                             if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) return 1.0;
+                            else if (c.ConstrName == Constants.CSTR_MAX_DUTIES) return 1.0;
                             else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES) return Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
                             else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME) return (newDuty.PaidDuration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
                             else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES) return Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
