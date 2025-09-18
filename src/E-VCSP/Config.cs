@@ -32,7 +32,7 @@
 
         public static Header VSP_LABELING = new();
         public static double VSP_LB_WEIGHT = 1;
-        public static int VSP_LB_MAX_COLS = 5;
+        public static int VSP_LB_MAX_COLS = 25;
         public static int VSP_LB_MIN_TRIPS = 3; // min number of trips in a single vehicle task
         public static bool VSP_LB_ATTEMPT_DISJOINT = true;
         public static double VSP_LB_CHARGE_EPSILON = 0.5; // Charge values within epsilon of eachother will be considered the same

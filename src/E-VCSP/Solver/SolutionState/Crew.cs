@@ -312,7 +312,7 @@ namespace E_VCSP.Solver.SolutionState {
                     Block: {blockHours * Constants.CR_HOURLY_COST} ({blockHours.ToString("0.##")}h)
                         Driving: {blockDrivingHours * Constants.CR_HOURLY_COST} ({blockDrivingHours.ToString("0.##")}h)
                         Idle: {(blockHours - blockDrivingHours) * Constants.CR_HOURLY_COST} ({(blockHours - blockDrivingHours).ToString("0.##")}h)
-                    Break: {breakHours * Constants.CR_HOURLY_COST} ({blockHours.ToString("0.##")}h)
+                    Break: {breakHours * Constants.CR_HOURLY_COST} ({breakHours.ToString("0.##")}h)
                     Other: {(workingHours - blockHours - breakHours) * Constants.CR_HOURLY_COST} ({(workingHours - blockHours - breakHours).ToString("0.##")}h)
                 Base duty cost: {SelectedDuties.Count * Config.CR_SHIFT_COST}
                 Broken duty costs: {SelectedDuties.Count * Constants.CR_BROKEN_SHIFT_COST}
