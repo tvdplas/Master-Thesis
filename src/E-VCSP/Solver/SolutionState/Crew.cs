@@ -48,7 +48,7 @@ namespace E_VCSP.Solver.SolutionState {
         public List<(CrewDuty duty, int count)> SelectedDuties = [];
         public List<CrewDuty> Duties = [];
         public Dictionary<string, CrewDuty> VarnameDutyMapping = [];
-        public Dictionary<BitArray, CrewDuty> CoverDutyMapping = new(new Utils.BitArrayComparer());
+        public Dictionary<(BitArray, int), CrewDuty> CoverTypeDutyMapping = new(new Utils.BitArrayIntComparer());
 
         public int ActiveBlockCount => BlockCount.Sum(b => b);
 
@@ -116,7 +116,7 @@ namespace E_VCSP.Solver.SolutionState {
             SelectedDuties.Clear();
             Duties.Clear();
             VarnameDutyMapping.Clear();
-            CoverDutyMapping.Clear();
+            CoverTypeDutyMapping.Clear();
             Adj = [[], []];
             AdjFull = [[null, null], [null, null]];
 

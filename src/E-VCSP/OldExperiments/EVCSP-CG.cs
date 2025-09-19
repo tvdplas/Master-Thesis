@@ -169,7 +169,7 @@ namespace E_VCSP.OldExperiments {
                         GRBVar unitDutyVar = model.AddVar(0, GRB.INFINITY, unitDuty.Cost, GRB.CONTINUOUS, name);
                         dutyVars.Add(unitDutyVar);
                         css.VarnameDutyMapping[name] = unitDuty;
-                        css.CoverDutyMapping.Add(unitDuty.ToBlockBitArray(knownBlocks.Count), unitDuty);
+                        css.CoverTypeDutyMapping.Add((unitDuty.ToBlockBitArray(knownBlocks.Count), (int)unitDuty.Type), unitDuty);
 
                         GRBLinExpr expr = new();
                         expr -= unitDutyVar;
@@ -218,7 +218,7 @@ namespace E_VCSP.OldExperiments {
 
                 dutyVars.Add(v);
                 css.VarnameDutyMapping[name] = css.Duties[i];
-                css.CoverDutyMapping.Add(css.Duties[i].ToBlockBitArray(knownBlocks.Count), css.Duties[i]);
+                css.CoverTypeDutyMapping.Add((css.Duties[i].ToBlockBitArray(knownBlocks.Count), (int)css.Duties[i].Type), css.Duties[i]);
             }
 
             // Max selected vehicle tasks
@@ -433,7 +433,7 @@ namespace E_VCSP.OldExperiments {
                 // Add column to model
                 dutyVars.Add(model.AddVar(0, GRB.INFINITY, newDuty.Cost, GRB.CONTINUOUS, col, name));
                 css.VarnameDutyMapping[name] = newDuty;
-                css.CoverDutyMapping[newDuty.ToBlockBitArray(knownBlocks.Count)] = newDuty;
+                css.CoverTypeDutyMapping[(newDuty.ToBlockBitArray(knownBlocks.Count), (int)newDuty.Type)] = newDuty;
             }
 
             // Attempt to do column generation for crew

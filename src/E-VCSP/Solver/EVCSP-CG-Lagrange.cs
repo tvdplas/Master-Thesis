@@ -19,13 +19,13 @@ namespace E_VCSP.Solver {
         /// </summary>
         private Dictionary<string, int> knownBlocks = [];
         /// <summary>
-        /// Vehicle tasks, checked on covered trips / blocks
+        /// Vehicle tasks, checked on covered trips / blocks. Maps to an index into vss
         /// </summary>
-        private HashSet<(BitArray, BitArray)> knownVTs = new(new BitArrayTupleComparer());
+        private Dictionary<(BitArray, BitArray), int> knownVTs = new(new BitArrayTupleComparer());
         /// <summary>
-        /// Crew duties, checked on covered blocks and duty type
+        /// Crew duties, checked on covered blocks and duty type. Maps to an index into css
         /// </summary>
-        private HashSet<(BitArray, int)> knownCDs = new(new BitArrayIntComparer());
+        private Dictionary<(BitArray, int), int> knownCDs = new(new BitArrayIntComparer());
 
         private List<(double C_i, int taskIndex)> taskReducedCosts = [];
         private List<(double C_j, int dutyIndex)> dutyReducedCosts = [];
@@ -92,7 +92,10 @@ namespace E_VCSP.Solver {
 
                 BitArray tripCover = task.ToTripBitArray(vss.Instance.Trips.Count);
                 BitArray blockCover = task.ToBlockBitArray(css.Blocks.Count);
-                knownVTs.Add((tripCover, blockCover));
+                if (knownVTs.ContainsKey((tripCover, blockCover))) {
+                    Console.WriteLine("Duplicate columns present in initial vh solution");
+                }
+                knownVTs.Add((tripCover, blockCover), i);
             }
             // reindex duties, add them to known columns
             for (int i = 0; i < css.Duties.Count; i++) {
@@ -105,7 +108,10 @@ namespace E_VCSP.Solver {
 
                 BitArray blockCover = duty.ToBlockBitArray(css.Blocks.Count);
                 int dutyType = (int)duty.Type;
-                knownCDs.Add((blockCover, dutyType));
+                if (knownCDs.ContainsKey((blockCover, dutyType))) {
+                    Console.WriteLine("Duplicate columns present in initial cr solution");
+                }
+                knownCDs.Add((blockCover, dutyType), i);
             }
 
             foreach (var task in vss.SelectedTasks) {
@@ -529,8 +535,6 @@ namespace E_VCSP.Solver {
                 foreach ((double reducedCosts, VehicleTask newTask) in newColumns) {
                     if (reducedCosts > 0) continue;
 
-                    newTask.Index = vss.Tasks.Count;
-
                     // Determine blocks for task; add any not yet known ones to css
                     List<Block> blocks = Block.FromVehicleTask(newTask);
                     foreach (Block b in blocks) {
@@ -549,15 +553,24 @@ namespace E_VCSP.Solver {
                     BitArray taskCover = newTask.ToTripBitArray(vss.Instance.Trips.Count);
                     BitArray blockCover = newTask.ToBlockBitArray(css.Blocks.Count);
 
-                    // If we already know this column, skip adding it
-                    if (knownVTs.Contains((taskCover, blockCover))) {
-                        duplicateColumnCount++;
-                        continue;
+                    // If we already know this column, check if it is an improvement
+                    if (knownVTs.ContainsKey((taskCover, blockCover))) {
+                        int vi = knownVTs[(taskCover, blockCover)];
+                        if (vss.Tasks[vi].Cost < newTask.Cost) {
+                            // Skip new column
+                            duplicateColumnCount++;
+                        }
+                        else {
+                            // Replace existing column
+                            vss.Tasks[vi] = newTask;
+                        }
                     }
-
-                    vss.Tasks.Add(newTask);
-                    X.Add(0);
-                    knownVTs.Add((taskCover, blockCover));
+                    else {
+                        newTask.Index = vss.Tasks.Count;
+                        vss.Tasks.Add(newTask);
+                        X.Add(0);
+                        knownVTs.Add((taskCover, blockCover), newTask.Index);
+                    }
                 }
 
                 gradientDescent(!disrupt);
@@ -766,15 +779,24 @@ namespace E_VCSP.Solver {
                     int dutyType = (int)newDuty.Type;
 
                     // If we already know this column, skip adding it
-                    if (knownCDs.Contains((blockCover, dutyType))) {
-                        duplicateColumnCount++;
-                        continue;
+                    if (knownCDs.ContainsKey((blockCover, dutyType))) {
+                        int ci = knownCDs[(blockCover, dutyType)];
+                        if (css.Duties[ci].Cost < newDuty.Cost) {
+                            // Skip new column
+                            duplicateColumnCount++;
+                        }
+                        else {
+                            // Replace existing column
+                            css.Duties[ci] = newDuty;
+                        }
+                    }
+                    else {
+                        newDuty.Index = css.Duties.Count;
+                        css.Duties.Add(newDuty);
+                        Y.Add(0);
+                        knownCDs.Add((blockCover, dutyType), newDuty.Index);
                     }
 
-                    newDuty.Index = css.Duties.Count;
-                    css.Duties.Add(newDuty);
-                    Y.Add(0);
-                    knownCDs.Add((blockCover, dutyType));
                 }
                 gradientDescent(!disrupt);
                 Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}\t{duplicateColumnCount}");
