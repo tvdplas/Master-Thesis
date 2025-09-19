@@ -302,7 +302,7 @@ namespace E_VCSP.Solver.SolutionState {
             // Determine overcoverage
             List<List<int>> coveredBy = Enumerable.Range(0, Instance.Trips.Count).Select(x => new List<int>()).ToList();
             for (int i = 0; i < vehicleTasks.Count; i++) {
-                foreach (int j in vehicleTasks[i].TripCover) {
+                foreach (int j in vehicleTasks[i].TripIndexCover) {
                     coveredBy[j].Add(i);
                 }
             }

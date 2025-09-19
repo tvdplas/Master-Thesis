@@ -74,7 +74,7 @@ namespace E_VCSP.OldExperiments {
 
                 VehicleTask vt = vss.VarnameTaskMapping[v.VarName];
                 selectedTasks.Add(vt);
-                foreach (int i in vt.TripCover) {
+                foreach (int i in vt.TripIndexCover) {
                     coveredBy[i].Add(selectedTasks.Count - 1);
                 }
             }
@@ -169,7 +169,7 @@ namespace E_VCSP.OldExperiments {
                         GRBVar unitDutyVar = model.AddVar(0, GRB.INFINITY, unitDuty.Cost, GRB.CONTINUOUS, name);
                         dutyVars.Add(unitDutyVar);
                         css.VarnameDutyMapping[name] = unitDuty;
-                        css.CoverDutyMapping.Add(unitDuty.ToBitArray(knownBlocks.Count), unitDuty);
+                        css.CoverDutyMapping.Add(unitDuty.ToBlockBitArray(knownBlocks.Count), unitDuty);
 
                         GRBLinExpr expr = new();
                         expr -= unitDutyVar;
@@ -210,7 +210,7 @@ namespace E_VCSP.OldExperiments {
 
                 taskVars.Add(v);
                 vss.VarnameTaskMapping[name] = vss.Tasks[i];
-                vss.CoverTaskMapping.Add(vss.Tasks[i].ToBitArray(vss.Instance.Trips.Count), vss.Tasks[i]);
+                vss.CoverTaskMapping.Add(vss.Tasks[i].ToTripBitArray(vss.Instance.Trips.Count), vss.Tasks[i]);
             }
             for (int i = 0; i < css.Duties.Count; i++) {
                 string name = $"cd_{i}";
@@ -218,7 +218,7 @@ namespace E_VCSP.OldExperiments {
 
                 dutyVars.Add(v);
                 css.VarnameDutyMapping[name] = css.Duties[i];
-                css.CoverDutyMapping.Add(css.Duties[i].ToBitArray(knownBlocks.Count), css.Duties[i]);
+                css.CoverDutyMapping.Add(css.Duties[i].ToBlockBitArray(knownBlocks.Count), css.Duties[i]);
             }
 
             // Max selected vehicle tasks
@@ -233,7 +233,7 @@ namespace E_VCSP.OldExperiments {
             foreach (Trip t in vss.Instance.Trips) {
                 GRBLinExpr expr = new();
                 for (int i = 0; i < vss.Tasks.Count; i++) {
-                    if (vss.Tasks[i].TripCover.Contains(t.Index)) {
+                    if (vss.Tasks[i].TripIndexCover.Contains(t.Index)) {
                         expr.AddTerm(1, taskVars[i]);
                     }
                 }
@@ -360,7 +360,7 @@ namespace E_VCSP.OldExperiments {
                     // Vehicle task contains trip
                     if (name.StartsWith(Constants.CSTR_BLOCK_COVER)) {
                         int tripIndex = int.Parse(name.Split("_")[^1]);
-                        return newTask.TripCover.Contains(tripIndex);
+                        return newTask.TripIndexCover.Contains(tripIndex);
                     }
                     // Vehicle task contains block
                     if (name.StartsWith(Constants.CSTR_BLOCK_COVER)) {
@@ -376,7 +376,7 @@ namespace E_VCSP.OldExperiments {
                 // Add column to model
                 taskVars.Add(model.AddVar(0, GRB.INFINITY, newTask.Cost, GRB.CONTINUOUS, col, name));
                 vss.VarnameTaskMapping[name] = newTask;
-                vss.CoverTaskMapping[newTask.ToBitArray(vss.Instance.Trips.Count)] = newTask;
+                vss.CoverTaskMapping[newTask.ToTripBitArray(vss.Instance.Trips.Count)] = newTask;
             }
 
             for (int currIt = 0; currIt < maxIts; currIt++) {
@@ -433,7 +433,7 @@ namespace E_VCSP.OldExperiments {
                 // Add column to model
                 dutyVars.Add(model.AddVar(0, GRB.INFINITY, newDuty.Cost, GRB.CONTINUOUS, col, name));
                 css.VarnameDutyMapping[name] = newDuty;
-                css.CoverDutyMapping[newDuty.ToBitArray(knownBlocks.Count)] = newDuty;
+                css.CoverDutyMapping[newDuty.ToBlockBitArray(knownBlocks.Count)] = newDuty;
             }
 
             // Attempt to do column generation for crew

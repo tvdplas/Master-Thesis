@@ -418,7 +418,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         if (vehicleTask == null) return null;
 
                         double reducedCost = vehicleTask.Cost;
-                        foreach (int coveredTripIndex in vehicleTask.TripCover) {
+                        foreach (int coveredTripIndex in vehicleTask.TripIndexCover) {
                             reducedCost -= tripDualCosts[coveredTripIndex];
                         }
                         return (reducedCost, vehicleTask);

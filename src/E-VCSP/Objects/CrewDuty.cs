@@ -245,7 +245,7 @@ namespace E_VCSP.Objects {
             BlockDescriptorCover = [.. elements.Where(e => e.Type == CrewDutyElementType.Block).Select(e => ((CDEBlock)e).Block.Descriptor)];
         }
 
-        public BitArray ToBitArray(int blockCount) {
+        public BitArray ToBlockBitArray(int blockCount) {
             BitArray ba = new(blockCount);
             for (int i = 0; i < BlockIndexCover.Count; i++) ba[BlockIndexCover[i]] = true;
             return ba;

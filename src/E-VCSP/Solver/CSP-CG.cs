@@ -54,7 +54,7 @@ namespace E_VCSP.Solver {
                 // Bookkeeping to find variable based on name / cover easily
                 dutyVars.Add(v);
                 css.VarnameDutyMapping[name] = css.Duties[i];
-                css.CoverDutyMapping.Add(css.Duties[i].ToBitArray(css.Blocks.Count), css.Duties[i]);
+                css.CoverDutyMapping.Add(css.Duties[i].ToBlockBitArray(css.Blocks.Count), css.Duties[i]);
             }
 
             // Add cover constraint for each of the trips
@@ -167,7 +167,7 @@ namespace E_VCSP.Solver {
                     (double reducedCost, CrewDuty newDuty) = ((double, CrewDuty))task;
 
                     // Check if task is already in model 
-                    BitArray ba = newDuty.ToBitArray(css.Blocks.Count);
+                    BitArray ba = newDuty.ToBlockBitArray(css.Blocks.Count);
                     bool coverExists = css.CoverDutyMapping.ContainsKey(ba);
 
                     // Add column to model 

@@ -602,7 +602,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             List<(double reducedCost, VehicleTask vehicleTask)> secondaryTasks = [];
 
             HashSet<BitArray> alreadyFound = new(new BitArrayComparer());
-            foreach (var x in primaryTasks) alreadyFound.Add(x.vehicleTask.ToBitArray(vss.Instance.Trips.Count));
+            foreach (var x in primaryTasks) alreadyFound.Add(x.vehicleTask.ToTripBitArray(vss.Instance.Trips.Count));
 
             for (int i = 0; i < Math.Min(primaryTasks.Count, Config.VSP_LB_SEC_COL_COUNT); i++) {
                 var baseTask = primaryTasks[i];
@@ -610,13 +610,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 for (int j = 1; j < (Config.VSP_LB_SEC_COL_ATTEMPTS + 1); j++) {
                     reset();
 
-                    for (int k = 0; k < (int)((double)j * baseTask.vehicleTask.TripCover.Count / (Config.VSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
-                        blockedNodes[baseTask.vehicleTask.TripCover[k]] = true;
+                    for (int k = 0; k < (int)((double)j * baseTask.vehicleTask.TripIndexCover.Count / (Config.VSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
+                        blockedNodes[baseTask.vehicleTask.TripIndexCover[k]] = true;
                     }
                     runLabeling();
                     var newExtracted = extractTasks("secondary", alreadyFound);
                     secondaryTasks.AddRange(newExtracted);
-                    foreach (var x in newExtracted) alreadyFound.Add(x.vehicleTask.ToBitArray(vss.Instance.Trips.Count));
+                    foreach (var x in newExtracted) alreadyFound.Add(x.vehicleTask.ToTripBitArray(vss.Instance.Trips.Count));
                 }
             }
 

@@ -22,6 +22,7 @@ namespace E_VCSP.Objects {
         Charge
     }
 
+    #region Elements
     /// <summary>
     /// Vehicle element which has not yet been finalized
     /// </summary>
@@ -276,25 +277,56 @@ namespace E_VCSP.Objects {
             return $"{base.ToString()} VE Charge {StartLocation!.Id} ({SoCDiff}%)";
         }
     }
+    #endregion
 
     public class VehicleTask {
+        /// <summary>
+        /// Task is part of initial covering of trips
+        /// </summary>
         public bool IsUnit = false;
+        /// <summary>
+        /// Column generation source which produced this column
+        /// </summary>
         [JsonInclude]
         public required string Source;
+        /// <summary>
+        /// Vehicle type used in task
+        /// </summary>
         [JsonInclude]
         public required VehicleType vehicleType;
+        /// <summary>
+        /// Trip indexes covered by the task
+        /// </summary>
         [JsonInclude]
-        public List<int> TripCover;
+        public List<int> TripIndexCover;
+        /// <summary>
+        /// Block indexes covered by the task
+        /// </summary>
         [JsonInclude]
         public List<int> BlockIndexCover;
+        /// <summary>
+        /// Block descriptors covered by task 
+        /// </summary>
         public List<string> BlockDescriptorCover = [];
+        /// <summary>
+        /// Elements used in task
+        /// </summary>
         [JsonInclude]
         public List<VehicleElement> Elements;
+        /// <summary>
+        /// Index of task in solution state list
+        /// </summary>
         [JsonInclude]
         public int Index = -1;
 
         private double cachedCost = -1;
+        /// <summary>
+        /// Reset cost calculation; only use when manually modifying elements
+        /// </summary>
         public void InvalidateCostCache() => cachedCost = -1;
+        /// <summary>
+        /// Cost of the task; includes driving, SoC and fixed costs
+        /// </summary>
         public double Cost {
             get {
                 if (cachedCost != -1) return cachedCost;
@@ -313,21 +345,35 @@ namespace E_VCSP.Objects {
             }
         }
 
-        public BitArray ToBitArray(int tripCount) {
+        /// <summary>
+        /// Returns a bitmask b where b[i] == 1 iff trip i is covered by this task
+        /// </summary>
+        /// <param name="tripCount">Total number of available trips</param>
+        public BitArray ToTripBitArray(int tripCount) {
             BitArray ba = new(tripCount);
-            foreach (int i in TripCover) ba[i] = true;
+            foreach (int i in TripIndexCover) ba[i] = true;
+            return ba;
+        }
+
+        /// <summary>
+        /// Returns a bitmask b where b[i] == 1 iff block i is covered by this task
+        /// </summary>
+        /// <param name="tripCount">Total number of available blocks</param>
+        public BitArray ToBlockBitArray(int blockCount) {
+            BitArray ba = new(blockCount);
+            foreach (int i in BlockIndexCover) ba[i] = true;
             return ba;
         }
 
         public VehicleTask(List<VehicleElement> elements) {
             Elements = elements;
-            TripCover = [];
+            TripIndexCover = [];
             BlockIndexCover = [];
             RecalcTripCovers();
         }
 
         public void RecalcTripCovers() {
-            TripCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
+            TripIndexCover = [.. Elements.Where(e => e.Type == VEType.Trip).Select(e => ((VETrip)e).Trip.Index)];
             InvalidateCostCache();
         }
     }

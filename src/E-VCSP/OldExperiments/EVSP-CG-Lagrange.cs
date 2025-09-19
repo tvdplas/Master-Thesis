@@ -30,7 +30,7 @@ namespace E_VCSP.OldExperiments {
                 if (v.X != 1) continue;
 
                 selectedTasks.Add(vss.Tasks[i]);
-                foreach (int j in vss.Tasks[i].TripCover) {
+                foreach (int j in vss.Tasks[i].TripIndexCover) {
                     coveredBy[j].Add(selectedTasks.Count - 1);
                 }
             }
@@ -100,7 +100,7 @@ namespace E_VCSP.OldExperiments {
                 // Bookkeeping to find variable based on name / cover easily
                 taskVars.Add(v);
                 vss.VarnameTaskMapping[name] = vss.Tasks[i];
-                vss.CoverTaskMapping.Add(vss.Tasks[i].ToBitArray(vss.Instance.Trips.Count), vss.Tasks[i]);
+                vss.CoverTaskMapping.Add(vss.Tasks[i].ToTripBitArray(vss.Instance.Trips.Count), vss.Tasks[i]);
             }
 
             for (int i = 0; i < vss.Instance.Trips.Count; i++) lambdaTrips.Add(1);
@@ -108,7 +108,7 @@ namespace E_VCSP.OldExperiments {
             foreach (Trip t in vss.Instance.Trips) {
                 GRBLinExpr expr = new();
                 for (int i = 0; i < vss.Tasks.Count; i++) {
-                    if (vss.Tasks[i].TripCover.Contains(t.Index)) {
+                    if (vss.Tasks[i].TripIndexCover.Contains(t.Index)) {
                         expr.AddTerm(1, taskVars[i]);
                     }
                 }
@@ -144,7 +144,7 @@ namespace E_VCSP.OldExperiments {
                 VehicleTask vt = vss.Tasks[taskIndex];
                 double newModelCost = vt.Cost;
 
-                foreach (int tripIndex in vt.TripCover) {
+                foreach (int tripIndex in vt.TripIndexCover) {
                     newModelCost -= lambdaTrips[tripIndex];
                 }
 
@@ -166,7 +166,7 @@ namespace E_VCSP.OldExperiments {
                 for (int i = 0; i < costsByTaskIndex.Count; i++) {
                     int taskIndex = costsByTaskIndex[i].taskIndex;
                     double cost = vss.Tasks[taskIndex].Cost;
-                    foreach (var tripIndex in vss.Tasks[taskIndex].TripCover) {
+                    foreach (var tripIndex in vss.Tasks[taskIndex].TripIndexCover) {
                         cost -= lambdaTrips[tripIndex];
                     }
                     costsByTaskIndex[i] = (cost, taskIndex);
@@ -202,7 +202,7 @@ namespace E_VCSP.OldExperiments {
                 for (int i = 0; i < G.Length; i++) G[i] = 1; // b
                 for (int taskIndex = 0; taskIndex < X.Count; taskIndex++) {
                     if (!X[taskIndex]) continue;
-                    foreach (var tripIndex in vss.Tasks[taskIndex].TripCover) G[tripIndex] -= 1;
+                    foreach (var tripIndex in vss.Tasks[taskIndex].TripIndexCover) G[tripIndex] -= 1;
                 }
 
                 double GSquaredSum = 0;
@@ -288,7 +288,7 @@ namespace E_VCSP.OldExperiments {
                         GRBConstr[] constrs = [.. modelConstrs.Where((constr) => {
                             if (constr.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER)) {
                                 int tripIndex = int.Parse(constr.ConstrName.Split(Constants.CSTR_BLOCK_COVER)[1]);
-                                return newTask.TripCover.Contains(tripIndex);
+                                return newTask.TripIndexCover.Contains(tripIndex);
                             }
 
                             else
@@ -300,7 +300,7 @@ namespace E_VCSP.OldExperiments {
                         // Add column to model
                         taskVars.Add(model.AddVar(0, 1, newTask.Cost, GRB.BINARY, col, name));
                         vss.VarnameTaskMapping[name] = vss.Tasks[^1];
-                        vss.CoverTaskMapping[newTask.ToBitArray(vss.Instance.Trips.Count)] = vss.Tasks[^1];
+                        vss.CoverTaskMapping[newTask.ToTripBitArray(vss.Instance.Trips.Count)] = vss.Tasks[^1];
                         addedNew++;
                     }
                 }

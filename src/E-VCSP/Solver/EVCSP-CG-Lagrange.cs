@@ -5,6 +5,7 @@ using E_VCSP.Solver.ColumnGenerators;
 using E_VCSP.Solver.SolutionState;
 using E_VCSP.Utils;
 using Gurobi;
+using System.Collections;
 
 namespace E_VCSP.Solver {
     internal class EVCSPCGLagrange : Solver {
@@ -13,15 +14,24 @@ namespace E_VCSP.Solver {
 
         private readonly Random random = new();
 
+        /// <summary>
+        /// Dictionary from block descriptor to block index in css
+        /// </summary>
         private Dictionary<string, int> knownBlocks = [];
+        /// <summary>
+        /// Vehicle tasks, checked on covered trips / blocks
+        /// </summary>
+        private HashSet<(BitArray, BitArray)> knownVTs = new(new BitArrayTupleComparer());
+        /// <summary>
+        /// Crew duties, checked on covered blocks and duty type
+        /// </summary>
+        private HashSet<(BitArray, int)> knownCDs = new(new BitArrayIntComparer());
 
         private List<(double C_i, int taskIndex)> taskReducedCosts = [];
         private List<(double C_j, int dutyIndex)> dutyReducedCosts = [];
 
         private List<int> X = []; // Select vt at index
-        private int vehicleSlack = 0; // Amount of over slack we are going
         private List<int> Y = []; // Select cd at index
-        private int maxDutiesSlack = 0; // Amount of over slack we are going
 
         /// <summary> >= 0 \forall i </summary>
         private List<double> lambdaTrips = [];
@@ -71,7 +81,7 @@ namespace E_VCSP.Solver {
                 knownBlocks[allBlocks[bi].b.Descriptor] = bi;
             }
 
-            // reindex tasks
+            // reindex tasks, add them to known columns
             for (int i = 0; i < vss.Tasks.Count; i++) {
                 var task = vss.Tasks[i];
                 if (task.Index != i) throw new InvalidDataException("Task indexing in initial solution is wrong");
@@ -79,8 +89,12 @@ namespace E_VCSP.Solver {
                 foreach (string desc in task.BlockDescriptorCover) {
                     task.BlockIndexCover.Add(knownBlocks[desc]);
                 }
+
+                BitArray tripCover = task.ToTripBitArray(vss.Instance.Trips.Count);
+                BitArray blockCover = task.ToBlockBitArray(css.Blocks.Count);
+                knownVTs.Add((tripCover, blockCover));
             }
-            // reindex duties
+            // reindex duties, add them to known columns
             for (int i = 0; i < css.Duties.Count; i++) {
                 var duty = css.Duties[i];
                 if (duty.Index != i) throw new InvalidDataException("Duty indexing in initial solution is wrong");
@@ -88,6 +102,10 @@ namespace E_VCSP.Solver {
                 foreach (string desc in duty.BlockDescriptorCover) {
                     duty.BlockIndexCover.Add(knownBlocks[desc]);
                 }
+
+                BitArray blockCover = duty.ToBlockBitArray(css.Blocks.Count);
+                int dutyType = (int)duty.Type;
+                knownCDs.Add((blockCover, dutyType));
             }
 
             foreach (var task in vss.SelectedTasks) {
@@ -117,9 +135,7 @@ namespace E_VCSP.Solver {
             resetLamdba(true);
 
             for (int i = 0; i < vss.Tasks.Count; i++) X.Add(0);
-            vehicleSlack = 0;
             for (int i = 0; i < css.Duties.Count; i++) Y.Add(0);
-            maxDutiesSlack = 0;
         }
         #endregion
 
@@ -142,8 +158,8 @@ namespace E_VCSP.Solver {
                             VehicleTask task = vss.Tasks[taskIndex];
                             double cost = task.Cost;
 
-                            for (int j = 0; j < task.TripCover.Count; j++)
-                                cost -= lambdaTrips[task.TripCover[j]];
+                            for (int j = 0; j < task.TripIndexCover.Count; j++)
+                                cost -= lambdaTrips[task.TripIndexCover[j]];
                             for (int j = 0; j < task.BlockIndexCover.Count; j++)
                                 cost -= lambdaBlocks[task.BlockIndexCover[j]];
 
@@ -211,9 +227,7 @@ namespace E_VCSP.Solver {
             double solve() {
                 // Reset current solution value
                 for (int i = 0; i < X.Count; i++) X[i] = 0;
-                vehicleSlack = 0;
                 for (int i = 0; i < Y.Count; i++) Y[i] = 0;
-                maxDutiesSlack = 0;
 
                 double cost = 0;
 
@@ -238,7 +252,6 @@ namespace E_VCSP.Solver {
                         X[targetTask.taskIndex] = 1;
                         cost += targetTask.C_i + taskSlackPenalty;
                         selectedTaskCount++;
-                        vehicleSlack++;
                     }
                     else {
                         // No profit to be made anymore, stop
@@ -284,7 +297,6 @@ namespace E_VCSP.Solver {
                             cost += targetDuty.C_j + crewSlackPenalty;
                             Y[targetDuty.dutyIndex]++;
                             selectedDutyCount++;
-                            maxDutiesSlack++;
                         }
                         else {
                             break;
@@ -301,7 +313,7 @@ namespace E_VCSP.Solver {
                 for (int i = 0; i < GTrips.Length; i++) GTrips[i] = 1; // b
                 for (int taskIndex = 0; taskIndex < X.Count; taskIndex++) {
                     if (X[taskIndex] == 0) continue;
-                    foreach (var tripIndex in vss.Tasks[taskIndex].TripCover)
+                    foreach (var tripIndex in vss.Tasks[taskIndex].TripIndexCover)
                         GTrips[tripIndex] -= 1;
                 }
 
@@ -470,7 +482,7 @@ namespace E_VCSP.Solver {
                 }
                 for (int i = 0; i < tasksToUpdate.Count; i++) {
                     (double C_i, int taskIndex) = tasksToUpdate[i];
-                    List<int> tripCover = vss.Tasks[taskIndex].TripCover;
+                    List<int> tripCover = vss.Tasks[taskIndex].TripIndexCover;
                     List<int> blockCover = vss.Tasks[taskIndex].BlockIndexCover;
                     double delta = C_i / (tripCover.Count + blockCover.Count);
 
@@ -513,7 +525,8 @@ namespace E_VCSP.Solver {
                 updateDualCosts();
                 var newColumns = vspLabelingInstance.GenerateVehicleTasks();
 
-                foreach ((var reducedCosts, var newTask) in newColumns) {
+                int duplicateColumnCount = 0;
+                foreach ((double reducedCosts, VehicleTask newTask) in newColumns) {
                     if (reducedCosts > 0) continue;
 
                     newTask.Index = vss.Tasks.Count;
@@ -533,12 +546,22 @@ namespace E_VCSP.Solver {
                         newTask.BlockIndexCover.Add(blockIndex);
                     }
 
+                    BitArray taskCover = newTask.ToTripBitArray(vss.Instance.Trips.Count);
+                    BitArray blockCover = newTask.ToBlockBitArray(css.Blocks.Count);
+
+                    // If we already know this column, skip adding it
+                    if (knownVTs.Contains((taskCover, blockCover))) {
+                        duplicateColumnCount++;
+                        continue;
+                    }
+
                     vss.Tasks.Add(newTask);
                     X.Add(0);
+                    knownVTs.Add((taskCover, blockCover));
                 }
 
                 gradientDescent(!disrupt);
-                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}");
+                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}\t{duplicateColumnCount}");
             }
         }
         #endregion
@@ -735,15 +758,26 @@ namespace E_VCSP.Solver {
                         }
                 });
 
+                int duplicateColumnCount = 0;
                 foreach ((double reducedCost, CrewDuty newDuty) in newColumns) {
                     if (reducedCost >= 0) continue;
+
+                    BitArray blockCover = newDuty.ToBlockBitArray(css.Blocks.Count);
+                    int dutyType = (int)newDuty.Type;
+
+                    // If we already know this column, skip adding it
+                    if (knownCDs.Contains((blockCover, dutyType))) {
+                        duplicateColumnCount++;
+                        continue;
+                    }
 
                     newDuty.Index = css.Duties.Count;
                     css.Duties.Add(newDuty);
                     Y.Add(0);
+                    knownCDs.Add((blockCover, dutyType));
                 }
                 gradientDescent(!disrupt);
-                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}");
+                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}\t{duplicateColumnCount}");
             }
         }
 
@@ -801,7 +835,7 @@ namespace E_VCSP.Solver {
             foreach (Trip t in vss.Instance.Trips) {
                 GRBLinExpr expr = new();
                 for (int i = 0; i < vss.Tasks.Count; i++) {
-                    if (vss.Tasks[i].TripCover.Contains(t.Index)) {
+                    if (vss.Tasks[i].TripIndexCover.Contains(t.Index)) {
                         expr.AddTerm(1, taskVars[i]);
                     }
                 }

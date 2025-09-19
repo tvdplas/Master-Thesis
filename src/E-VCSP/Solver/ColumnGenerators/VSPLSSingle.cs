@@ -100,7 +100,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             VehicleTask? vehicleTask = head!.ToVehicleTask(vss.VehicleType, "LS Single");
             if (vehicleTask == null) return null;
             double reducedCost = vehicleTask.Cost;
-            foreach (int coveredTripIndex in vehicleTask.TripCover) {
+            foreach (int coveredTripIndex in vehicleTask.TripIndexCover) {
                 reducedCost -= tripDualCosts[coveredTripIndex];
             }
             return (reducedCost, vehicleTask);

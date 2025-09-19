@@ -28,7 +28,7 @@ namespace E_VCSP.Solver {
 
                 VehicleTask vt = vss.VarnameTaskMapping[v.VarName];
                 selectedTasks.Add(vt);
-                foreach (int i in vt.TripCover) {
+                foreach (int i in vt.TripIndexCover) {
                     coveredBy[i].Add(selectedTasks.Count - 1);
                 }
             }
@@ -107,7 +107,7 @@ namespace E_VCSP.Solver {
                 // Bookkeeping to find variable based on name / cover easily
                 taskVars.Add(v);
                 vss.VarnameTaskMapping[name] = vss.Tasks[i];
-                vss.CoverTaskMapping.Add(vss.Tasks[i].ToBitArray(vss.Instance.Trips.Count), vss.Tasks[i]);
+                vss.CoverTaskMapping.Add(vss.Tasks[i].ToTripBitArray(vss.Instance.Trips.Count), vss.Tasks[i]);
             }
 
             // Add cover constraint for each of the trips
@@ -115,7 +115,7 @@ namespace E_VCSP.Solver {
             foreach (Trip t in vss.Instance.Trips) {
                 GRBLinExpr expr = new();
                 for (int i = 0; i < vss.Tasks.Count; i++) {
-                    if (vss.Tasks[i].TripCover.Contains(t.Index)) {
+                    if (vss.Tasks[i].TripIndexCover.Contains(t.Index)) {
                         expr.AddTerm(1, taskVars[i]);
                     }
                 }
@@ -231,7 +231,7 @@ namespace E_VCSP.Solver {
                         (double reducedCost, VehicleTask newTask) = ((double, VehicleTask))task;
 
                         // Check if task is already in model 
-                        BitArray ba = newTask.ToBitArray(vss.Instance.Trips.Count);
+                        BitArray ba = newTask.ToTripBitArray(vss.Instance.Trips.Count);
                         bool coverExists = vss.CoverTaskMapping.ContainsKey(ba);
 
                         // Cover already exists and is cheaper -> skip
@@ -266,7 +266,7 @@ namespace E_VCSP.Solver {
                                 // Create new column to add to model
                                 var modelConstrs = model.GetConstrs();
                                 GRBConstr[] constrs = [.. modelConstrs.Where(
-                                    (_, i) => newTask.TripCover.Contains(i)    // Covers trip
+                                    (_, i) => newTask.TripIndexCover.Contains(i)    // Covers trip
                                     || i == modelConstrs.Length - 1        // Add to used vehicles
                                 )];
                                 GRBColumn col = new();
