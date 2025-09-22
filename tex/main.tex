@@ -419,10 +419,6 @@ For all detour arcs, we assume that the time at the charging location is maximiz
 
 Any feasible vehicle task can now be described as a path in $G$ from $d_s$ to $d_e$. The costs for a task can be defined as a base cost of using a vehicle plus the sum of all used arc costs and a KWh costs. In this, we assume that the cost of energy remains constant throughout the day and at different charging locations, and that vehicles will be fully recharged overnight for the same KWh cost as during the day. Additionally note that not every path from  $d_s$ to $d_e$ describes a feasible vehicle task; depending on the arcs used, the amount of time that a vehicle has to charge may not be sufficient in order to keep it within SoC bounds during the task. As we previously defined how much time is spent at a charging location during an arc, this information can be used to determine whether a task is feasible or not.
 
-
-
-
-
 \subsubsection{Solving}
 In order to now solve the E-VSP, a collection of feasible vehicle tasks that cover the trips $\mathcal{T}$ must be found. In order to do this, we use a column generation approach; this has previously been shown to be an effective solution method for the E-VSP by works such as \citet{vanKootenNiekerk2017}, \citet{Zhang2021} and \citet{deVos2024}. The ILP used to model this is based on a set covering formulation. In this let $VT$ represent the available set of vehicle tasks, let $x_{i}$ be a binary decision variable indicating the use of vehicle task $vt_i \in VT$, and let $k_{i,t}$ be a parameter defining whether vehicle task $vt_i$ includes the trip $t \in \mathcal{T}$.
 \begin{align}
@@ -630,7 +626,6 @@ Starting with an empty task $vt$, a collection of operations is again repeatedly
     \node (t2) [lsnode, xshift=4.5cm] {Trip 2};
     \node (t3) [lsnode, xshift=9cm] {Trip 3};
     
-
     % Original arcs
     \draw [dashedarrow] (t1) -- (t2);
     \draw [dashedarrow] (t2) -- (t3);
@@ -715,12 +710,12 @@ This problem can be relaxed to an LP by replacing constraint (\ref{form:y-intege
 \begin{align}
 0 &\leq y_{j} && \forall cd_j \in \textit{CD}
 \end{align}
-In this relaxed problem, let the dual cost of constraints (\ref{form:block-cover}-\ref{form:max-between-shifts}) be $\tau_{\textit{cover},b}, \tau_{\textit{avgdur}}, \tau_{\textit{longdur}}, \tau_{\textit{broken}}$ and $\tau_{\textit{between}}$ respectively. Using this, we can define the reduced costs of a new crew duty $cd_0$ as being: 
+In this relaxed problem, let the dual cost of constraints (\ref{form:block-cover}-\ref{form:max-between-shifts}) be $\tau_{b}, \tau_{\textit{avg}}, \tau_{\textit{long}}, \tau_{\textit{broken}}$ and $\tau_{\textit{between}}$ respectively. Using this, we can define the reduced costs of a new crew duty $cd_0$ as being: 
 \begin{align}
 \text{cost}(cd_0) 
-&- \sum_{b \in B} m_{0,b} \tau_{\textit{cover},b} 
-- \frac{d_0}{\text{8 hours}} \tau_{\textit{avgdur}} \nonumber \\
-&- \tau_{\textit{longdur}} (0.15 - d_{0,\textit{longdur}}) 
+&- \sum_{b \in B} m_{0,b} \tau_{b} 
+- \frac{d_0}{\text{8 hours}} \tau_{\textit{avg}} \nonumber \\
+&- \tau_{\textit{long}} (0.15 - d_{0,\textit{long}}) 
 - \tau_{\textit{broken}} (0.3 - \rho_{0,\textit{broken}}) 
 - \tau_{\textit{between}} (0.1 - \rho_{0,\textit{between}})
 \end{align}
@@ -767,8 +762,10 @@ In order to have a baseline solution for the E-VCSP, we first solve the E-VSP an
 
 During the solving process, a set of columns $VT_{init}$ and $CD_{init}$ representing vehicle tasks and crew duties respectively are generated. Let $VT_{init}^* \subseteq VT_{init}$ and $CD_{init}^* \subseteq CD_{init}$ be the selected subsets that form the solution to the sequential problem. Let $z_{init}$ be the total cost of this solution, representing an upper bound for the cost of the integrated problem.
 
-\subsubsection{Solving}
-Let us once again define an ILP which can be used in order to solve the E-VCSP. We will continue to use the same notation as in Sections \ref{sec:problem_def}, \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}; that is, let $VT$ and $CD$ be the sets of available vehicle tasks and crew duties respectively. Let $x_i$ and $y_j$ be binary decision variables indicating the usage of vehicle task $vt_i \in VT$ and crew duty $cd_j \in CD$ respectively. Let $k_{i,t}$, $l_{i,b}$ and $m_{j,b}$ be parameters indicating that $vt_i$ covers $t$, $vt_i$ contains block $b$ and $cd_j$ covers $b$ respectively. Additionally, let $d_j$ be the duration of $cd_j$, let $d_{j,\textit{long}}$ indicate that $d_j$ is longer than 8.5 hours, and let $\rho_{j,\textit{broken}}$ and $\rho_{j,\textit{between}}$ indicate that $cd_j$ is of duty type \textit{broken} or \textit{between}, respectively. Lastly, let $cost(vt_i)$ and $cost(cd_j)$ be the costs of vehicle task $vt_i$ and crew duty $cd_j$ respectively. Our ILP is then defined as follows:
+\subsubsection{Solution improvement}
+We will now attempt to improve the initial solution. In order to do this, we will first discuss an ILP formulation for the E-VSCP and the problems that arise by directly using its corresponding LP relaxation. Afterwards, we will use an Lagrangian relaxation of the ILP which we used in order to solve the E-VSCP, before finally discussing the modifications needed to the column generations methods from Sections \ref{sec:evsp-methodology} and \ref{sec:csp-methodology} in order to use them for the integrated problem.
+
+\paragraph{ILP formulation and LP relaxation} Let us once again define an ILP which can be used in order to solve the E-VCSP. We will continue to use the same notation as in Sections \ref{sec:problem_def}, \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}; that is, let $VT$ and $CD$ be the sets of available vehicle tasks and crew duties respectively. Let $x_i$ and $y_j$ be binary decision variables indicating the usage of vehicle task $vt_i \in VT$ and crew duty $cd_j \in CD$ respectively. Let $k_{i,t}$, $l_{i,b}$ and $m_{j,b}$ be parameters indicating that $vt_i$ covers $t$, $vt_i$ contains block $b$ and $cd_j$ covers $b$ respectively. Additionally, let $d_j$ be the duration of $cd_j$, let $d_{j,\textit{long}}$ indicate that $d_j$ is longer than 8.5 hours, and let $\rho_{j,\textit{broken}}$ and $\rho_{j,\textit{between}}$ indicate that $cd_j$ is of duty type \textit{broken} or \textit{between}, respectively. Lastly, let $cost(vt_i)$ and $cost(cd_j)$ be the costs of vehicle task $vt_i$ and crew duty $cd_j$ respectively. Our ILP is then defined as follows:
 
 \begin{align}
 \min \quad
@@ -782,43 +779,91 @@ Subject to:
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.15 - d_{j,\textit{long}}) &\geq 0 && \label{form:methods-integrated-max-long-shifts}\\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.3 - \rho_{j,\textit{broken}}) &\geq 0 && \label{form:methods-integrated-max-broken-shifts}\\
 \sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.1 - \rho_{j,\textit{between}}) &\geq 0 && \label{form:methods-integrated-max-between-shifts}\\
-x_{i} &\in \{ 0, 1 \} && \forall i = 1,\:\dots,\:|VT| \\
-y_{j} &\in \mathbb{N}_0 && \forall j = 1,\:\dots,\:|CD|
+x_{i} &\in \{ 0, 1 \} && \forall vt_i \in VT \\
+y_{j} &\in \mathbb{N}_0 && \forall cd_j \in CD
 \end{align}
 In this, constraint (\ref{form:methods-integrated-all-trips-covered}) ensures that all trips are covered by at least one vehicle task, while constraint (\ref{form:methods-integrated-all-blocks-covered}) ensures that there are enough drivers available for all blocks used in vehicle tasks. Constraints (\ref{form:methods-integrated-max-avg-shift-length}-\ref{form:methods-integrated-max-between-shifts}) once again ensure that average shift length and shift type constraints resulting from the labor regulations are met.
 
-We note that constraints (\ref{form:methods-integrated-all-trips-covered}) and (\ref{form:methods-integrated-all-blocks-covered}) allow overcoverage; that is, a trip can be driven more than once, and a block may be covered by more drivers than vehicles. When a trip is driven multiple times, any unnecessary busses may simply drive a deadhead instead. When multiple drivers are assigned to the same driven block, all but one may simply ride along as passengers. We additionally note however that under this formulation, it is possible to assign a driver to a block which does not have a corresponding vehicle; in this case, an alternate form of transport must be used in order to get the driver from the starting location to the ending location of the block. During testing however, this was generally not an issue as the hourly wage cost associated with block overcoverage was high enough to disincentivize it in final solutions.
+We note that constraints (\ref{form:methods-integrated-all-trips-covered}) and (\ref{form:methods-integrated-all-blocks-covered}) allow overcoverage; that is, a trip can be driven more than once, and a block may be covered by more drivers than vehicles. When a trip is driven multiple times, any unnecessary busses may simply drive a deadhead instead. When multiple drivers are assigned to the same driven block, all but one may simply ride along as passengers. 
 
-This ILP may once again be relaxed to an LP by removing the binary / integrality constraints of $x$ and $y$. Solving this LP gives us a set of dual costs for the constraints (\ref{form:methods-integrated-all-trips-covered}-\ref{form:methods-integrated-max-between-shifts}), allowing us to once again to once again formulate reduced costs for both vehicle and crew columns. A combination of column generation for new columns and branch and bound for a final solution could then be used in order to find a better quality solution than $z_{init}$.
+Under this formulation, it is also possible that a driver is assigned to a block which is not driven; in this case, an alternate form of transport would need to be used in order to get the driver from the starting location to the ending location of the block. In our testing, this almost never occurred in final solutions due to the associated increase in cost, and in the following sections we will therefore assume that a final schedule does not contain this type of conflict. Note that one might also chose to introduce a cost penalty when this occurs, modeling the costs of the alternate form of transport.
 
-This direct approach showed poor results, with poor quality columns being generated and the relaxation taking quite long to solve when compared to the sequential problems. Let us therefore instead apply a Lagrangean relaxation; this allows us to fully relax the linking constraint (\ref{form:methods-integrated-all-blocks-covered}), resulting in a problem which is significantly easier to solve. Previous work by \citet{vanKootenNiekerk2017} has also shown that relaxing the trip coverage constraint may also lead to a problem which is computationally easier to solve; as such, we have decided to fully relax our problem. That is, all constraints are replaced with a penalty in the objective function which depends on the deviation from the constraint. For each relaxed constraint, let us define our penalty factor (more commonly known as a Lagrangean multiplier) and contribution to the objective function as follows: 
+This ILP may once again be relaxed to an LP by removing the binary / integrality constraints of $x$ and $y$. Solving this LP gives us a set of dual costs for the constraints (\ref{form:methods-integrated-all-trips-covered}-\ref{form:methods-integrated-max-between-shifts}), which we shall refer to as $\pi_t,\:\pi_b,\:\pi_{avg},\:\pi_{long},\:\pi_{between}$ and $\pi_{broken}$ respectively. Using this, we now define the a reduced cost for a vehicle task $vt_0$ as being:
 \begin{align}
-\lambda_{t} &\geq 0 && \lambda_{t} (1 - \sum_{vt_i \in VT} x_{i}k_{i,t}) && \forall t = 1,\:\dots,\:|T| \\
-\lambda_{b} &\in \mathbb{R} && \lambda_{b} (\sum_{cd_j \in CD}y_j m_{j,b} - \sum_{vt_i \in VT} x_i l_{i,b}) && \forall b \in B \\
-\lambda_{\text{avg}} &\geq 0 && \lambda_{\text{avg}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (\frac{d_{j}}{\textit{8 hours}} - 1)) && \\
-\lambda_{\text{long}} &\geq 0 && -\lambda_{\text{long}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.15 - d_{j,\textit{long}})) && \\
-\lambda_{\text{broken}} &\geq 0 && -\lambda_{\text{broken}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.3 - \rho_{j,\textit{broken}})) && \\
-\lambda_{\text{between}} &\geq 0 && -\lambda_{\text{between}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.1 - \rho_{j,\textit{between}})) &&
+\text{cost}(vt_0) - \sum_{t \in T} k_{0,t}\pi_t - \sum_{b \in B} l_{0,b}\pi_b \label{form:evcsp-rc-vt}
 \end{align}
-Using this, for a certain set of multipliers $\lambda$, we can now redefine our cost function as follows:
+As we can see, the dual cost $\pi_b$ of the blocks contained in $vt_0$ now influence the reduced cost of the task; the quality of the crew solution is therefore now linked to the reduced cost of a vehicle task.
+
+For a crew duty $cd_0$, we can similary define the reduced cost as follows: 
+\begin{align}
+\text{cost}(cd_0) 
+&+ \sum_{b \in B} m_{0,b} \tau_{b} 
+- \frac{d_0}{\text{8 hours}} \tau_{\textit{avg}} \nonumber \\
+&- \tau_{\textit{longdur}} (0.15 - d_{0,\textit{long}}) 
+- \tau_{\textit{broken}} (0.3 - \rho_{0,\textit{broken}}) 
+- \tau_{\textit{between}} (0.1 - \rho_{0,\textit{between}})
+\end{align}
+Note that this formulation is almost identical to the one found in Section \ref{sec:csp-methodology}, however the sign for the contribution of the block dual costs is flipped due to the change in sign in the LP formulation. 
+
+Using these reduced cost formulations, we can now once again apply column generation to find columns with negative reduced cost which will improve the solution quality of our LP. In order to do this, we will alternate between finding vehicle and crew columns. For now, let us assume that we have column generation methods available for both vehicle tasks and crew duties; we will discuss these in more detail in a later section. An outline of the approach is given in Algorithm \ref{alg:E-VCSP-rounds-lp}. \\\\
+\begin{algorithm}[h]
+\caption{E-VCSP Rounds - LP}\label{alg:E-VCSP-rounds-lp}
+\begin{algorithmic}[1]
+\State $(VT, CD) \gets \Call{SequentialSolution}$
+\State $(x, y, \pi) \gets \Call{SolveLP}{VT, CD}$
+\While{$round \in 1 ... MaxRounds$} 
+  \For{$i \in 1 \dots N_{VT}$}
+    \State $VT \gets VT \cup \Call{GenVTs}{T, \pi}$
+    \State $(x, y, \pi) \gets \Call{SolveLP}{VT, CD}$
+  \EndFor
+  \For{$i \in 1 \dots N_{CD}$}
+    \State $B' \gets$ Blocks covered by vehicle tasks in $VT$ with $x_i > 0$ \label{line:block-coverage}
+    \State $CD \gets CD \cup \Call{GenCDs}{B', \pi}$
+    \State $(x, y, \pi) \gets \Call{SolveLP}{VT, CD}$
+  \EndFor
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+Initial testing using this round based approach showed poor results; the columns generated during the round did not lead to significant improvements to the final (integer) solution. 
+
+On the crew side, this can most likely be traced back to line \ref{line:block-coverage}; here, a selection is made from all known blocks in order to use as a basis for duty generation. This is done based on the blocks currently present in (partially) selected tasks, as this both gives an indication that a block is more likely to be useful in the final solution as well as limiting the overall number of blocks in $B'$. In our initial experiments however, it became apparent that the number of blocks in $B'$ was generally still rather large, often exceeding twice the amount of blocks considered during the sequential problem. This resulted in generated duties with blocks that were unlikely to occur in final solutions, thereby reducing the effectiveness of the generation as a whole.
+
+The same argument partially applies to the generation of vehicle tasks; blocks in duties which were unlikely to occur in final solutions could be partially selected, resulting in dual costs for these blocks which can negatively influence the direction of column generation. 
+
+\paragraph{Lagrangean relaxation}
+In order to resolve the issues that arise from directly using the LP relaxation, let us instead apply a Lagrangean relaxation to our original ILP. In this, we replace constraints with penalties in the objective function when the constraint is not met. This allows us to fully relax the block linking constraint (\ref{form:methods-integrated-all-blocks-covered}), allowing us to oncemore consider the vehicle and crew parts as seperate problems. 
+
+Previous work by \citet{vanKootenNiekerk2017} has also shown that relaxing the trip coverage constraint (\ref{form:methods-integrated-all-trips-covered}) leads to a problem which is computationally easier to solve while maintaining high quality final solutions; as such, we have decided to fully relax our problem. That is, constraints (\ref{form:methods-integrated-all-trips-covered}-\ref{form:methods-integrated-max-between-shifts}) are all relaxed. For each relaxed constraint, let us define our penalty factor (more commonly known as a Lagrangean multiplier $\lambda$) and contribution to the objective function as follows: 
+\begin{align}
+\lambda_{t} &\geq 0 && \lambda_{t} (1 - \sum_{vt_i \in VT} x_{i}k_{i,t}) && \forall t = 1,\:\dots,\:|T| \nonumber \\
+\lambda_{b} &\geq 0 && \lambda_{b} (\sum_{vt_i \in VT} x_i l_{i,b} - \sum_{cd_j \in CD}y_j m_{j,b}) && \forall b \in B \nonumber \\
+\lambda_{\text{avg}} &\geq 0 && \lambda_{\text{avg}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (\frac{d_{j}}{\textit{8 hours}} - 1)) && \nonumber \\
+\lambda_{\text{long}} &\geq 0 && -\lambda_{\text{long}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.15 - d_{j,\textit{long}})) && \nonumber \\
+\lambda_{\text{broken}} &\geq 0 && -\lambda_{\text{broken}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.3 - \rho_{j,\textit{broken}})) && \nonumber \\
+\lambda_{\text{between}} &\geq 0 && -\lambda_{\text{between}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.1 - \rho_{j,\textit{between}})) && \nonumber
+\end{align}
+Using this, given a set of multipliers $\lambda$, we can now redefine our objective function as follows:
 \begin{align}
 \min \quad
 & \sum_{vt_i \in VT} x_{i} \cdot cost(vt_i) + \sum_{cd_j \in CD} y_{j} \cdot cost(cd_j)\quad+ \nonumber \\ 
 &\lambda_{t} (1 - \sum_{vt_i \in VT} x_{i}k_{i,t}) + \lambda_{b} (\sum_{cd_j \in CD}y_j m_{j,b} - \sum_{vt_i \in VT}x_i l_{i,b}) \quad+\nonumber \\
 &\lambda_{\text{avg}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (\frac{d_{j}}{\textit{8 hours}} - 1)) -\lambda_{\text{long}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.15 - d_{j,\textit{long}}))\quad- \nonumber \\
-&\lambda_{\text{broken}}(\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.3 - \rho_{j,\textit{broken}})) -\lambda_{\text{between}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.1 - \rho_{j,\textit{between}}))
+&\lambda_{\text{broken}}(\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.3 - \rho_{j,\textit{broken}})) -\lambda_{\text{between}} (\sum_{cd_j \in \textit{CD}} y_{j} \cdot (0.1 - \rho_{j,\textit{between}})) \nonumber
 \end{align}
 We can simplify this to the following:
 \begin{align}
 \min \quad & \sum_{vt_i \in VT} x_{i} (cost(vt_i) -\sum_{t \in T} \lambda_{t} k_{i,t} - \sum_{b \in B} \lambda_{b} l_{i,b})\quad+ \nonumber \\
 & \sum_{cd_j \in CD} y_{j} (cost(cd_j) + \sum_{b \in B} \lambda_{b} m_{j,b} + \lambda_{\text{avg}} (\frac{d_{j}}{\textit{8 hours}} - 1) - \lambda_{\text{long}} (0.15 - d_{j,\text{long}}) \nonumber \\
 &\quad\quad\quad\quad\:-\lambda_{\text{broken}} (0.3 - d_{j,\text{broken}}) - \lambda_{\text{between}} (0.1 - d_{j,\text{between}})) \quad + \nonumber \\
-& \sum_{t \in T} \lambda_{t}
+& \sum_{t \in T} \lambda_{t} \nonumber
 \end{align}
-In this, we note that for a given set of multipliers $\lambda$, the costs for selecting a vehicle task or crew duty are fixed; let us define the cost of a vehicle task $vt_i$ and crew duty $cd_j$ under multipliers $\lambda$ as being $cost_\lambda(vt_i)$ and $cost_\lambda(cd_j)$ respectively. Our problem can be written as follows:
+In this, we note that for a given set of multipliers $\lambda$, the costs for selecting a vehicle task or crew duty are fixed; let us define the cost of a vehicle task $vt_i$ and crew duty $cd_j$ under multipliers $\lambda$ as being $cost_\lambda(vt_i)$ and $cost_\lambda(cd_j)$ respectively. Our problem, given a fixed $\lambda$, can now be written as follows:
 \begin{align}
-\min \quad
-& \sum_{vt_i \in VT} x_{i} \cdot cost_\lambda(vt_i) + \sum_{cd_j \in CD} y_{j} \cdot cost_\lambda(cd_j) + \sum_{t \in T} \lambda_{t}
+\min \quad \sum_{vt_i \in VT}& x_{i} \cdot cost_\lambda(vt_i) + \sum_{cd_j \in CD} y_{j} \cdot cost_\lambda(cd_j) + \sum_{t \in T} \lambda_{t}
+\end{align}
+\begin{align}
+x_{i} &\in \{ 0, 1 \} && \forall vt_i \in VT \\
+ y_{j} &\in \mathbb{N}_0 && \forall cd_j \in CD
 \end{align}
 For a given set of multipliers $\lambda$, we can now find a solution to the problem by inspection. First, for all $vt_i \in VT$ for which $cost_\lambda(vt_i) < 0$, set $x_i = 1$ otherwise $x_i = 0$. This is guaranteed to be optimal as the inclusion of any other vehicle task will by definition only increase the overall cost of the solution. 
 
@@ -826,17 +871,18 @@ For the duties, we cannot directly do the same as $y_j$ is unbounded. We can how
 
 Using this, for all $cd_j \in CD$ for which $cost_\lambda(cd_j) < 0$, set $y_j = \bar{y_{j}}$, otherwise $y_j = 0$, following the same reasoning as earlier. We can ignore the $\lambda_t$ term as it is constant for a given set of multipliers.
 
-This solution of this Lagrangean relaxation provides a lower bound to the optimal solution of the original E-VCSP. The quality of this lower bound may differ depending on the value of $\lambda$. In order to find a good lower bound, we would need to solve the following problem:
+The solution of this Lagrangean relaxation provides a lower bound to the optimal solution of the original E-VCSP. The quality of this lower bound may differ depending on the value of $\lambda$. In order to find the best lower bound, we would need to solve the following problem:
 \begin{align}
 \max_{\lambda} \quad & \min \sum_{vt_i \in VT} x_{i} \cdot cost_\lambda(vt_i) + \sum_{cd_j \in CD} y_{j} \cdot cost_\lambda(cd_j) + \sum_{t \in T} \lambda_{t}
 \end{align}
-Let $\lambda^*$ be the set of multipliers for which our lower bound is maximized. $\lambda^*$ can be used as stand-ins for dual values for the relaxed constraints, allowing us to once again use the column generation methods that we used in the sequential problem. In order to find $\lambda^*$, we use subgradient optimization.
+Let $\lambda^*$ be the set of multipliers for which our lower bound is maximized. $\lambda^*$ can be used as a stand-in for the dual values $\pi$ of the LP relaxation discussed in the previous section, allowing us to once again use the column generation methods that we used in the sequential problem. In order to find $\lambda^*$, we use subgradient optimization. \todo{meer info over deze subgradient optimization}
 
-Using $\lambda^*$ as a standin for our dual values does have a drawback: columns which are already known may be generated, as columns in the basis may get negative reduced cost. In order to minimize this effect, we will apply a hueristic previously used in \todo{marcel, freling, caressi} which adjust the multipliers such that all selected columns have a nonnegative reduced cost, and the value of the relaxation does not descrease. This hueristic can either be applied to the vehicle tasks or the crew duties, depending on which column generation round we will be doing.
+Using $\lambda^*$ as a stand-in for our dual values does have a drawback: columns which are already known may be generated, as columns in the basis may get negative reduced cost. In order to minimize this effect, we will apply a modified version of a heuristic previously used in \todo{marcel, freling, caressi} which adjust the multipliers such that all selected columns have a nonnegative reduced cost, and the value of the relaxation does not descrease. We seperately apply this heuristic for vehicle columns or crew columns, depending on which type of columns we will be generating in a given round.
 \begin{algorithm}[h]
-\caption{Lagrangean Multiplier Heuristic - Vehicle Tasks}\label{alg:lagrange-multiplier-vt}
+\caption{Lagrangean Multiplier Heuristics}\label{alg:lagrange-multiplier-vt}
 \begin{algorithmic}
-\For{$vt_i \in VT,\:cost_\lambda(vt_i) < 0$} \Comment{Adjust Vehicle Task Multipliers}
+\Procedure{NonNegativeVTs}{$VT, \lambda$} \Comment{Adjust Vehicle Task Multipliers}
+\For{$vt_i \in VT,\:cost_\lambda(vt_i) < 0$} 
   \State $\delta \gets cost_\lambda(vt_i) / (\sum_{t \in T} k_{i,t} + \sum_{b \in B} l_{i,b})$
   \For {$t \in T,\:k_{i,t} = 1$}
     \State $\lambda_{t} \gets \lambda_{t} + \delta$
@@ -845,46 +891,104 @@ Using $\lambda^*$ as a standin for our dual values does have a drawback: columns
     \State $\lambda_{b} \gets \lambda_{b} + \delta$
   \EndFor
 \EndFor
-\end{algorithmic}
-\end{algorithm}
-\begin{algorithm}[h]
-\caption{Lagrangean Multiplier Heuristic - Vehicle Tasks}\label{alg:lagrange-multiplier-cd}
-\begin{algorithmic}
-\For{$vt_i \in VT,\:cost_\lambda(vt_i) < 0$} \Comment{Adjust Vehicle Task Multipliers}
-  \State $\delta \gets cost_\lambda(vt_i) / ()\sum_{b \in B} l_{i,b})$
-  \For {$t \in T,\:k_{i,t} = 1$}
-    \State $\lambda_{t} \gets \lambda_{t} + \delta$
+\Return $\lambda$
+\EndProcedure\\
+\Procedure{NonNegativeCDs}{$CD, \lambda$} \Comment{Adjusts Crew Duty Multipliers}
+  \For{$cd_j \in CD,\:cost_\lambda(cd_j) < 0$} 
+    \State $\delta \gets cost_\lambda(cd_j) / (0.55 - \sum_{b \in B} m_{j,b} - (\frac{d_{j}}{\textit{8 hours}} - 1) - d_{j,\textit{long}} - \rho_{j,\textit{broken}} - \rho_{j,\textit{between}})$
+    \For {$b \in B,\:m_{j,b} = 1$}
+      \State $\lambda_{b} \gets \lambda_{b} + \delta$
+    \EndFor
+    \State $\lambda_{avg} \gets \lambda_{avg} + \delta$
+    \State $\lambda_{long} \gets \lambda_{long} + \delta$
+    \State $\lambda_{broken} \gets \lambda_{broken} + \delta$
+    \State $\lambda_{between} \gets \lambda_{between} + \delta$
   \EndFor
-  \For {$b \in B,\:l_{i,b} = 1$}
-    \State $\lambda_{b} \gets \lambda_{b} + \delta$
-  \EndFor
-\EndFor
-\end{algorithmic}
+\Return $\lambda$
+\EndProcedure
+\end{algorithmic} 
 \end{algorithm}
-\todo{formules voor subgradient optimization}
-We now have a method to find a lower bound for the original E-VCSP, along with dual costs for each of the relaxed constraints. We will now use these in order to generate new columns, hopefully improving the solution. An outline of this process is as follows:  
+
+We now have a method to find a lower bound for the original E-VCSP, along with approximated dual costs for each of the constraints by letting $\pi \gets \lambda$. We will now modify Algorithm \ref{alg:E-VCSP-rounds-lp} in order to use this new approach. An outline of this process has been provided in Algorithm \ref{alg:E-VCSP-lagrange}.
 
 \begin{algorithm}
-\caption{E-VCSP Rounds}\label{alg:E-VCSP}
+\caption{E-VCSP Rounds - Lagrangean}\label{alg:E-VCSP-lagrange}
 \begin{algorithmic}
-\State $(VT, CD, z_{init}) \gets SequentialSolution()$
-\State $(x, y, \lambda) \gets SubgradientOptimization(VT, CD)$
+\State $(VT, CD, z_{init}) \gets \Call{SequentialSolution}$
+\State $(x, y, \lambda) \gets \Call{SubgradientOpt}{VT, CD}$
 \While{$round \in 1 ... MaxRounds$} 
-    \For{$i \in 1 \dots N_{VT}$}
-        \State $VT \gets VT \cup GenerateVehicleTasks(T, \lambda)$
-        \State $(x, y, \lambda) \gets SubgradientOptimization(VT, CD)$
-    \EndFor
-    \For{$i \in 1 \dots N_{CD}$}
-        \State $B' \gets$ Blocks covered by vehicle tasks in $VT$ with $x_i = 1$
-        \State $CD \gets CD \cup GenerateCrewDuties(B', \lambda)$
-        \State $(x, y, \lambda) \gets SubgradientOptimization(VT, CD)$
-    \EndFor
+  \For{$i \in 1 \dots N_{VT}$}
+    \State $\lambda \gets$ \Call{NonNegativeVTs}{$VT, \lambda$}
+    \State $VT \gets VT \cup \Call{GenVTs}{T, \lambda}$
+    \State $(x, y, \lambda) \gets \Call{SubgradientOpt}{VT, CD}$
+  \EndFor
+  \For{$i \in 1 \dots N_{CD}$}
+    \State $B' \gets$ Blocks covered by vehicle tasks in $VT$ with $x_i = 1$
+    \State $\lambda \gets$ \Call{NonNegativeCDs}{$CD, \lambda$}
+    \State $CD \gets CD \cup \Call{GenCDs}{B', \lambda}$
+    \State $(x, y, \lambda) \gets \Call{SubgradientOpt}{VT, CD}$
+  \EndFor
 \EndWhile
 \end{algorithmic}
 \end{algorithm}
 
-During this process, we alternate between rounds focused on vehicle tasks and crew duties; this is done as the testing during the sequential approach showed that solution quality with a fixed set of trips / blocks significantly increased after a just a few rounds, therefore multiple sequential rounds with the same input may be benificial. 
+During this process, we alternate between rounds focused on vehicle tasks and crew duties; this is done as the testing during the sequential approach showed that solution quality with a fixed set of trips / blocks significantly increased after a just a few rounds, therefore multiple sequential rounds with roughly the same input may be benificial.
 
+\paragraph{Column generation}
+In order to improve our solution quality beyond the initial sequential solution, we once again apply column generation. However, as we have split the integrated problem into two seperate subproblems by relaxing the block link constraint, we can reuse the column generation methods that we discussed in Sections \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}. As our formulas for reduced costs have slightly changed, our generation methods will be modified slightly in order to incorporate these changes; we will primarily focus on the changes required in the previously discussed labeling algorithms, however adjustments for the local search based approaches will also be discussed. 
+
+\subparagraph{E-VSP Labeling} Let us recall the reduced cost formula for a vehicle task $vt_0$ as described by Formula (\ref{form:evcsp-rc-vt}). As mentioned earlier, the difference between this and the reduced cost formula in the sequential problem is the inclusion of the dual costs of the blocks which are contained within the vehicle task. Let us visualise this within our graph $G_{vt}$ by outlining known blocks within the graph; see Figure \ref{fig:evsp-graph-blocks} for an example. In this figure, we represent the ends of trips as a nodes, and the connectings arcs incorporate both movements and (charging) idles.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[
+    node distance=25mm and 18mm,
+  ]
+  % Nodes
+  \node[lsnode] (A) {Trip 1};
+  \node[lsnode, right=25mm of A, yshift=-10mm] (B) {Trip 2};
+  \node[lsnode, right=25mm of B, yshift=10mm] (C) {Trip 3};
+  \node[lsnode, right=25mm of B, yshift=-10mm] (D) {Trip 4};
+
+  \draw[->] (B.east) -- (C.west);
+  \draw[->] (B.east) -- (D.west);
+  \draw[-] (A.east) -- (B.west);
+  \draw[-] ($(A.west) + (0,-24mm)$) -- (B.west);
+  \draw[->] ($(B.west) + (-0.01mm, 0)$)-- (B.west);
+  \draw[->] (B.east) -- ++(63mm,0);
+  \draw[->] (C.east) -- ++(15mm,0);
+  \draw[->] (D.east) -- ++(15mm,0);
+
+  \draw[dash pattern={on 1pt off 1pt}, thick, rounded corners=8pt]
+    ($(A.west) + (0,-24mm) +(0mm,6mm)$) -- ($(B.north west)+(-3mm,3mm)$) -- ($(B.north east)+(3mm,3mm)$) -- ($(C.north west)+(-3mm,3mm)$) -- ($(C.north east)+(0mm,3mm)$) -- ($(C.south east)+(0mm,-3mm)$) -- ($(C.south west)+(-3mm,-3mm)$) -- ($(B.south east)+(3mm,-3mm)$) -- ($(B.south west)+(-3mm,-3mm)$) -- ($(A.west) + (0,-24mm) +(0mm,-6mm)$) -- cycle;
+  \draw[dashed, thick, rounded corners=8pt]
+    ($(A.north east)+(0mm,3mm)$) -- ($(B.north west)+(-3mm,3mm)$) -- ($(B.north east)+(3mm,3mm)$) -- ($(D.north west)+(-3mm,3mm)$) -- ($(D.north east)+(0mm,3mm)$) -- ($(D.south east)+(0mm,-3mm)$) -- ($(D.south west)+(-3mm,-3mm)$) -- ($(B.south east)+(3mm,-3mm)$) -- ($(B.south west)+(-3mm,-3mm)$) -- ($(A.south east)+(0mm,-3mm)$) -- cycle;
+  \node[above=3mm of C.north] {Block 1};
+  \node[below=3mm of D.south] {Block 2};
+  \end{tikzpicture}
+  \caption{A simplified view of $G_{vt}$ with 2 known blocks. Trip nodes represent ends of trips, edges contain both movements and idles between pairs of trips.}
+  \label{fig:evsp-graph-blocks}
+\end{figure}
+
+Suppose that in this graph, we have two labels in Trip 2 with $l_1 = (SoC = 80\%, Cost = 120)$ and $l_2 = (SoC = 90\%, Cost = 100)$. By our domination rule as defined previously, $l_1$ dominates $l_2$, as the SoC is greater and incurred costs are lower. This would imply that we may safely discard $l_2$, as there is no way to expand labels such that an expansion of $l_2$ gives a better result than an expansion of $l_1$.
+
+Let us now consider the known blocks within the graph. In order to more easily do this, assume that for each label we know its origin: for now, let us simply say that $l_1$ originates from Trip 1 and $l_2$ originates elsewhere. As we can see, if $l_1$ were to be expanded towards Trip 4 into a new label $l_1'$, it would cover Block 2; our cost in $l_1'$ would therefore consist of the costs of the edge to Trip 4 minus $\pi_{b_2}$. If we on the other hand expand $l_2$ towards Trip 4, it would not contain Block 1 and therefore not gain the $\pi_{b_2}$. If  $\pi_{b_2} \geq 20$, $l_1'$ would be cheaper in Trip 4 than $l_2'$. This breaks our domination rule, as keeping $l_1$ would have resulted in a better overall outcome.
+
+Note that the problem can also be seen in reverse, where the covering of a block causes a penalty. If $\pi_{b_1} < 0$ and we expand to Trip 3 instead, $l_2'$ becomes more expensive due to covering Block 2 as opposed to $l_1'$ not facing a penalty. If $\pi_{b_1} \geq 20$, $l_1'$ would again be better than $l_2'$, resulting in a broken domination rule.    
+
+In order to account for this, let us redefine our label in order to also include a cost upper bound $c_{max}$ and lower bound $c_{min}$. Let the base cost in that label be called $c$, where $c_{min} \leq c \leq c_{max}$. During propegation along throughout the graph, update $c, c_{min}$ and $c_{max}$ as defined for the sequential approach, incorporating both operation costs and trip dual costs. When, during expansion, we encounter the start of a known block, let us consider all known blocks which start at this combination of location and time $B'$. Then, find $\pi_{max} = \max_{b \in B'} \pi_{b}$ and $\pi_{min} = \min_{b \in B'} \pi_{b}$. We can now update our bounds to $c_{min} = c - \pi_{max}$, $c_{max} = c - \pi_{min}$. When the end of a block $b$ is reached, set $c \gets c - \pi_b$ and reset $c_{min}$ and $c_{max}$ to $c$. Note that as multiple blocks may end at the same point, the starting time and location of $b$ must be tracked within the label as well during propegation. 
+
+Using this, we can now redefine our domination rule such that for $l$ to dominate $l'$ both $SoC_l \geq SoC_l'$ and $c_{max,l} \leq c_{min,l'}$ must hold. If this is the case, we now know with certainty that the costs of the expansion will not be compesated for by the dual costs of a not yet completed block, thereby making $l$ better than $l'$.
+
+\noindent \subparagraph{E-VSP Local search} For both local search approaches, the block dual costs must once again be incorporated. Luckily, this is trivial as we can simply check for the existence of known blocks within the current vehicle task, and subtract any applicable block reduced costs. No further modifications are required.
+
+\subparagraph{CSP} 
+
+- blok generatie aan crew kant
+
+\paragraph{Additional heuristics}
+- subgradient optimization -> pi / 2 na x rondes, T niet meetellen voor dingen die geen invloed hebben op een lambda
+- max aantal labels in eindknopen van labeling algoritmes
 
 
 \section{Results}

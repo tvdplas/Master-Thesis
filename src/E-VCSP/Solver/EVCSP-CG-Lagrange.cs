@@ -376,7 +376,7 @@ namespace E_VCSP.Solver {
 
                 for (int i = 0; i < lambdaBlocks.Count; i++) {
                     // == constraint
-                    lambdaBlocks[i] = lambdaBlocks[i] + T * GBlocks[i];
+                    lambdaBlocks[i] = Math.Min(0, lambdaBlocks[i] + T * GBlocks[i]);
                 }
 
                 lambdaAvgDutyLength = Math.Max(0, lambdaAvgDutyLength + T * GAvgDutyLength);
@@ -531,7 +531,7 @@ namespace E_VCSP.Solver {
                 updateDualCosts();
                 var newColumns = vspLabelingInstance.GenerateVehicleTasks();
 
-                int duplicateColumnCount = 0;
+                int discardedColumns = 0, improvedColumns = 0;
                 foreach ((double reducedCosts, VehicleTask newTask) in newColumns) {
                     if (reducedCosts > 0) continue;
 
@@ -558,10 +558,12 @@ namespace E_VCSP.Solver {
                         int vi = knownVTs[(taskCover, blockCover)];
                         if (vss.Tasks[vi].Cost < newTask.Cost) {
                             // Skip new column
-                            duplicateColumnCount++;
+                            discardedColumns++;
                         }
                         else {
                             // Replace existing column
+                            improvedColumns++;
+                            newTask.Index = vi;
                             vss.Tasks[vi] = newTask;
                         }
                     }
@@ -574,7 +576,7 @@ namespace E_VCSP.Solver {
                 }
 
                 gradientDescent(!disrupt);
-                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}\t{duplicateColumnCount}");
+                Console.WriteLine($"{round}.V{currIt}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}\t{improvedColumns}\t{discardedColumns}");
             }
         }
         #endregion
@@ -771,7 +773,7 @@ namespace E_VCSP.Solver {
                         }
                 });
 
-                int duplicateColumnCount = 0;
+                int discardedColumns = 0, improvedColumns = 0;
                 foreach ((double reducedCost, CrewDuty newDuty) in newColumns) {
                     if (reducedCost >= 0) continue;
 
@@ -783,10 +785,12 @@ namespace E_VCSP.Solver {
                         int ci = knownCDs[(blockCover, dutyType)];
                         if (css.Duties[ci].Cost < newDuty.Cost) {
                             // Skip new column
-                            duplicateColumnCount++;
+                            discardedColumns++;
                         }
                         else {
                             // Replace existing column
+                            improvedColumns++;
+                            newDuty.Index = ci;
                             css.Duties[ci] = newDuty;
                         }
                     }
@@ -799,7 +803,7 @@ namespace E_VCSP.Solver {
 
                 }
                 gradientDescent(!disrupt);
-                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}\t{duplicateColumnCount}");
+                Console.WriteLine($"{round}.C{it}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}\t{newColumns.Count}\t{improvedColumns}\t{discardedColumns}");
             }
         }
 
