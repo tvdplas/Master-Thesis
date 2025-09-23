@@ -22,13 +22,19 @@ namespace E_VCSP.Solver.ColumnGenerators {
         public int LastHubTime = 0; // Time since a stop with hub capibility was visited
         public required ChargeTime ChargeTime; // Was charge at start / end of deadhead
         public BitArray CoveredTrips;
-        public double CurrSoC; // SoC at the end of trip
+
+        public double CurrActualSoC; // SoC at the end of trip
+        public int CurrSoCBin; // SoC bin used for domination
 
         public double CurrCosts;  // Actual costs incurred at the end of trip, including blocks already completed
-
         public string CurrentBlockStart = ""; // Origin block start
         public double MaxBlockSavings; // Min costs that can be made based on block reduced cost
         public double MinBlockSavings; // Max costs that can be made based on block reduced cost
+
+        public static int SoCBin(double SoC)
+        {
+            return (int)Math.Round(SoC / 100 * Config.VSP_LB_SOC_BINS);
+        }
 
         public VSPLabel() {
             this.Id = ID_COUNTER++;
@@ -36,7 +42,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
     }
 
     public class VSPFront {
-        private SortedList<double, VSPLabel> front = [];
+        private SortedList<int, VSPLabel> front = [];
 
         /// <summary>
         /// Inserts label into front
@@ -44,12 +50,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
         /// <param name="label">Label to be inserted</param>
         /// <returns>The difference in amount of items currently in the front; min = -#items in front + 1, max = 1</returns>
         public int Insert(VSPLabel label) {
+            // Adjust charge to epsilon
             int l = 0, r = front.Count;
 
             // find first item that is larger than or equal to label CurrSoC
             while (l < r) {
                 int m = (l + r) / 2;
-                if (front.Keys[m] >= label.CurrSoC - Config.VSP_LB_CHARGE_EPSILON) r = m;
+                if (front.Keys[m] >= label.CurrSoCBin) r = m;
                 else l = m + 1;
             }
 
@@ -63,7 +70,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 // If domination is not found however we are within epsilon range of the inserted label, 
                 // add it to a seperate list of items we might remove if the new label dominates it
-                if (Math.Abs(front.Values[i].CurrSoC - label.CurrSoC) < Config.VSP_LB_CHARGE_EPSILON) sameCharge.Add(i);
+                if (front.Values[i].CurrSoCBin == label.CurrSoCBin) sameCharge.Add(i);
             }
 
             // Keep track of front size diff
@@ -72,7 +79,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Remove labels within epsilon range if they are dominated by the new label
             for (int i = sameCharge.Count - 1; i >= 0; i--) {
                 VSPLabel existing = front.Values[sameCharge[i]];
-                if (existing.CurrCosts - existing.MaxBlockSavings >= label.CurrSoC - label.MinBlockSavings) {
+                if (existing.CurrCosts - existing.MaxBlockSavings >= label.CurrActualSoC - label.MinBlockSavings) {
                     front.RemoveAt(sameCharge[i]);
                     diff--;
                 }
@@ -81,16 +88,16 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Remove all items which are strictly dominated
             for (int i = l - 1; i >= 0 && i < front.Count; i--) {
                 var existing = front.Values[i];
-                if (existing.CurrCosts - existing.MaxBlockSavings >= label.CurrSoC - label.MinBlockSavings) {
+                if (existing.CurrCosts - existing.MaxBlockSavings >= label.CurrActualSoC - label.MinBlockSavings) {
                     front.RemoveAt(i);
                     diff--;
                 }
             }
 
             // Lastly, insert new item. First path should never be taken
-            if (front.ContainsKey(label.CurrSoC)) front[label.CurrSoC] = label;
+            if (front.ContainsKey(label.CurrSoCBin)) front[label.CurrSoCBin] = label;
             else {
-                front[label.CurrSoC] = label;
+                front[label.CurrSoCBin] = label;
                 diff++;
             }
             return diff;
@@ -142,7 +149,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 CurrCosts = Config.VH_PULLOUT_COST,
                 MaxBlockSavings = 0,
                 MinBlockSavings = 0,
-                CurrSoC = vss.VehicleType.StartSoC,
+                CurrActualSoC = vss.VehicleType.StartSoC,
+                CurrSoCBin = VSPLabel.SoCBin(vss.VehicleType.StartSoC),
                 ChargeTime = ChargeTime.None,
                 CoveredTrips = new BitArray(vss.Instance.Trips.Count)
             }, vss.Nodes.Count - 2);
@@ -208,7 +216,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                         int steeringTime = expandingLabel.SteeringTime;
                         int hubTime = expandingLabel.LastHubTime;
-                        double SoC = expandingLabel.CurrSoC;
+                        double SoC = expandingLabel.CurrActualSoC;
                         double minBlockSavings = expandingLabel.MinBlockSavings;
                         double maxBlockSavings = expandingLabel.MaxBlockSavings;
                         string blockDescriptorStart = expandingLabel.CurrentBlockStart;
@@ -323,7 +331,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         // Always assume that detour is performed directly after previous label
                         int steeringTime = expandingLabel.SteeringTime;
                         int hubTime = expandingLabel.LastHubTime;
-                        double SoC = expandingLabel.CurrSoC;
+                        double SoC = expandingLabel.CurrActualSoC;
                         double costs = (dht1.Distance + dht2.Distance) * Constants.VH_M_COST;
                         double minBlockSavings = expandingLabel.MinBlockSavings;
                         double maxBlockSavings = expandingLabel.MaxBlockSavings;
@@ -392,7 +400,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             ChargeTime = stats.chargeTime,
                             ChargeLocationIndex = stats.chargeIndex,
                             CurrCosts = expandingLabel.CurrCosts + stats.cost,
-                            CurrSoC = stats.SoC,
+                            CurrActualSoC = stats.SoC,
+                            CurrSoCBin = VSPLabel.SoCBin(stats.SoC),
                             SteeringTime = stats.steeringTime,
                             LastHubTime = stats.hubTime,
                             CoveredTrips = newCover,
@@ -406,7 +415,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Perform cost correction for charge at end
             foreach (var finalLabel in allLabels[^1]) {
-                finalLabel.CurrCosts += Math.Max(0, vss.VehicleType.StartSoC - finalLabel.CurrSoC)
+                finalLabel.CurrCosts += Math.Max(0, vss.VehicleType.StartSoC - finalLabel.CurrActualSoC)
                     * vss.VehicleType.Capacity / 100 * Constants.KWH_COST;
             }
         }
