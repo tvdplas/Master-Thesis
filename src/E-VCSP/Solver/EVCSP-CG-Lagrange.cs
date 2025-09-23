@@ -351,7 +351,7 @@ namespace E_VCSP.Solver {
 
                 double GSquaredSum = 0;
                 for (int i = 0; i < GTrips.Length; i++) {
-                    if (lambdaTrips[i] == 0 && GTrips[i] < 0) GTrips[i] = 0;
+                    //if (lambdaTrips[i] == 0 && GTrips[i] < 0) GTrips[i] = 0;
                     GSquaredSum += GTrips[i] * GTrips[i];
                 }
                 for (int i = 0; i < GBlocks.Length; i++) {
@@ -371,12 +371,12 @@ namespace E_VCSP.Solver {
 
                 // Everything >= / == constraint
                 for (int i = 0; i < lambdaTrips.Count; i++) {
-                    lambdaTrips[i] = Math.Max(0, lambdaTrips[i] + T * GTrips[i]);
+                    lambdaTrips[i] = lambdaTrips[i] + T * GTrips[i];
                 }
 
                 for (int i = 0; i < lambdaBlocks.Count; i++) {
                     // == constraint
-                    lambdaBlocks[i] = Math.Min(0, lambdaBlocks[i] + T * GBlocks[i]);
+                    lambdaBlocks[i] = lambdaBlocks[i] + T * GBlocks[i];
                 }
 
                 lambdaAvgDutyLength = Math.Max(0, lambdaAvgDutyLength + T * GAvgDutyLength);
@@ -556,7 +556,7 @@ namespace E_VCSP.Solver {
                     // If we already know this column, check if it is an improvement
                     if (knownVTs.ContainsKey((taskCover, blockCover))) {
                         int vi = knownVTs[(taskCover, blockCover)];
-                        if (vss.Tasks[vi].Cost < newTask.Cost) {
+                        if (vss.Tasks[vi].Cost <= newTask.Cost) { // todo fix other ref
                             // Skip new column
                             discardedColumns++;
                         }
