@@ -391,24 +391,59 @@ namespace E_VCSP.Solver {
                 if (vss.Tasks.Count > Config.VCSP_MAX_TASKS_DURING) {
                     rcUpdateRequired = true;
                     taskReducedCosts.Sort();
+                    // Determine tasks with worst reduced costs
                     HashSet<int> taskIndexesToRemove = new();
                     for (int j = Config.VCSP_MAX_TASKS_DURING; j < taskReducedCosts.Count; j++) {
                         if (!vss.Tasks[taskReducedCosts[j].taskIndex].IsUnit)
                             taskIndexesToRemove.Add(taskReducedCosts[j].taskIndex);
                     }
-                    vss.Tasks = vss.Tasks.Where((vt, i) => !taskIndexesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
+
+                    // Remove from known tasks
+                    foreach (int vi in taskIndexesToRemove) {
+                        VehicleTask vt = vss.Tasks[vi];
+                        knownVTs.Remove((vt.ToTripBitArray(vss.Instance.Trips.Count), vt.ToBlockBitArray(css.Blocks.Count)));
+                    }
+
+                    // Remove from vss
+                    vss.Tasks = vss.Tasks
+                        .Where((vt, i) => !taskIndexesToRemove.Contains(i))
+                        .Select((x, i) => {
+                            x.Index = i;
+                            knownVTs[(x.ToTripBitArray(vss.Instance.Trips.Count), x.ToBlockBitArray(css.Blocks.Count))] = i;
+                            return x;
+                        }).ToList();
+
+                    // Update X/reduced costs 
                     X = X.Where((_, i) => !taskIndexesToRemove.Contains(i)).ToList();
                     taskReducedCosts = vss.Tasks.Select((x, i) => (double.MaxValue, i)).ToList();
                 }
                 if (css.Duties.Count > Config.VCSP_MAX_DUTIES_DURING) {
                     rcUpdateRequired = true;
                     dutyReducedCosts.Sort();
+                    // Determine duties with worst reduced cost
                     HashSet<int> dutyIndexesToRemove = new();
                     for (int j = Config.VCSP_MAX_DUTIES_DURING; j < dutyReducedCosts.Count; j++) {
                         if (!css.Duties[dutyReducedCosts[j].dutyIndex].IsUnit)
                             dutyIndexesToRemove.Add(dutyReducedCosts[j].dutyIndex);
                     }
-                    css.Duties = css.Duties.Where((cd, i) => !dutyIndexesToRemove.Contains(i)).Select((x, i) => { x.Index = i; return x; }).ToList();
+
+                    // Remove from known duties
+                    foreach (int ci in dutyIndexesToRemove) {
+                        CrewDuty cd = css.Duties[ci];
+                        knownCDs.Remove((cd.ToBlockBitArray(css.Blocks.Count), (int)cd.Type));
+                    }
+
+
+                    // Remove from css
+                    css.Duties = css.Duties
+                        .Where((cd, i) => !dutyIndexesToRemove.Contains(i))
+                        .Select((x, i) => {
+                            x.Index = i;
+                            knownCDs[(x.ToBlockBitArray(css.Blocks.Count), (int)x.Type)] = i;
+                            return x;
+                        }).ToList();
+
+                    // Update Y/reduced costs
                     Y = Y.Where((_, i) => !dutyIndexesToRemove.Contains(i)).ToList();
                     dutyReducedCosts = css.Duties.Select((x, i) => (double.MaxValue, i)).ToList();
                 }
@@ -783,7 +818,7 @@ namespace E_VCSP.Solver {
                     // If we already know this column, skip adding it
                     if (knownCDs.ContainsKey((blockCover, dutyType))) {
                         int ci = knownCDs[(blockCover, dutyType)];
-                        if (css.Duties[ci].Cost < newDuty.Cost) {
+                        if (css.Duties[ci].Cost <= newDuty.Cost) {
                             // Skip new column
                             discardedColumns++;
                         }
