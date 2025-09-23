@@ -413,11 +413,38 @@ More formally: for each trip node $t$, let $A_t \subset A_{vt}$ be the set of al
 
 Once this initial reduction of arcs between trips has been performed, we will extend the remaining arcs in order to properly accommodate charging. Let us first assume that charging never occurs when driving to or from the depot; all charging operations will therefore take place in the time between pairs of trips. Additionally, let us assume that whenever we are idle at a charging station, we will charge. Given the current state of our graph $G_{vt}$, this implies that charging exclusively takes place if a trip starts or ends at a charging location, and a connecting trip allows for more idle time than the minimum charging time.
 
-In order to increase the amount of charging options, let us consider the existing arcs in $A_{vt}$ between pairs of trips $t$ and $t'$; let us refer to these arcs as \textit{base arcs}. For each charging location $l_c \in \mathcal{L}_c$ for which $l_c \neq d(t)$ and $l_c \neq o(t')$, we will attempt to add an additional charging arc. This arc will model the possibility of performing a detour between $t$ and $t'$ to $l_c$ in order to charge there; let us refer to one of these arcs as a \textit{detour arc}. Let us add a detour arc if there exists a deadhead $dh \in \mathcal{DH}$ from the ending location of $t$ to $l_c$, a deadhead $dh' \in \mathcal{DH}$ from $l_c$ to the start of $t'$, and the combined duration of $dh$ and $dh'$ allows for enough time at $l_c$ to meet the minimum charging time.
+In order to increase the amount of charging options, let us consider the existing arcs in $A_{vt}$ between pairs of trips $t$ and $t'$; let us refer to these arcs as \textit{base arcs}. For each charging location $l_c \in \mathcal{L}_c$ for which $l_c \neq d(t)$ and $l_c \neq o(t')$, we will attempt to add an additional charging arc. This arc will model the possibility of performing a detour between $t$ and $t'$ to $l_c$ in order to charge there; let us refer to one of these arcs as a \textit{detour arc}. Let us add a detour arc if there exists a deadhead $dh \in \mathcal{DH}$ from the ending location of $t$ to $l_c$, a deadhead $dh' \in \mathcal{DH}$ from $l_c$ to the start of $t'$, and the combined duration of $dh$ and $dh'$ allows for enough time at $l_c$ to meet the minimum charging time. A visualization the resulting graph is shown in Figure \todo{ref}.
 
-For all detour arcs, we assume that the time at the charging location is maximized. This means that we we always perform the deadhead towards the charging location at the earliest possible time, and the deadhead to the next trip at the latest possible time. For base arcs, let us also uniquely define where we will spend our idle time by maximizing time at a charging location; if the start and end location of a base arc are both non-charging or both charging locations, time at the start location is maximized as a tiebreaker. Knowing this, we can define the costs of each arc based on driving costs of the deadhead(s) and target trip, as well as SoC usage. 
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[
+    node distance=25mm and 18mm,
+  ]
+  % Nodes
+  \node[lsnode] (ds) {$d_s$};
+  \node[lsnode, right=15mm of ds, yshift=10mm] (t1) {Trip 1};
+  \node[lsnode, right=15mm of t1, yshift=-5mm] (t2) {Trip 2};
+  \node[lsnode, right=40mm of t1, yshift=-10mm] (t3) {Trip 3};
+  \node[lsnode, right=15mm of t3] (de) {$d_e$};
 
-Any feasible vehicle task can now be described as a path in $G$ from $d_s$ to $d_e$. The costs for a task can be defined as a base cost of using a vehicle plus the sum of all used arc costs and a KWh costs. In this, we assume that the cost of energy remains constant throughout the day and at different charging locations, and that vehicles will be fully recharged overnight for the same KWh cost as during the day. Additionally note that not every path from  $d_s$ to $d_e$ describes a feasible vehicle task; depending on the arcs used, the amount of time that a vehicle has to charge may not be sufficient in order to keep it within SoC bounds during the task. As we previously defined how much time is spent at a charging location during an arc, this information can be used to determine whether a task is feasible or not.
+  % \draw[->] (B.east) -- (C.west);
+  % \draw[->] (B.east) -- (D.west);
+  % \draw[-] (A.east) -- (B.west);
+  % \draw[-] ($(A.west) + (0,-24mm)$) -- (B.west);
+  % \draw[->] ($(B.west) + (-0.01mm, 0)$)-- (B.west);
+  % \draw[->] (B.east) -- ++(63mm,0);
+  % \draw[->] (C.east) -- ++(15mm,0);
+  % \draw[->] (D.east) -- ++(15mm,0);
+  \end{tikzpicture}
+  \caption{A simplified view of $G_{vt}$ with 2 known blocks. Trip nodes represent ends of trips, edges contain both movements and idles between pairs of trips.}
+  \label{fig:evsp-graph}
+\end{figure}
+
+For all detour arcs, we assume that the time at the charging location is maximized. This means that we always perform the deadhead towards the charging location at the earliest possible time, and the deadhead to the next trip at the latest possible time. 
+
+For base arcs, let us also uniquely define where we will spend our idle time by maximizing time at a charging location if one is present. If no charging location is present, instead attempt to maximize time spent at a relief location. If no relief locations are present or a tie occurs, maximize time spent at the starting location. Knowing this, each arc within $A_{vt}$ is now uniquely defined as a sequence of deadheads and (charging) idles, followed by a trip. We can therefore define the cost of each arc based on driving costs of the deadhead(s) and target trip, as well as SoC usage. 
+
+Any feasible vehicle task can now be described as a path in $G$ from $d_s$ to $d_e$. The costs for a task can be defined as a base cost of using a vehicle plus the sum of all used arc costs. In this, we assume that the cost of energy remains constant throughout the day and at different charging locations, and that vehicles will be fully recharged overnight for the same KWh cost as during the day. Additionally note that not every path from  $d_s$ to $d_e$ describes a feasible vehicle task; depending on the arcs used, the amount of time that a vehicle has to charge may not be sufficient in order to keep it within SoC bounds during the task. As we previously defined how much time is spent at a charging location during an arc, this information can be used to determine whether a task is feasible or not.
 
 \subsubsection{Solving}
 In order to now solve the E-VSP, a collection of feasible vehicle tasks that cover the trips $\mathcal{T}$ must be found. In order to do this, we use a column generation approach; this has previously been shown to be an effective solution method for the E-VSP by works such as \citet{vanKootenNiekerk2017}, \citet{Zhang2021} and \citet{deVos2024}. The ILP used to model this is based on a set covering formulation. In this let $VT$ represent the available set of vehicle tasks, let $x_{i}$ be a binary decision variable indicating the use of vehicle task $vt_i \in VT$, and let $k_{i,t}$ be a parameter defining whether vehicle task $vt_i$ includes the trip $t \in \mathcal{T}$.
@@ -962,7 +989,7 @@ In order to incorporate these costs in our labeling algorithm, let us first visu
   \draw[->] (D.east) -- ++(15mm,0);
 
   \draw[dash pattern={on 1pt off 1pt}, thick, rounded corners=8pt]
-    ($(A.west) + (0,-24mm) +(0mm,6mm)$) -- ($(B.north west)+(-3mm,3mm)$) -- ($(B.north east)+(3mm,3mm)$) -- ($(C.north west)+(-3mm,3mm)$) -- ($(C.north east)+(0mm,3mm)$) -- ($(C.south east)+(0mm,-3mm)$) -- ($(C.south west)+(-3mm,-3mm)$) -- ($(B.south east)+(3mm,-3mm)$) -- ($(B.south west)+(-3mm,-3mm)$) -- ($(A.west) + (0,-24mm) +(0mm,-6mm)$) -- cycle;
+    ($(A.east) + (0,-17.5mm) +(0mm,6mm)$) -- ($(B.north west)+(-3mm,3mm)$) -- ($(B.north east)+(3mm,3mm)$) -- ($(C.north west)+(-3mm,3mm)$) -- ($(C.north east)+(0mm,3mm)$) -- ($(C.south east)+(0mm,-3mm)$) -- ($(C.south west)+(-3mm,-3mm)$) -- ($(B.south east)+(3mm,-3mm)$) -- ($(B.south west)+(-3mm,-3mm)$) -- ($(A.east) + (0,-17.5mm) +(0mm,-6mm)$) -- cycle;
   \draw[dashed, thick, rounded corners=8pt]
     ($(A.north east)+(0mm,3mm)$) -- ($(B.north west)+(-3mm,3mm)$) -- ($(B.north east)+(3mm,3mm)$) -- ($(D.north west)+(-3mm,3mm)$) -- ($(D.north east)+(0mm,3mm)$) -- ($(D.south east)+(0mm,-3mm)$) -- ($(D.south west)+(-3mm,-3mm)$) -- ($(B.south east)+(3mm,-3mm)$) -- ($(B.south west)+(-3mm,-3mm)$) -- ($(A.south east)+(0mm,-3mm)$) -- cycle;
   \node[above=3mm of C.north] {Block 1};
