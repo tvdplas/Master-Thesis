@@ -292,10 +292,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private List<(double reducedCost, CrewDuty crewDuty)> extractDuties(string source) {
             // Walk back through in order to get the minimum costs
             var feasibleEnds = allLabels[^1]
-                .Where(x =>
-                    x.Cost < 0
-                    && x.isFeasible(css.Blocks[x.PrevBlockId].EndTime + css.Blocks[x.PrevBlockId].EndLocation.SignOffTime, true)
-                )
+                .Where(x => x.isFeasible(css.Blocks[x.PrevBlockId].EndTime + css.Blocks[x.PrevBlockId].EndLocation.SignOffTime, true))
                 .OrderBy(x => x.Cost).ToList();
 
             List<CSPLabel> validTargets = [];

@@ -291,7 +291,8 @@ namespace E_VCSP.Solver {
                 for (int i = 0; i < dutyReducedCosts.Count; i++) {
                     var targetDuty = dutyReducedCosts[i];
 
-                    for (int k = 0; k < barY[i]; k++) {
+                    bool done = false;
+                    for (int k = 0; k < barY[i] && !done; k++) {
                         if (selectedDutyCount < Config.MAX_DUTIES && targetDuty.C_j < 0) {
                             // Select normally
                             cost += targetDuty.C_j;
@@ -305,9 +306,10 @@ namespace E_VCSP.Solver {
                             selectedDutyCount++;
                         }
                         else {
-                            break;
+                            done = true;
                         }
                     }
+                    if (done) break;
                 }
 
                 return cost;
@@ -376,7 +378,7 @@ namespace E_VCSP.Solver {
 
                 for (int i = 0; i < lambdaBlocks.Count; i++) {
                     // == constraint
-                    lambdaBlocks[i] = Math.Min(0, lambdaBlocks[i] + T * GBlocks[i]);
+                    lambdaBlocks[i] = lambdaBlocks[i] + T * GBlocks[i];
                 }
 
                 lambdaAvgDutyLength = Math.Max(0, lambdaAvgDutyLength + T * GAvgDutyLength);
@@ -568,7 +570,7 @@ namespace E_VCSP.Solver {
 
                 int discardedColumns = 0, improvedColumns = 0;
                 foreach ((double reducedCosts, VehicleTask newTask) in newColumns) {
-                    if (reducedCosts > 0) continue;
+                    //if (reducedCosts > 0) continue;
 
                     // Determine blocks for task; add any not yet known ones to css
                     List<Block> blocks = Block.FromVehicleTask(newTask);
@@ -617,14 +619,6 @@ namespace E_VCSP.Solver {
         #endregion
 
         #region Crew its
-        private Dictionary<string, double> crewDualCost() {
-            Dictionary<string, double> res = lambdaBlocks.Select((l, i) => (Constants.CSTR_BLOCK_COVER + css.Blocks[i].Descriptor, -l)).ToDictionary();
-            res[Constants.CSTR_CR_AVG_TIME] = lambdaAvgDutyLength;
-            res[Constants.CSTR_CR_LONG_DUTIES] = lambdaMaxLongDuty;
-            res[Constants.CSTR_CR_BROKEN_DUTIES] = lambdaMaxBroken;
-            res[Constants.CSTR_CR_BETWEEN_DUTIES] = lambdaMaxBetween;
-            return res;
-        }
         private void runCrewIts(int round, bool disrupt = false) {
             int maxIts = round == 0 ? Config.VCSP_CR_ITS_INIT : Config.VCSP_CR_ITS_ROUND;
 
@@ -787,6 +781,15 @@ namespace E_VCSP.Solver {
                 }
             }
 
+            Dictionary<string, double> crewDualCost() {
+                Dictionary<string, double> res = lambdaBlocks.Select((l, i) => (Constants.CSTR_BLOCK_COVER + css.Blocks[i].Descriptor, -l)).ToDictionary();
+                res[Constants.CSTR_CR_AVG_TIME] = -lambdaAvgDutyLength;
+                res[Constants.CSTR_CR_LONG_DUTIES] = lambdaMaxLongDuty;
+                res[Constants.CSTR_CR_BROKEN_DUTIES] = lambdaMaxBroken;
+                res[Constants.CSTR_CR_BETWEEN_DUTIES] = lambdaMaxBetween;
+                return res;
+            }
+
             CSPLabeling[] cspLabelingInstances = [.. Enumerable.Range(0, Config.VCSP_CR_INSTANCES).Select(_ => new CSPLabeling(css))];
             for (int it = 0; it < maxIts; it++) {
                 makeCDsNonNegativeRC();
@@ -810,7 +813,7 @@ namespace E_VCSP.Solver {
 
                 int discardedColumns = 0, improvedColumns = 0;
                 foreach ((double reducedCost, CrewDuty newDuty) in newColumns) {
-                    if (reducedCost >= 0) continue;
+                    //if (reducedCost >= 0) continue;
 
                     BitArray blockCover = newDuty.ToBlockBitArray(css.Blocks.Count);
                     int dutyType = (int)newDuty.Type;

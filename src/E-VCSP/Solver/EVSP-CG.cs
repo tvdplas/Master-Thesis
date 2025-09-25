@@ -24,7 +24,7 @@ namespace E_VCSP.Solver {
             List<List<int>> coveredBy = Enumerable.Range(0, vss.Instance.Trips.Count).Select(x => new List<int>()).ToList();
             List<VehicleTask> tasks = [];
             foreach (GRBVar v in model.GetVars()) {
-                if (!v.VarName.StartsWith("vt_") || v.X != 1) continue;
+                if (!v.VarName.StartsWith("vt_") || Math.Round(v.X) != 1.0) continue;
 
                 VehicleTask vt = vss.VarnameTaskMapping[v.VarName];
                 selectedTasks.Add(vt);
@@ -240,44 +240,42 @@ namespace E_VCSP.Solver {
                             continue;
                         }
 
-                        if (reducedCost <= 0) {
-                            // Replace existing column with this task, as it has lower costs
-                            if (coverExists) {
-                                VehicleTask toBeReplaced = vss.CoverTaskMapping[ba];
-                                int index = toBeReplaced.Index;
-                                newTask.Index = index;
+                        // Replace existing column with this task, as it has lower costs
+                        if (coverExists) {
+                            VehicleTask toBeReplaced = vss.CoverTaskMapping[ba];
+                            int index = toBeReplaced.Index;
+                            newTask.Index = index;
 
-                                // Bookkeeping; replace task in public datastructures
-                                vss.Tasks[index] = newTask;
-                                vss.VarnameTaskMapping[$"vt_{index}"] = newTask;
-                                vss.CoverTaskMapping[ba] = newTask;
+                            // Bookkeeping; replace task in public datastructures
+                            vss.Tasks[index] = newTask;
+                            vss.VarnameTaskMapping[$"vt_{index}"] = newTask;
+                            vss.CoverTaskMapping[ba] = newTask;
 
-                                // Adjust costs in model
-                                taskVars[index].Obj = newTask.Cost;
-                                discardedOldColumns++;
-                            }
-                            // Create new column for task, add it to model.
-                            else {
-                                int index = vss.Tasks.Count;
-                                string name = $"vt_{index}";
-                                vss.Tasks.Add(newTask);
-                                newTask.Index = index;
+                            // Adjust costs in model
+                            taskVars[index].Obj = newTask.Cost;
+                            discardedOldColumns++;
+                        }
+                        // Create new column for task, add it to model.
+                        else {
+                            int index = vss.Tasks.Count;
+                            string name = $"vt_{index}";
+                            vss.Tasks.Add(newTask);
+                            newTask.Index = index;
 
-                                // Create new column to add to model
-                                var modelConstrs = model.GetConstrs();
-                                GRBConstr[] constrs = [.. modelConstrs.Where(
-                                    (_, i) => newTask.TripIndexCover.Contains(i)    // Covers trip
-                                    || i == modelConstrs.Length - 1        // Add to used vehicles
-                                )];
-                                GRBColumn col = new();
-                                col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
+                            // Create new column to add to model
+                            var modelConstrs = model.GetConstrs();
+                            GRBConstr[] constrs = [.. modelConstrs.Where(
+                                (_, i) => newTask.TripIndexCover.Contains(i)    // Covers trip
+                                || i == modelConstrs.Length - 1        // Add to used vehicles
+                            )];
+                            GRBColumn col = new();
+                            col.AddTerms([.. constrs.Select(_ => 1.0)], constrs);
 
-                                // Add column to model
-                                taskVars.Add(model.AddVar(0, GRB.INFINITY, newTask.Cost, GRB.CONTINUOUS, col, name));
-                                vss.VarnameTaskMapping[name] = vss.Tasks[^1];
-                                vss.CoverTaskMapping[ba] = vss.Tasks[^1];
-                                addedNew++;
-                            }
+                            // Add column to model
+                            taskVars.Add(model.AddVar(0, GRB.INFINITY, newTask.Cost, GRB.CONTINUOUS, col, name));
+                            vss.VarnameTaskMapping[name] = vss.Tasks[^1];
+                            vss.CoverTaskMapping[ba] = vss.Tasks[^1];
+                            addedNew++;
                         }
                     }
                 }
@@ -335,7 +333,7 @@ namespace E_VCSP.Solver {
                 return false;
             }
 
-            Console.WriteLine($"Solution found with {taskVars.Where(x => x.X == 1).Count()} vehicles, overall costs {model.ObjVal}");
+            Console.WriteLine($"Solution found with {taskVars.Where(x => Math.Round(x.X) == 1).Count()} vehicles, overall costs {model.ObjVal}");
 
             (var selectedTasks, _) = finalizeResults(true);
             vss.SelectedTasks = selectedTasks;

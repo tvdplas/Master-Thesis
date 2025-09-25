@@ -176,65 +176,62 @@ namespace E_VCSP.Solver {
                     // Skip adding column if we already have an equivalent one which is cheaper
                     if (coverExists && css.CoverTypeDutyMapping[(ba, dutyType)].Cost < newDuty.Cost) continue;
 
-                    // Add column to model 
-                    if (reducedCost < 0) {
-                        // Create new column to add to model
-                        var modelConstrs = model.GetConstrs();
-                        GRBConstr[] constrs = [.. modelConstrs.Where(
-                            (_, i) => newDuty.BlockIndexCover.Contains(i) || i >= css.Blocks.Count  // Covers block || one of the shift type.length constraints
-                        )];
-                        double[] coefficients = new double[constrs.Length];
+                    // Create new column to add to model
+                    var modelConstrs = model.GetConstrs();
+                    GRBConstr[] constrs = [.. modelConstrs.Where(
+                        (_, i) => newDuty.BlockIndexCover.Contains(i) || i >= css.Blocks.Count  // Covers block || one of the shift type.length constraints
+                    )];
+                    double[] coefficients = new double[constrs.Length];
+                    for (int i = 0; i < constrs.Length; i++) {
+                        GRBConstr c = constrs[i];
+                        double coeff = 0;
+                        if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER))
+                            coeff = 1.0;
+                        else if (c.ConstrName == Constants.CSTR_MAX_DUTIES)
+                            coeff = 1.0;
+                        else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES)
+                            coeff = Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
+                        else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME)
+                            coeff = (newDuty.PaidDuration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
+                        else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES)
+                            coeff = Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
+                        else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES)
+                            coeff = Constants.CR_MAX_BETWEEN_SHIFTS - newDuty.IsBetweenDuty;
+                        else
+                            throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
+                        coefficients[i] = coeff;
+                    }
+
+                    if (coverExists) {
+                        CrewDuty toBeReplaced = css.CoverTypeDutyMapping[(ba, dutyType)];
+                        int index = toBeReplaced.Index;
+                        newDuty.Index = index;
+
+                        // Bookkeeping; replace task in public datastructures
+                        css.Duties[index] = newDuty;
+                        css.VarnameDutyMapping[$"cd_{index}"] = newDuty;
+                        css.CoverTypeDutyMapping[(ba, dutyType)] = newDuty;
+
+                        // Adjust costs / coefficients in model
+                        dutyVars[index].Obj = newDuty.Cost;
                         for (int i = 0; i < constrs.Length; i++) {
-                            GRBConstr c = constrs[i];
-                            double coeff = 0;
-                            if (c.ConstrName.StartsWith(Constants.CSTR_BLOCK_COVER))
-                                coeff = 1.0;
-                            else if (c.ConstrName == Constants.CSTR_MAX_DUTIES)
-                                coeff = 1.0;
-                            else if (c.ConstrName == Constants.CSTR_CR_LONG_DUTIES)
-                                coeff = Constants.CR_MAX_OVER_LONG_DUTY - newDuty.IsLongDuty;
-                            else if (c.ConstrName == Constants.CSTR_CR_AVG_TIME)
-                                coeff = (newDuty.PaidDuration / (double)Constants.CR_TARGET_SHIFT_LENGTH - 1);
-                            else if (c.ConstrName == Constants.CSTR_CR_BROKEN_DUTIES)
-                                coeff = Constants.CR_MAX_BROKEN_SHIFTS - newDuty.IsBrokenDuty;
-                            else if (c.ConstrName == Constants.CSTR_CR_BETWEEN_DUTIES)
-                                coeff = Constants.CR_MAX_BETWEEN_SHIFTS - newDuty.IsBetweenDuty;
-                            else
-                                throw new InvalidOperationException($"Constraint {c.ConstrName} not handled when adding new column");
-                            coefficients[i] = coeff;
+                            model.ChgCoeff(constrs[i], dutyVars[index], coefficients[i]);
                         }
+                    }
+                    else {
+                        // Reset non-reduced costs iterations
+                        int index = css.Duties.Count;
+                        string name = $"cd_{index}";
+                        css.Duties.Add(newDuty);
+                        newDuty.Index = index;
 
-                        if (coverExists) {
-                            CrewDuty toBeReplaced = css.CoverTypeDutyMapping[(ba, dutyType)];
-                            int index = toBeReplaced.Index;
-                            newDuty.Index = index;
+                        GRBColumn col = new();
+                        col.AddTerms(coefficients, constrs);
 
-                            // Bookkeeping; replace task in public datastructures
-                            css.Duties[index] = newDuty;
-                            css.VarnameDutyMapping[$"cd_{index}"] = newDuty;
-                            css.CoverTypeDutyMapping[(ba, dutyType)] = newDuty;
-
-                            // Adjust costs / coefficients in model
-                            dutyVars[index].Obj = newDuty.Cost;
-                            for (int i = 0; i < constrs.Length; i++) {
-                                model.ChgCoeff(constrs[i], dutyVars[index], coefficients[i]);
-                            }
-                        }
-                        else {
-                            // Reset non-reduced costs iterations
-                            int index = css.Duties.Count;
-                            string name = $"cd_{index}";
-                            css.Duties.Add(newDuty);
-                            newDuty.Index = index;
-
-                            GRBColumn col = new();
-                            col.AddTerms(coefficients, constrs);
-
-                            // Add column to model
-                            dutyVars.Add(model.AddVar(0, GRB.INFINITY, newDuty.Cost, GRB.CONTINUOUS, col, name));
-                            css.VarnameDutyMapping[name] = css.Duties[^1];
-                            css.CoverTypeDutyMapping[(ba, dutyType)] = css.Duties[^1];
-                        }
+                        // Add column to model
+                        dutyVars.Add(model.AddVar(0, GRB.INFINITY, newDuty.Cost, GRB.CONTINUOUS, col, name));
+                        css.VarnameDutyMapping[name] = css.Duties[^1];
+                        css.CoverTypeDutyMapping[(ba, dutyType)] = css.Duties[^1];
                     }
                 }
             }

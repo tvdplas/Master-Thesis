@@ -31,8 +31,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         public double MaxBlockSavings; // Min costs that can be made based on block reduced cost
         public double MinBlockSavings; // Max costs that can be made based on block reduced cost
 
-        public static int SoCBin(double SoC)
-        {
+        public static int SoCBin(double SoC) {
             return (int)Math.Round(SoC / 100 * Config.VSP_LB_SOC_BINS);
         }
 
@@ -424,10 +423,16 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Backtrack in order to get path
             // indexes to nodes
             List<VSPLabel> feasibleEnds = allLabels[^1]
-                .Where(x => x.CurrCosts < 0
-                    && !alreadyFound.Contains(x.CoveredTrips)
-                    && x.CoveredTrips.Count > Config.VSP_LB_MIN_TRIPS
-                )
+                .Where(x => {
+                    if (alreadyFound.Contains(x.CoveredTrips))
+                        return false;
+                    int c = 0;
+                    for (int i = 0; i < x.CoveredTrips.Count; i++)
+                        if (x.CoveredTrips[i]) c++;
+                    if (c < Config.VSP_LB_MIN_TRIPS)
+                        return false;
+                    return true;
+                })
                 .OrderBy(x => x.CurrCosts).ToList();
 
             List<VSPLabel> validEnds = [];
