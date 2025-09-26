@@ -571,6 +571,7 @@ namespace E_VCSP.Solver {
                 int discardedColumns = 0, improvedColumns = 0;
                 foreach ((double reducedCosts, VehicleTask newTask) in newColumns) {
                     //if (reducedCosts > 0) continue;
+                    if (newTask == null) continue;
 
                     // Determine blocks for task; add any not yet known ones to css
                     List<Block> blocks = Block.FromVehicleTask(newTask);
@@ -814,6 +815,7 @@ namespace E_VCSP.Solver {
                 int discardedColumns = 0, improvedColumns = 0;
                 foreach ((double reducedCost, CrewDuty newDuty) in newColumns) {
                     //if (reducedCost >= 0) continue;
+                    if (newDuty == null) continue;
 
                     BitArray blockCover = newDuty.ToBlockBitArray(css.Blocks.Count);
                     int dutyType = (int)newDuty.Type;
