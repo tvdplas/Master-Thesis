@@ -111,6 +111,73 @@ namespace E_VCSP.Objects.ParsedData {
 
             DepotStartIndex = Trips.Count;
             DepotEndIndex = Trips.Count + 1;
+
+
+            // Analyse trip frequencies
+            Dictionary<(string, int), List<Trip>> tripsByLine = [];
+            foreach (Trip trip in Trips) {
+                tripsByLine.TryAdd((trip.Route, trip.StartLocation.Index), []);
+                tripsByLine[(trip.Route, trip.StartLocation.Index)].Add(trip);
+            }
+
+            Dictionary<(string, int), Dictionary<(int, int), HashSet<int>>> lineFrequencies = [];
+
+            foreach (var kvp in tripsByLine) {
+                (string line, int locationIndex) = kvp.Key;
+                List<Trip> trips = kvp.Value;
+
+                trips.Sort((a, b) => a.StartTime - b.StartTime);
+
+                Dictionary<int, HashSet<int>> frequencyStartTimes = [];
+
+                for (int i = 1; i < trips.Count; i++) {
+                    int timeDiff = trips[i].StartTime - trips[i - 1].StartTime;
+
+                    frequencyStartTimes.TryAdd(timeDiff, []);
+                    frequencyStartTimes[timeDiff].Add(trips[i - 1].StartTime);
+                    frequencyStartTimes[timeDiff].Add(trips[i].StartTime);
+                }
+
+                // Merge keys which are close together 
+                var mergedFrequencies = new Dictionary<(int, int), HashSet<int>>();
+                var sortedKeys = frequencyStartTimes.Keys.ToList();
+                sortedKeys.Sort();
+
+                List<(int, int)> merge = [];
+
+                for (int i = 0; i < sortedKeys.Count; i++) {
+                    int currentKey = sortedKeys[i];
+                    bool merged = false;
+                    for (int j = 0; j < merge.Count; j++) {
+                        (int low, int high) = merge[j];
+                        if (currentKey >= low && currentKey <= high) break;
+
+                        if (currentKey + Constants.LINE_FREQ_SIM_THRESHOLD >= low || currentKey - Constants.LINE_FREQ_SIM_THRESHOLD <= high) {
+                            merge[j] = (Math.Min(low, currentKey), Math.Max(high, currentKey));
+                            merged = true;
+                            break;
+                        }
+                    }
+                    if (!merged) {
+                        merge.Add((currentKey, currentKey));
+                    }
+                }
+
+                foreach ((int freq, HashSet<int> times) in frequencyStartTimes) {
+                    (int, int) timespan = merge.Find(x => freq >= x.Item1 && freq <= x.Item2);
+                    mergedFrequencies.TryAdd(timespan, []);
+                    mergedFrequencies[timespan].UnionWith(times);
+                }
+
+                lineFrequencies[(line, locationIndex)] = mergedFrequencies;
+            }
+
+            foreach (((string line, int locationIndex), var fst) in lineFrequencies) {
+                Console.WriteLine($"{line} starting from {locationIndex}:");
+                foreach (((int low, int high), var starts) in fst) {
+                    Console.WriteLine($"\t({low}-{high}): {String.Join(", ", starts)}");
+                }
+            }
         }
     }
 }
