@@ -1,0 +1,5 @@
+Totale werkuren: 271.1666667
+Totale diensten: 35
+	waarvan gebroken: 8
+
+Totale crew kosten: 100 * 35 + 8 * 271.1667 * 65 = 21285.83333
