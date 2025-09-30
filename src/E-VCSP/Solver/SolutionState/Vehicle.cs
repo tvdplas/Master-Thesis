@@ -210,6 +210,19 @@ namespace E_VCSP.Solver.SolutionState {
                     if (dht == null) continue; // not a possible drive
                     if (tn1.Trip.EndTime + dht.Duration > tn2.Trip.StartTime) continue; // Deadhead not time feasible
 
+                    if (dht.FreqChangeOnly) {
+                        if (!Config.VSP_ALLOW_UNKNOWN_DHTS) continue;
+
+                        // Only allowed if at least one of the trips has a frequency change
+                        bool tn1FreqChange =
+                            tn1.Trip.FrequencyChange == FrequencyChange.EndOfTrip
+                            || tn1.Trip.FrequencyChange == FrequencyChange.SingleTrip;
+                        bool tn2FreqChange =
+                            tn2.Trip.FrequencyChange == FrequencyChange.StartOfTrip
+                            || tn2.Trip.FrequencyChange == FrequencyChange.SingleTrip;
+                        if (!tn1FreqChange && !tn2FreqChange) continue;
+                    }
+
                     VSPArc arc = new VSPArc() {
                         StartTime = tn1.Trip.EndTime,
                         EndTime = tn2.Trip.StartTime,

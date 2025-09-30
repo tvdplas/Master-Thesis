@@ -8,6 +8,11 @@
         public static bool DUMP_CSP = false;
         public static int THREAD_COUNT = 10;
 
+        public static Header GUROBI = new();
+        public static bool GRB_EXTEND_TIME = true;
+        public static int GRB_MAX_EXTENDED_TIME = 60 * 60 * 2;
+        public static double GRB_TARGET_GAP = 0.005;
+
         public static Header SOLVER_HINTS = new();
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double CR_SHIFT_COST = 100; // Minimum price to pay a crew member
@@ -23,6 +28,7 @@
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static bool VSP_ALLOW_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
         public static int VSP_PRE_DIRECT_TIME = 0;
+        public static bool VSP_ALLOW_UNKNOWN_DHTS = true; // allow the use of estimated deadheads during vsp solving
 
         public static Header VSP_CG = new();
         public static int VSP_INSTANCES_PER_IT = 1;
@@ -39,7 +45,8 @@
         public static double VSP_LB_SEC_COL_COUNT = 5; // Number of primary columns to generate secondary columns for 
         public static double VSP_LB_SEC_COL_ATTEMPTS = 4; // Number of attempts per secondary column
 
-        public static Header VSP_LS_SHARED_PENALTIES = new();
+        public static Header VSP_LS_SHARED = new();
+        public static bool VSP_LS_SHR_EXPAND_AVT = true;
         public static bool VSP_LS_SHR_ALLOW_PENALTY = true;
         public static double VSP_LS_SHR_HNDVR_FIX = 5000;
         public static double VSP_LS_SHR_HNDVR_VAR = 10;

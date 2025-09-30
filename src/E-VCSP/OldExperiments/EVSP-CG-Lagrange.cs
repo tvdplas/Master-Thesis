@@ -81,7 +81,7 @@ namespace E_VCSP.OldExperiments {
             model.Parameters.TimeLimit = Config.VSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 3; // upper bound
             model.Parameters.Presolve = 2; // aggresive presolve
-            model.SetCallback(new CustomGRBCallback());
+            model.SetCallback(new CustomGRBCallback(model));
             ct.Register(() => {
                 Console.WriteLine("Cancellation requested. Terminating Gurobi model...");
                 model.Terminate();

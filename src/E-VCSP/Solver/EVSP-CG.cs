@@ -90,7 +90,7 @@ namespace E_VCSP.Solver {
             model.Parameters.Cuts = 1;
             model.Parameters.Presolve = 2;
             model.Parameters.Symmetry = 2;
-            model.SetCallback(new CustomGRBCallback());
+            model.SetCallback(new CustomGRBCallback(model));
             ct.Register(() => {
                 Console.WriteLine("Cancellation requested. Terminating Gurobi model...");
                 model.Terminate();
@@ -215,12 +215,6 @@ namespace E_VCSP.Solver {
                     default: throw new InvalidOperationException("You forgot to add a case");
                 }
 
-                int percent = (int)((totalGenerated / (double)maxColumns) * 100);
-                if (percent >= lastReportedPercent + 10) {
-                    lastReportedPercent = percent - (percent % 10);
-                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{model.ObjVal}");
-                }
-
                 foreach (var taskSet in generatedTasks) {
                     if (taskSet.Count == 0) {
                         notFound++;
@@ -285,6 +279,12 @@ namespace E_VCSP.Solver {
                 model.Update();
                 model.Optimize();
                 currIts++;
+
+                int percent = (int)((totalGenerated / (double)maxColumns) * 100);
+                if (percent >= lastReportedPercent + 10) {
+                    lastReportedPercent = percent - (percent % 10);
+                    Console.WriteLine($"{lastReportedPercent}%\t{totalGenerated}\t{lbGenerated}\t{singleGenerated}\t{globalGenerated}\t{addedNew}\t{notFound}\t{discardedNewColumns}\t{discardedOldColumns}\t{model.ObjVal}");
+                }
 
                 if (model.ObjVal < z_prev) {
                     roundsWithoutImprovement = 0;

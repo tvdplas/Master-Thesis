@@ -36,7 +36,7 @@ namespace E_VCSP.Solver {
             model.Parameters.Cuts = 1;
             model.Parameters.Presolve = 2;
             model.Parameters.Symmetry = 2;
-            model.SetCallback(new CustomGRBCallback());
+            model.SetCallback(new CustomGRBCallback(model));
             ct.Register(() => {
                 Console.WriteLine("Cancellation requested during crew scheduling. Terminating Gurobi model...");
                 model?.Terminate();

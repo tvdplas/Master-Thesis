@@ -11,6 +11,7 @@ namespace E_VCSP.Parsing {
                 ( "ToId", "To" ),
                 ( "Duration", "Time" ),
                 ( "Distance", "Distance" ),
+                ( "FreqChangeOnly", "FreqChangeOnly" ),
             };
         }
 
@@ -23,6 +24,7 @@ namespace E_VCSP.Parsing {
                 EndLocation = to,
                 Duration = ParseTime(line[attributeIndexMapping["Duration"]]) * 60,
                 Distance = (int)(1000 * double.Parse(line[attributeIndexMapping["Distance"]], CultureInfo.InvariantCulture)),
+                FreqChangeOnly = line[attributeIndexMapping["FreqChangeOnly"]].Equals("yes", StringComparison.InvariantCultureIgnoreCase),
                 Id = $"dht{index}",
             };
         }

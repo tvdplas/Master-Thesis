@@ -3,8 +3,8 @@ using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.SolutionState;
 
 namespace E_VCSP.Solver.ColumnGenerators {
-    public class VSPLSGlobal(VehicleSolutionState vss) : VehicleColumnGen(vss) {
-        private LSOperations ops = new(vss, Config.VSP_LS_G_STARTING_T, "LS Global");
+    public class VSPLSGlobal : VehicleColumnGen {
+        private LSOperations ops;
         private List<VSPLSNode> tasks = new();
         private List<List<DeadheadTemplate?>> locationDHT = [];
         private Random rnd = new();
@@ -13,11 +13,16 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private double alpha;
         private int Q;
 
+        public VSPLSGlobal(VehicleSolutionState vss) : base(vss) {
+            reset();
+        }
+
+
         private void reset() {
             T = Config.VSP_LS_G_STARTING_T;
             alpha = Config.VSP_LS_G_COOLING_RATE;
             Q = (int)Math.Round(-Config.VSP_LS_G_ITERATIONS / (Math.Log(Config.VSP_LS_G_STARTING_T / Config.VSP_LS_G_ENDING_T) / Math.Log(alpha)));
-            ops = new(vss, T, "LS Global");
+            ops = new(this, T, "LS Global");
 
             tasks.Clear();
 
@@ -139,29 +144,23 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 // Now going to compare costs of both solutions; charging costs + driving costs
                 double costDiff = 0;
 
-                var originalRes = head.validateTail(vss.VehicleType);
-                if (Config.VSP_LS_SHR_ALLOW_PENALTY) costDiff -= originalRes.penaltyCost;
-                else {
-                    if (originalRes.penaltyCost != 0) throw new Exception("Original state not valid");
-                }
-                costDiff -= originalRes.chargingCost;
-                costDiff -= originalRes.drivingCost;
+                var originalRes = head.validateTail(this);
+                if (!Config.VSP_LS_SHR_ALLOW_PENALTY && originalRes.PenaltyCost != 0) throw new Exception("Original state not valid");
+                costDiff -= originalRes.OverallCost(Config.VSP_LS_SHR_ALLOW_PENALTY);
 
                 // Change tail
                 additionTarget.Next = travel;
                 firstAffected.Prev = travel;
 
-                var newRes = head.validateTail(vss.VehicleType);
+                var newRes = head.validateTail(this);
                 // Continue with calculation either way; otherwise revert might be skipped
-                if (Config.VSP_LS_SHR_ALLOW_PENALTY) costDiff += newRes.penaltyCost;
-                costDiff += newRes.chargingCost;
-                costDiff += newRes.drivingCost;
+                costDiff += newRes.OverallCost(Config.VSP_LS_SHR_ALLOW_PENALTY);
 
                 // Revert changes
                 additionTarget.Next = atNext;
                 firstAffected.Prev = faPrev;
 
-                if (!Config.VSP_LS_SHR_ALLOW_PENALTY && newRes.penaltyCost != 0) return (false, double.MinValue, null);
+                if (!Config.VSP_LS_SHR_ALLOW_PENALTY && newRes.PenaltyCost != 0) return (false, double.MinValue, null);
                 else return (true, costDiff, travel);
             }
 
@@ -323,20 +322,15 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Find previous costs
             double costDiff = 0;
-            var t1OriginalRes = t1Head.validateTail(vss.VehicleType);
-            var t2OriginalRes = t2Head.validateTail(vss.VehicleType);
-            if (Config.VSP_LS_SHR_ALLOW_PENALTY) {
-                costDiff -= t1OriginalRes.penaltyCost;
-                costDiff -= t2OriginalRes.penaltyCost;
-            }
-            else {
-                if (t1OriginalRes.penaltyCost != 0 || t2OriginalRes.penaltyCost != 0)
+            var t1OriginalRes = t1Head.validateTail(this);
+            var t2OriginalRes = t2Head.validateTail(this);
+            if (!Config.VSP_LS_SHR_ALLOW_PENALTY) {
+                if (t1OriginalRes.PenaltyCost != 0 || t2OriginalRes.PenaltyCost != 0)
                     throw new InvalidOperationException("Something went wrong in previous operations; the original state was not valid");
             }
-            costDiff -= t1OriginalRes.drivingCost;
-            costDiff -= t2OriginalRes.drivingCost;
-            costDiff -= t1OriginalRes.chargingCost;
-            costDiff -= t2OriginalRes.chargingCost;
+
+            costDiff -= t1OriginalRes.OverallCost(Config.VSP_LS_SHR_ALLOW_PENALTY);
+            costDiff -= t2OriginalRes.OverallCost(Config.VSP_LS_SHR_ALLOW_PENALTY);
 
             // Perform operation 
             t1Prev.Next = newStartTravel;
@@ -347,17 +341,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
             t2Next.Prev = newTravel;
 
             // Add new costs
-            var t1NewRes = t1Head.validateTail(vss.VehicleType);
-            var t2NewRes = t2Head.validateTail(vss.VehicleType);
-            if (Config.VSP_LS_SHR_ALLOW_PENALTY) {
-                costDiff += t1NewRes.penaltyCost;
-                costDiff += t2NewRes.penaltyCost;
-            }
-
-            costDiff += t1NewRes.drivingCost;
-            costDiff += t1NewRes.chargingCost;
-            costDiff += t2NewRes.drivingCost;
-            costDiff += t2NewRes.chargingCost;
+            var t1NewRes = t1Head.validateTail(this);
+            var t2NewRes = t2Head.validateTail(this);
+            costDiff += t1NewRes.OverallCost(Config.VSP_LS_SHR_ALLOW_PENALTY);
+            costDiff += t2NewRes.OverallCost(Config.VSP_LS_SHR_ALLOW_PENALTY);
 
             bool t2Remove = t2Head.TailCount() <= 3;
             if (t2Remove) {
@@ -366,7 +353,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     : Config.VH_PULLOUT_COST;
             }
 
-            bool acceptPenalty = Config.VSP_LS_SHR_ALLOW_PENALTY || (t1NewRes.penaltyCost == 0 && t2NewRes.penaltyCost == 0);
+            bool acceptPenalty = Config.VSP_LS_SHR_ALLOW_PENALTY || (t1NewRes.PenaltyCost == 0 && t2NewRes.PenaltyCost == 0);
 
             // Check acceptance
             if (!acceptPenalty || !accept(costDiff)) {
@@ -414,7 +401,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             void dumpTasks() {
                 generatedColumns.AddRange(tasks
                     .Select<VSPLSNode, (double reducedCost, VehicleTask vehicleTask)?>(taskHead => {
-                        VehicleTask? vehicleTask = taskHead.ToVehicleTask(vss.VehicleType, "LS Global");
+                        VehicleTask? vehicleTask = taskHead.ToVehicleTask(this, "LS Global");
                         if (vehicleTask == null) return null;
 
                         double reducedCost = vehicleTask.Cost;

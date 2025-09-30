@@ -139,6 +139,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
         private void runLabeling() {
             bool handoverAllowed(Location l, int idleTime) => l.HandoverAllowed && idleTime >= l.MinHandoverTime;
+            bool inBounds(double SoC, int steeringTime, int hubTime) {
+                return SoC >= vss.VehicleType.MinSoC
+                    && steeringTime <= Constants.MAX_STEERING_TIME
+                    && hubTime <= Constants.MAX_NO_HUB_TIME;
+            }
 
             // Initial label at start of depot; note: no cost range yet, as 
             // we cannot be inside of a block yet
@@ -195,23 +200,37 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         string blockDescriptorStart
                     )> statsAtTrip = [];
 
+                    bool depotStart = expandingLabelIndex >= vss.Instance.Trips.Count;
+                    bool depotEnd = targetIndex >= vss.Instance.Trips.Count;
+                    bool depotArc = depotStart || depotEnd;
+
                     // Direct trip
                     {
-                        bool depotStart = expandingLabelIndex >= vss.Instance.Trips.Count,
-                             depotEnd = targetIndex >= vss.Instance.Trips.Count;
+                        Location arcStartLocation = expandingLabelIndex < vss.Instance.Trips.Count
+                            ? vss.Instance.Trips[expandingLabelIndex].EndLocation
+                            : depot;
+                        Location arcEndLocation = targetIndex < vss.Instance.Trips.Count
+                            ? vss.Instance.Trips[targetIndex].StartLocation
+                            : depot;
 
-                        int idleTime = depotStart || depotEnd
-                            ? 0
+                        int idleTime = depotArc ? 0
                             : vss.Instance.Trips[targetIndex].StartTime - vss.Instance.Trips[expandingLabelIndex].EndTime - arc.DeadheadTemplate.Duration;
-
-                        int canCharge = 0;
-                        if (idleTime > Constants.MIN_CHARGE_TIME && !depotStart && vss.Instance.Trips[expandingLabelIndex].EndLocation.CanCharge) canCharge += 1;
-                        if (idleTime > Constants.MIN_CHARGE_TIME && !depotEnd && vss.Instance.Trips[targetIndex].StartLocation.CanCharge) canCharge += 2;
-
-                        Location? chargeLocation = null;
-                        if (canCharge > 0) {
-                            chargeLocation = canCharge >= 2 ? vss.Instance.Trips[targetIndex].StartLocation : vss.Instance.Trips[expandingLabelIndex].EndLocation;
+                        bool idleAtStart = true;
+                        Location? idleLocation = arcStartLocation;
+                        if (depotArc) {
+                            // No idle anyways
+                            idleLocation = depot;
                         }
+                        else if (arcEndLocation.CanCharge && !arcStartLocation.CanCharge) {
+                            idleLocation = arcEndLocation;
+                            idleAtStart = false;
+                        }
+                        else if (arcEndLocation.HandoverAllowed && !arcStartLocation.HandoverAllowed) {
+                            idleLocation = arcEndLocation;
+                            idleAtStart = false;
+                        }
+
+                        bool canCharge = idleLocation.CanCharge && idleTime > Constants.MIN_CHARGE_TIME;
 
                         int steeringTime = expandingLabel.SteeringTime;
                         int hubTime = expandingLabel.LastHubTime;
@@ -220,88 +239,136 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         double maxBlockSavings = expandingLabel.MaxBlockSavings;
                         string blockDescriptorStart = expandingLabel.CurrentBlockStart;
 
+                        // Costs of doing arc
                         double costs = arc.DeadheadTemplate.Distance * Constants.VH_M_COST;
                         if (targetIndex < vss.Instance.Trips.Count) costs -= tripDualCosts[targetIndex];
 
-                        if (canCharge == 0) steeringTime += idleTime;
+                        // ###### IDLE BEFORE DEADHEAD ######
 
-                        if (canCharge == 1) {
-                            var res = chargeLocation!.ChargingCurves[vss.VehicleType.Index].MaxChargeGained(SoC, idleTime);
-                            costs += res.Cost;
-                            SoC = Math.Min(SoC + res.SoCGained, vss.VehicleType.MaxSoC);
-
-                            if (handoverAllowed(chargeLocation, idleTime)) {
+                        // Short idle at start of arc
+                        if (idleAtStart) {
+                            // No handover possible
+                            if (!handoverAllowed(idleLocation, idleTime)) {
+                                steeringTime += idleTime;
+                                hubTime += idleTime;
+                            }
+                            // Handover possible
+                            else {
+                                // Reset steering time
                                 steeringTime = 0;
+                                if (idleLocation.CrewBase) hubTime = 0;
 
                                 // Finalize block dual costs by adding to actual costs
-                                int locationIndex = chargeLocation.Index;
+                                int locationIndex = idleLocation.Index;
                                 int idleStartTime = arc.StartTime;
                                 int idleEndTime = arc.StartTime + idleTime;
-                                string descriptor = $"{blockDescriptorStart}#{Descriptor.Create(chargeLocation, idleStartTime)}";
+                                string descriptor = $"{blockDescriptorStart}#{Descriptor.Create(idleLocation, idleStartTime)}";
                                 costs -= blockDualCosts.GetValueOrDefault(descriptor);
 
                                 // Initialize new range
-                                blockDescriptorStart = Descriptor.Create(chargeLocation, idleEndTime);
+                                blockDescriptorStart = Descriptor.Create(idleLocation, idleEndTime);
                                 minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                                 maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                             }
+
+                            // Charging during idle
+                            if (canCharge) {
+                                var res = idleLocation!.ChargingCurves[vss.VehicleType.Index].MaxChargeGained(SoC, idleTime);
+                                costs += res.Cost;
+                                SoC = Math.Min(SoC + res.SoCGained, vss.VehicleType.MaxSoC);
+                            }
+                            // Losing charge during idle
+                            else if (!idleLocation.FreeIdle) {
+                                double idleChargeUsed = idleTime * vss.VehicleType.IdleUsage;
+                                SoC -= idleChargeUsed;
+                            }
                         }
 
-                        // Initialize block descriptor start
+                        // Check for valid state
+                        if (!inBounds(SoC, steeringTime, hubTime)) continue;
+
+                        // ###### END IDLE BEFORE DEADHEAD ######
+
+                        // ###### DEADHEAD #######
+                        // Block descriptor init when coming from depot
                         if (depotStart && !depotEnd) {
                             blockDescriptorStart = Descriptor.Create(depot, arc.StartTime);
                             minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                             maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
 
+                        // Perform actual deadhead
                         SoC -= arc.DeadheadTemplate.Distance * vss.VehicleType.DriveUsage;
                         steeringTime += arc.DeadheadTemplate.Duration;
                         hubTime += arc.DeadheadTemplate.Duration;
-                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Constants.MAX_STEERING_TIME || hubTime >= Constants.MAX_NO_HUB_TIME) continue;
 
-                        if (canCharge >= 2) {
-                            var res = chargeLocation!.ChargingCurves[vss.VehicleType.Index].MaxChargeGained(SoC, idleTime);
-                            costs += res.Cost;
-                            SoC = Math.Min(SoC + res.SoCGained, vss.VehicleType.MaxSoC);
-                        }
-                        if (targetTrip != null && handoverAllowed(targetTrip.StartLocation, idleTime)) {
-                            steeringTime = 0;
-
-                            // Finalize block dual costs by adding to actual costs
-                            int idleStartTime = arc.StartTime + arc.DeadheadTemplate.Duration;
-                            int idleEndTime = arc.EndTime;
-                            string descriptor = blockDescriptorStart + "#" + Descriptor.Create(targetTrip.StartLocation, idleStartTime);
+                        // Block descriptor finalization when entering depot
+                        if (!depotStart && depotEnd) {
+                            int vehicleEndTime = arc.StartTime + arc.DeadheadTemplate.Duration;
+                            string descriptor = blockDescriptorStart + "#" + Descriptor.Create(depot, vehicleEndTime);
                             costs -= blockDualCosts.GetValueOrDefault(descriptor);
-
-                            // Initialize new range
-                            blockDescriptorStart = Descriptor.Create(targetTrip.StartLocation, idleEndTime);
-                            minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
-                            maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
-                        }
-                        if (targetTrip != null && targetTrip.StartLocation.CrewBase && idleTime >= targetTrip.StartLocation.MinHandoverTime) {
-                            hubTime = 0;
                         }
 
-                        if (canCharge == 0 && targetTrip != null && !targetTrip.StartLocation.FreeIdle) {
-                            // Idle is after adjust SoC
-                            SoC -= idleTime * vss.VehicleType.IdleUsage;
-                            if (SoC < vss.VehicleType.MinSoC) continue;
+                        // Check for valid state
+                        if (!inBounds(SoC, steeringTime, hubTime)) continue;
+
+                        // ###### END DEADHEAD ######
+
+                        // ###### IDLE AFTER DEADHEAD ######
+
+                        // check for idle; no idle if next stop is depot end
+                        if (!idleAtStart && targetTrip != null) {
+                            // handover allowed
+                            if (handoverAllowed(targetTrip.StartLocation, idleTime)) {
+                                // reset steering time
+                                steeringTime = 0;
+                                if (idleLocation.CrewBase) hubTime = 0;
+
+
+                                // Finalize block dual costs by adding to actual costs
+                                int idleStartTime = arc.StartTime + arc.DeadheadTemplate.Duration;
+                                int idleEndTime = arc.EndTime;
+                                string descriptor = blockDescriptorStart + "#" + Descriptor.Create(targetTrip.StartLocation, idleStartTime);
+                                costs -= blockDualCosts.GetValueOrDefault(descriptor);
+
+                                // Initialize new range
+                                blockDescriptorStart = Descriptor.Create(targetTrip.StartLocation, idleEndTime);
+                                minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
+                                maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
+                            }
+                            else {
+                                steeringTime += idleTime;
+                                hubTime += idleTime;
+                            }
+
+                            // Charge during idle
+                            if (canCharge) {
+                                var res = idleLocation!.ChargingCurves[vss.VehicleType.Index].MaxChargeGained(SoC, idleTime);
+                                costs += res.Cost;
+                                SoC = Math.Min(SoC + res.SoCGained, vss.VehicleType.MaxSoC);
+                            }
+                            // Losing charge during idle
+                            else if (!idleLocation.FreeIdle) {
+                                double idleChargeUsed = idleTime * vss.VehicleType.IdleUsage;
+                                SoC -= idleChargeUsed;
+                            }
                         }
 
-                        ChargeTime cl = canCharge switch {
-                            0 => ChargeTime.None,
-                            1 => ChargeTime.Source,
-                            2 => ChargeTime.Target,
-                            3 => ChargeTime.Target,
-                            _ => throw new InvalidDataException("not possible")
-                        };
+                        if (!inBounds(SoC, steeringTime, hubTime)) continue;
+
+                        // ###### END IDLE AFTER DEADHEAD ######
+                        // trip itself is handled later
+
+                        ChargeTime cl = idleAtStart
+                            ? (canCharge ? ChargeTime.Source : ChargeTime.None)
+                            : (canCharge ? ChargeTime.Target : ChargeTime.None);
 
                         statsAtTrip.Add((
                             SoC,
                             costs,
                             steeringTime,
                             hubTime,
-                            chargeLocation?.Index ?? -1,
+                            canCharge ? idleLocation.Index : -1,
                             cl,
                             minBlockSavings,
                             maxBlockSavings,
@@ -310,6 +377,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     }
                     // Check possible detours to charging locations for which the location is not already visited
                     for (int j = 0; j < vss.Instance.ChargingLocations.Count; j++) {
+                        if (depotArc) continue;
+
                         Location candidateLocation = vss.Instance.ChargingLocations[j];
                         // Dont allow detour to already visited location
                         if (candidateLocation.Index == arc.DeadheadTemplate.StartLocation.Index ||
@@ -321,6 +390,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                         // Not possible to do deadhead 
                         if (dht1 == null || dht2 == null) continue;
+
+                        Trip fromTrip = vss.Instance.Trips[expandingLabelIndex];
+                        Trip toTrip = vss.Instance.Trips[targetIndex];
+                        bool invalidFromTrip = dht1.FreqChangeOnly && (fromTrip.FrequencyChange == FrequencyChange.None || fromTrip.FrequencyChange == FrequencyChange.StartOfTrip);
+                        bool invalidToTrip = dht2.FreqChangeOnly && (fromTrip.FrequencyChange == FrequencyChange.None || fromTrip.FrequencyChange == FrequencyChange.EndOfTrip);
+                        if (invalidFromTrip || invalidToTrip) continue;
 
                         // No time to perform charge
                         int idleTime = (arc.EndTime - arc.StartTime) - (dht1.Duration + dht2.Duration);
@@ -340,11 +415,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         steeringTime += dht1.Duration;
                         hubTime += dht1.Duration;
                         SoC -= dht1.Distance * vss.VehicleType.DriveUsage;
-                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Constants.MAX_STEERING_TIME || hubTime >= Constants.MAX_NO_HUB_TIME) continue;
+                        if (!inBounds(SoC, steeringTime, hubTime)) continue;
 
                         // Check if we can reset steering/hub time now that we are at charging location
                         if (handoverAllowed(candidateLocation, idleTime)) {
                             steeringTime = 0;
+                            if (candidateLocation.CrewBase) hubTime = 0;
 
                             // Finalize block dual costs by adding to actual costs
                             int idleStartTime = arc.StartTime + dht1.Duration;
@@ -357,8 +433,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             minBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Min();
                             maxBlockSavings = (blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart) ?? [0]).Max();
                         }
-                        if (candidateLocation.CrewBase && idleTime >= candidateLocation.MinHandoverTime)
-                            hubTime = 0;
+
 
                         // Perform charge at charging location  
                         var res = candidateLocation.ChargingCurves[vss.VehicleType.Index].MaxChargeGained(SoC, idleTime);
@@ -369,7 +444,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         steeringTime += dht2.Duration;
                         hubTime += dht2.Duration;
                         SoC -= dht2.Distance * vss.VehicleType.DriveUsage;
-                        if (SoC < vss.VehicleType.MinSoC || steeringTime >= Constants.MAX_STEERING_TIME || hubTime >= Constants.MAX_NO_HUB_TIME) continue;
+                        if (!inBounds(SoC, steeringTime, hubTime)) continue;
 
                         statsAtTrip.Add((
                             SoC,
@@ -484,7 +559,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         : vss.VehicleType.StartSoC;
 
                     // Depending on detour not: 
-                    // (charge) -> dh -> (charge) -> trip; never charge when going to/from depot
+                    // (idle) -> dh -> (idle) -> trip; never charge when going to/from depot
                     // dh -> charge -> dh -> trip; 
 
                     if (curr.label.ChargeTime == ChargeTime.Detour) {

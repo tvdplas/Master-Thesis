@@ -867,7 +867,7 @@ namespace E_VCSP.Solver {
             model.Parameters.Cuts = 1;
             model.Parameters.Presolve = 2;
             model.Parameters.Symmetry = 2;
-            model.SetCallback(new CustomGRBCallback());
+            model.SetCallback(new CustomGRBCallback(model));
 
             // Add selection variables for vehicle tasks and crew duties, set initial solution
             List<GRBVar> taskVars = [], dutyVars = [];

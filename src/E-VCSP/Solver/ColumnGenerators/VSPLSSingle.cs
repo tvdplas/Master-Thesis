@@ -3,7 +3,7 @@ using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.SolutionState;
 
 namespace E_VCSP.Solver.ColumnGenerators {
-    public class VSPLSSingle(VehicleSolutionState vss) : VehicleColumnGen(vss) {
+    public class VSPLSSingle : VehicleColumnGen {
         private double T;
         private double alpha;
         private int Q;
@@ -15,13 +15,17 @@ namespace E_VCSP.Solver.ColumnGenerators {
         private VSPLSNode? head = null;
         private List<int> activeTrips = [];
         private List<int> inactiveTrips = [];
-        private LSOperations ops = new(vss, Config.VSP_LS_S_STARTING_T, "LS Single");
+        private LSOperations ops;
+
+        public VSPLSSingle(VehicleSolutionState vss) : base(vss) {
+            Reset();
+        }
 
         public void Reset() {
             T = Config.VSP_LS_S_STARTING_T;
             alpha = Config.VSP_LS_S_COOLING_RATE;
             Q = (int)Math.Round(-Config.VSP_LS_S_ITERATIONS / (Math.Log(Config.VSP_LS_S_STARTING_T / Config.VSP_LS_S_ENDING_T) / Math.Log(alpha)));
-            ops = new(vss, T, "LS Single");
+            ops = new(this, T, "LS Single");
             activeTrips = [];
             inactiveTrips = [.. vss.Instance.Trips.Select(x => x.Index)];
 
@@ -37,12 +41,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 PVE = new PVEDepot(vss.Depot, vss.StartTime - Constants.MIN_NODE_TIME, vss.StartTime),
             };
 
-            head.AddAfter(
-                    new PVETravel(dht, vss.StartTime, vss.EndTime, vss.VehicleType)
-                )
-                .AddAfter(
-                    new PVEDepot(vss.Depot, vss.EndTime, vss.EndTime + Constants.MIN_NODE_TIME)
-                );
+            head.AddAfter(new PVETravel(dht, vss.StartTime, vss.EndTime, vss.VehicleType))
+                .AddAfter(new PVEDepot(vss.Depot, vss.EndTime, vss.EndTime + Constants.MIN_NODE_TIME));
         }
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             inactiveTrips[^1] = selectedTrip; // Order doesn't matter, simply preparing for removal
             Trip trip = vss.Instance.Trips[selectedTrip];
 
-            LSOpResult res = ops.addStop(head, new PVETrip(trip, vss.VehicleType), -tripDualCosts[trip.Index]);
+            LSOpResult res = ops.addStop(head, new PVETrip(trip, vss.VehicleType));
 
             if (res == LSOpResult.Decline || res == LSOpResult.Invalid) return res;
 
@@ -86,7 +86,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             }
             if (curr == null) throw new InvalidOperationException("Could not find selected trip for removal");
 
-            LSOpResult res = ops.removeStop(head, curr, tripDualCosts[t.Index]);
+            LSOpResult res = ops.removeStop(head, curr);
 
             if (res == LSOpResult.Decline || res == LSOpResult.Invalid) return res;
 
@@ -97,7 +97,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
         }
 
         private (double reducedCost, VehicleTask vehicleTask)? finalizeTask() {
-            VehicleTask? vehicleTask = head!.ToVehicleTask(vss.VehicleType, "LS Single");
+            VehicleTask? vehicleTask = head!.ToVehicleTask(this, "LS Single");
             if (vehicleTask == null) return null;
             double reducedCost = vehicleTask.Cost;
             foreach (int coveredTripIndex in vehicleTask.TripIndexCover) {

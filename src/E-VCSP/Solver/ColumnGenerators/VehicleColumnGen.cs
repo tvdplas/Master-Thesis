@@ -5,9 +5,9 @@ namespace E_VCSP.Solver {
     public abstract class VehicleColumnGen(VehicleSolutionState vss) {
         // Information about current instance state
         public VehicleSolutionState vss = vss;
-        internal List<double> tripDualCosts = [];
-        internal Dictionary<string, double> blockDualCosts = [];
-        internal Dictionary<string, List<double>> blockDualCostsByStart = [];
+        public List<double> tripDualCosts = [];
+        public Dictionary<string, double> blockDualCosts = [];
+        public Dictionary<string, List<double>> blockDualCostsByStart = [];
 
         public void UpdateDualCosts(
             List<double> newTripDualCosts,

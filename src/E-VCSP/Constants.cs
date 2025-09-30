@@ -1,8 +1,7 @@
 ﻿namespace E_VCSP {
     public static class Constants {
-        //
-
-
+        // Preprocessing line frequency 
+        public static int LINE_FREQ_SIM_THRESHOLD = 1 * 60;
 
         // Min width of each node
         public static int MIN_NODE_TIME = 300;
@@ -23,7 +22,7 @@
         // Driving/Charging
         public static double KWH_COST = 0.32; // based on national average price
         public static int MIN_CHARGE_TIME = 300;
-        public static double VH_M_COST = 0.00005; // verified at 
+        public static double VH_M_COST = 0.00005; // verified at qbuzz
         public static int MAX_STEERING_TIME = 60 * 60 * 4; // conitnous driving time
         public static int MAX_NO_HUB_TIME = 60 * 60 * 8; // conitnous time without visiting crew hub
         public static double VH_IDLE_COST = 0; // Cost per unit of time for being idle.
