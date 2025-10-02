@@ -81,15 +81,11 @@ namespace E_VCSP.Solver {
             GRBModel model = new(env);
             model.Parameters.TimeLimit = Config.VSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 1; // upper bound
-            model.Parameters.Heuristics = 0.8;
-            model.Parameters.RINS = 10;
+            model.Parameters.Presolve = 2; // aggresive presolve
+            model.Parameters.RINS = 5;
             model.Parameters.SubMIPNodes = 5000;
-            model.Parameters.PumpPasses = 20;
             model.Parameters.NoRelHeurTime = Config.VSP_SOLVER_TIMEOUT_SEC / 4;
-            model.Parameters.ImproveStartTime = Config.VSP_SOLVER_TIMEOUT_SEC / 4;
-            model.Parameters.Cuts = 1;
-            model.Parameters.Presolve = 2;
-            model.Parameters.Symmetry = 2;
+            model.Parameters.ImproveStartTime = 0;
             model.SetCallback(new CustomGRBCallback(model));
             ct.Register(() => {
                 Console.WriteLine("Cancellation requested. Terminating Gurobi model...");
@@ -307,16 +303,42 @@ namespace E_VCSP.Solver {
                 if (var.VarName.StartsWith("vt_"))
                     var.Set(GRB.CharAttr.VType, GRB.BINARY);
             }
-
             if (!Config.VSP_ALLOW_SLACK_FINAL_SOLVE) {
                 // Remove ability to go over vehicle bounds -> hopefully speeds up solving at end.
                 model.GetVarByName("vehicle_count_slack").UB = 0;
             }
 
-            Console.WriteLine($"Total generation attempts: ${totalGenerated}");
-            Console.WriteLine($"LS failed to generate charge-feasible trip {notFound} times during generation");
-            Console.WriteLine($"Discarded {discardedOldColumns} old, {discardedNewColumns} new columns during generation");
-            Console.WriteLine($"Solving non-relaxed model with total of {vss.Tasks.Count} columns");
+            // Apply greedy set cover as initial solution
+            var covered = new bool[vss.Instance.Trips.Count];
+            var score = new double[vss.Tasks.Count];
+            var chosen = new bool[vss.Tasks.Count];
+            int uncovered = vss.Instance.Trips.Count;
+
+            while (uncovered > 0) {
+                // compute cost per newly-covered row
+                for (int j = 0; j < vss.Tasks.Count; j++) {
+                    if (chosen[j]) { score[j] = double.PositiveInfinity; continue; }
+                    int newly = 0;
+                    foreach (var i in vss.Tasks[j].TripIndexCover)
+                        if (!covered[i]) newly++;
+                    score[j] = newly > 0
+                        ? vss.Tasks[j].Cost / newly
+                        : double.PositiveInfinity;
+                }
+
+                int best = Array.IndexOf(score, score.Min());
+                chosen[best] = true;
+
+                foreach (var i in vss.Tasks[best].TripIndexCover)
+                    if (!covered[i]) {
+                        covered[i] = true;
+                        uncovered--;
+                    }
+            }
+
+            // assign starts
+            for (int j = 0; j < taskVars.Count; j++) taskVars[j].Start = chosen[j] ? 1.0 : 0.0;
+
             model.Update();
             bool configState = Config.CONSOLE_GUROBI;
             Config.CONSOLE_GUROBI = true; // Force enable console at end as this solve takes a long time

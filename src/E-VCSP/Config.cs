@@ -18,13 +18,13 @@
         public static double CR_SHIFT_COST = 100; // Minimum price to pay a crew member
         public static double CR_SINGLE_SHIFT_COST = 1_000; // penalty for use of initial shifts
         public static int MAX_VEHICLES = 18; // Maximum number of vehicles that can be used in the solution.
-        public static double VH_OVER_MAX_COST = 0; // Cost per vehicle of going over. only used as penalty
+        public static double VH_OVER_MAX_COST = 5000; // Cost per vehicle of going over. only used as penalty
         public static int MAX_DUTIES = 38; // Maximum number of vehicles that can be used in the solution.
-        public static double CR_OVER_MAX_COST = 0; // Cost per vehicle of going over. only used as penalty
+        public static double CR_OVER_MAX_COST = 2000; // Cost per vehicle of going over. only used as penalty
 
         public static Header VSP = new();
         public static bool VSP_DETERMINE_IIS = false;
-        public static int VSP_SOLVER_TIMEOUT_SEC = 300;
+        public static int VSP_SOLVER_TIMEOUT_SEC = 450;
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static bool VSP_ALLOW_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
         public static int VSP_PRE_DIRECT_TIME = 0;
@@ -32,18 +32,17 @@
 
         public static Header VSP_CG = new();
         public static int VSP_INSTANCES_PER_IT = 1;
-        public static int VSP_MAX_COL_GEN_ITS = 150;
+        public static int VSP_MAX_COL_GEN_ITS = 250;
         public static int VSP_OPT_IT_THRESHOLD = 2; // Amount of columns sequentially generated without rc before cg is stopped
         public static string VSP_OPERATION_SEQUENCE = "-"; // Defines an initial operation sequence
 
         public static Header VSP_LABELING = new();
         public static double VSP_LB_WEIGHT = 1;
-        public static int VSP_LB_MAX_COLS = 25;
+        public static int VSP_LB_MAX_COLS = 50;
         public static int VSP_LB_MIN_TRIPS = 3; // min number of trips in a single vehicle task
-        public static bool VSP_LB_ATTEMPT_DISJOINT = true;
-        public static double VSP_LB_SOC_BINS = 101; // Charge values within epsilon of eachother will be considered the same
-        public static double VSP_LB_SEC_COL_COUNT = 5; // Number of primary columns to generate secondary columns for 
-        public static double VSP_LB_SEC_COL_ATTEMPTS = 4; // Number of attempts per secondary column
+        public static int VSP_LB_SOC_BINS = 101; // Charge values within epsilon of eachother will be considered the same
+        public static int VSP_LB_SEC_COL_COUNT = 9; // Number of primary columns to generate secondary columns for 
+        public static int VSP_LB_SEC_COL_ATTEMPTS = 10; // Number of attempts per secondary column
 
         public static Header VSP_LS_SHARED = new();
         public static bool VSP_LS_SHR_EXPAND_AVT = true;
@@ -91,9 +90,8 @@
         public static double CSP_LABELING_WEIGHT = 0;
         public static int CSP_LB_MAX_LABELS_IN_END = 100_000;
         public static int CSP_LB_MAX_COLS = 50;
-        public static bool CSP_LB_ATTEMPT_DISJOINT = true; // try to find disjoint paths; if none can be found, return any arbitrary path
-        public static double CSP_LB_SEC_COL_COUNT = 2; // Number of primary columns to generate secondary columns for 
-        public static double CSP_LB_SEC_COL_ATTEMPTS = 2; // Number of attempts per secondary column
+        public static int CSP_LB_SEC_COL_COUNT = 9; // Number of primary columns to generate secondary columns for 
+        public static double CSP_LB_SEC_COL_ATTEMPTS = 10; // Number of attempts per secondary column
 
         public static Header CSP_LS_GLOBAL = new();
         public static double CSP_LS_GLOBAL_WEIGHT = 0;
@@ -113,8 +111,6 @@
         public static int VCSP_VH_ITS_ROUND = 10;
         public static int VCSP_CR_ITS_INIT = 10;
         public static int VCSP_CR_ITS_ROUND = 10;
-        public static int VCSP_VH_INSTANCES = 1;
-        public static int VCSP_CR_INSTANCES = 2;
         public static int VCSP_MAX_TASKS_DURING = 40000;
         public static int VCSP_MAX_DUTIES_DURING = 40000;
         public static bool VCSP_VH_CSTR_SLACK = true;
@@ -123,6 +119,7 @@
         public static double VSCP_BLOCK_ADD_CHANCE = 0.1;
         public static bool VCSP_NONNEGATIVE_RC_VSP = true;
         public static bool VCSP_NONNEGATIVE_RC_CSP = true;
+        public static bool VCSP_SLACK_IN_FINAL_OBJ = false;
 
         public static Header LAGRANGE = new();
         public static double LAGRANGE_PI_START = 2;

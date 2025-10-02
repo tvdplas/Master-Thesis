@@ -17,7 +17,7 @@ namespace E_VCSP.Solver {
         /// <summary>
         /// Dictionary from block descriptor to block index in css
         /// </summary>
-        private Dictionary<string, int> knownBlocks = [];
+        private Dictionary<Descriptor, int> knownBlocks = [];
         /// <summary>
         /// Vehicle tasks, checked on covered trips / blocks. Maps to an index into vss
         /// </summary>
@@ -86,7 +86,7 @@ namespace E_VCSP.Solver {
                 var task = vss.Tasks[i];
                 if (task.Index != i) throw new InvalidDataException("Task indexing in initial solution is wrong");
                 task.BlockIndexCover = [];
-                foreach (string desc in task.BlockDescriptorCover) {
+                foreach (Descriptor desc in task.BlockDescriptorCover) {
                     task.BlockIndexCover.Add(knownBlocks[desc]);
                 }
 
@@ -102,7 +102,7 @@ namespace E_VCSP.Solver {
                 var duty = css.Duties[i];
                 if (duty.Index != i) throw new InvalidDataException("Duty indexing in initial solution is wrong");
                 duty.BlockIndexCover = [];
-                foreach (string desc in duty.BlockDescriptorCover) {
+                foreach (Descriptor desc in duty.BlockDescriptorCover) {
                     duty.BlockIndexCover.Add(knownBlocks[desc]);
                 }
 
@@ -449,6 +449,7 @@ namespace E_VCSP.Solver {
                     Y = Y.Where((_, i) => !dutyIndexesToRemove.Contains(i)).ToList();
                     dutyReducedCosts = css.Duties.Select((x, i) => (double.MaxValue, i)).ToList();
                 }
+
                 if (rcUpdateRequired) updateReducedCosts();
             }
 
@@ -539,13 +540,13 @@ namespace E_VCSP.Solver {
             }
 
             void updateDualCosts() {
-                Dictionary<string, double> blockDualCosts = new();
-                Dictionary<string, List<double>> blockDualCostsByStart = new();
+                Dictionary<Descriptor, double> blockDualCosts = new();
+                Dictionary<DescriptorHalf, List<double>> blockDualCostsByStart = new();
 
                 for (int bi = 0; bi < css.Blocks.Count; bi++) {
                     Block b = css.Blocks[bi];
-                    string descriptor = b.Descriptor;
-                    string descriptorStart = Descriptor.GetStart(descriptor);
+                    Descriptor descriptor = b.Descriptor;
+                    DescriptorHalf descriptorStart = descriptor.GetStart();
 
                     blockDualCosts[descriptor] = lambdaBlocks[bi];
                     if (blockDualCostsByStart.ContainsKey(descriptorStart))
@@ -576,7 +577,7 @@ namespace E_VCSP.Solver {
                     // Determine blocks for task; add any not yet known ones to css
                     List<Block> blocks = Block.FromVehicleTask(newTask);
                     foreach (Block b in blocks) {
-                        string desc = b.Descriptor;
+                        Descriptor desc = b.Descriptor;
                         if (!knownBlocks.ContainsKey(desc)) {
                             knownBlocks[desc] = css.Blocks.Count;
                             css.AddBlock(b, 1);
@@ -698,7 +699,7 @@ namespace E_VCSP.Solver {
                             if (!transitionAllowed || !overallTimeAllowed) continue;
 
                             // Check if this block is already known
-                            string candidateDescriptor = Descriptor.Create(t.StartLocation, t.StartTime, block.EndLocation, block.EndTime);
+                            Descriptor candidateDescriptor = new Descriptor(t.StartLocation, t.StartTime, block.EndLocation, block.EndTime);
                             if (knownBlocks.ContainsKey(candidateDescriptor)) continue;
 
                             candidateDescriptors.Add((-lambdaTrips[t.Index], true, t.StartLocation, t.StartTime));
@@ -712,7 +713,7 @@ namespace E_VCSP.Solver {
                                 DeadheadTemplate? dht = vss.LocationDHT[li][curr.Index];
                                 if (dht == null) continue;
 
-                                string candidateDescriptor = Descriptor.Create(
+                                Descriptor candidateDescriptor = new Descriptor(
                                     dht.StartLocation,
                                     block.StartTime - dht.Duration,
                                     block.EndLocation,
@@ -739,7 +740,7 @@ namespace E_VCSP.Solver {
                             if (!transitionAllowed || !overallTimeAllowed) continue;
 
                             // Check if this block is already known
-                            string candidateDescriptor = Descriptor.Create(block.StartLocation, block.StartTime, t.EndLocation, t.EndTime);
+                            Descriptor candidateDescriptor = new Descriptor(block.StartLocation, block.StartTime, t.EndLocation, t.EndTime);
                             if (knownBlocks.ContainsKey(candidateDescriptor)) continue;
 
                             candidateDescriptors.Add((-lambdaTrips[t.Index], false, t.EndLocation, t.EndTime));
@@ -753,7 +754,7 @@ namespace E_VCSP.Solver {
                                 DeadheadTemplate? dht = vss.LocationDHT[curr.Index][li];
                                 if (dht == null) continue;
 
-                                string candidateDescriptor = Descriptor.Create(
+                                Descriptor candidateDescriptor = new Descriptor(
                                     block.StartLocation,
                                     block.StartTime,
                                     dht.EndLocation,
@@ -769,7 +770,7 @@ namespace E_VCSP.Solver {
                     candidateDescriptors = candidateDescriptors.OrderBy((x) => x.cost).ToList();
                     for (int ci = 0; ci < candidateDescriptors.Count; ci++) {
                         (_, bool front, Location l, int t) = candidateDescriptors[ci];
-                        string desc = front ? Descriptor.Create(l, t, block.EndLocation, block.EndTime) : Descriptor.Create(block.StartLocation, block.StartTime, l, t);
+                        Descriptor desc = front ? new Descriptor(l, t, block.EndLocation, block.EndTime) : new Descriptor(block.StartLocation, block.StartTime, l, t);
                         if (knownBlocks.ContainsKey(desc)) continue;
                         Block newBlock = front ? Block.FromDescriptor(l, t, block.EndLocation, block.EndTime) : Block.FromDescriptor(block.StartLocation, block.StartTime, l, t);
 
@@ -791,7 +792,8 @@ namespace E_VCSP.Solver {
                 return res;
             }
 
-            CSPLabeling[] cspLabelingInstances = [.. Enumerable.Range(0, Config.VCSP_CR_INSTANCES).Select(_ => new CSPLabeling(css))];
+            CSPLabeling cspLabelingInstance = new CSPLabeling(css);
+
             for (int it = 0; it < maxIts; it++) {
                 makeCDsNonNegativeRC();
                 if (disrupt) disruptMultipliers();
@@ -803,18 +805,16 @@ namespace E_VCSP.Solver {
                 var dualCost = crewDualCost();
                 List<(double reducedCosts, CrewDuty newDuty)> newColumns = [];
 
-                Parallel.For(0, cspLabelingInstances.Length, (i) => {
-                    cspLabelingInstances[i].UpdateDualCosts(dualCost, 1);
-                    var res = cspLabelingInstances[i].GenerateDuties();
-                    foreach (var resCol in res)
-                        if (resCol.crewDuty != null) {
-                            newColumns.Add(resCol);
-                        }
-                });
+                cspLabelingInstance.UpdateDualCosts(dualCost, 1);
+                var res = cspLabelingInstance.GenerateDuties();
+                foreach (var resCol in res) {
+                    if (resCol.crewDuty != null) {
+                        newColumns.Add(resCol);
+                    }
+                }
 
                 int discardedColumns = 0, improvedColumns = 0;
                 foreach ((double reducedCost, CrewDuty newDuty) in newColumns) {
-                    //if (reducedCost >= 0) continue;
                     if (newDuty == null) continue;
 
                     BitArray blockCover = newDuty.ToBlockBitArray(css.Blocks.Count);
@@ -889,7 +889,11 @@ namespace E_VCSP.Solver {
             // Max selected vehicle tasks
             GRBLinExpr maxVehiclesExpr = new();
             GRBVar maxVehiclesSlack = model.AddVar(
-                0, Config.VCSP_VH_CSTR_SLACK ? GRB.INFINITY : 0, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_slack"
+                0,
+                Config.VCSP_VH_CSTR_SLACK ? GRB.INFINITY : 0,
+                Config.VCSP_SLACK_IN_FINAL_OBJ ? Config.VH_OVER_MAX_COST : 0,
+                GRB.CONTINUOUS,
+                "vehicle_slack"
             );
             foreach (GRBVar v in taskVars) {
                 maxVehiclesExpr += v;
@@ -912,7 +916,7 @@ namespace E_VCSP.Solver {
 
             // Block cover of selected tasks by duties
             for (int blockIndex = 0; blockIndex < css.Blocks.Count; blockIndex++) {
-                string blockDescriptor = css.Blocks[blockIndex].Descriptor;
+                Descriptor blockDescriptor = css.Blocks[blockIndex].Descriptor;
                 GRBLinExpr expr = new();
 
                 for (int vtIndex = 0; vtIndex < taskVars.Count; vtIndex++) {
@@ -931,7 +935,11 @@ namespace E_VCSP.Solver {
 
             GRBLinExpr maxDutiesExpr = new();
             GRBVar maxDutiesSlack = model.AddVar(
-                0, Config.VCSP_CR_MAX_CSTR_SLACK ? GRB.INFINITY : 0, Config.CR_OVER_MAX_COST, GRB.CONTINUOUS, "duty_slack"
+                0,
+                Config.VCSP_CR_MAX_CSTR_SLACK ? GRB.INFINITY : 0,
+                Config.VCSP_SLACK_IN_FINAL_OBJ ? Config.CR_OVER_MAX_COST : 0,
+                GRB.CONTINUOUS,
+                "duty_slack"
             );
             foreach (GRBVar v in dutyVars) {
                 maxDutiesExpr += v;
@@ -984,9 +992,9 @@ namespace E_VCSP.Solver {
 
             Console.WriteLine($"Solution found with {vss.SelectedTasks.Count} vehicles, {css.SelectedDuties.Count} duties, overall costs {model.ObjVal}");
             Dictionary<int, int> vehicleTripCover = [];
-            Dictionary<string, int> vehicleBlockCover = [];
-            Dictionary<string, int> crewBlockCover = [];
-            HashSet<string> blockDescriptors = [];
+            Dictionary<Descriptor, int> vehicleBlockCover = [];
+            Dictionary<Descriptor, int> crewBlockCover = [];
+            HashSet<Descriptor> blockDescriptors = [];
             for (int i = 0; i < vss.SelectedTasks.Count; i++) {
                 foreach (var elem in vss.SelectedTasks[i].Elements) {
                     if (elem is VETrip vet) {

@@ -36,8 +36,9 @@ namespace E_VCSP.Objects.ParsedData {
         public bool FreeIdle => BreakAllowed || CanCharge;
         [JsonIgnore]
         public double ChargePowerPerSpot => ChargeSpots > 0 ? ChargeTotalPower / ChargeSpots : 0;
+
         [JsonIgnore]
-        public bool CanCharge => ChargePowerPerSpot > 0;
+        public bool CanCharge;
 
         public override string ToString() {
             return Id;

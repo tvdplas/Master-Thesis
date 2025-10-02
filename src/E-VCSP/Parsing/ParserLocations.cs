@@ -18,6 +18,7 @@ namespace E_VCSP.Parsing {
             loc.ChargeSpots = int.Parse(line[attributeIndexMapping["ChargeSpots"]]);
             loc.IsDepot = line[attributeIndexMapping["IsDepot"]] == "1";
             loc.ChargeTotalPower = double.Parse(line[attributeIndexMapping["ChargeTotalPower"]]);
+            loc.CanCharge = loc.ChargeSpots > 0 && loc.ChargeTotalPower > 0;
             return loc;
         }
     }

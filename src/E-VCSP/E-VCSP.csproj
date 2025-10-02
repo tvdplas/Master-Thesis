@@ -9,6 +9,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Remove="Properties\DataSources\**" />
     <EmbeddedResource Remove="Properties\DataSources\**" />

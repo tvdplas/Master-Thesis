@@ -17,7 +17,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
             reset();
         }
 
-
         private void reset() {
             T = Config.VSP_LS_G_STARTING_T;
             alpha = Config.VSP_LS_G_COOLING_RATE;
@@ -267,10 +266,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Can be checked by finding the trip preceding t2S in t1,
             // then checking the trip coming after that to see if it is possible
             // to travel from t2E to it.
-            VSPLSNode? t1Prev = t1Head.FindLastAfter(x => x.PVE.EndTime < t2Start.PVE.StartTime && (x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip)) ?? t1Head;
-            if (t1Prev == null) throw new InvalidOperationException("heh");
-            VSPLSNode? t1Next = t1Prev.FindFirstAfter(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip);
-            if (t1Next == null) throw new InvalidOperationException("heh");
+            VSPLSNode? t1Prev =
+                t1Head.FindLastAfter(x => x.PVE.EndTime < t2Start.PVE.StartTime && (x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip))
+                ?? t1Head ?? throw new InvalidOperationException("heh");
+            VSPLSNode? t1Next =
+                t1Prev.FindFirstAfter(x => x.PVE.Type == PVEType.Depot || x.PVE.Type == PVEType.Trip)
+                ?? throw new InvalidOperationException("heh");
             PVETrip t2StartRangeAsTrip = (PVETrip)t2Start.PVE,
                     t2EndRangeAsTrip = (PVETrip)t2End.PVE;
             PVETrip? t1PrevAsTrip = t1Prev.PVE.Type == PVEType.Trip ? (PVETrip)t1Prev.PVE : null,

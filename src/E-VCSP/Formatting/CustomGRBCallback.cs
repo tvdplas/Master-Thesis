@@ -22,7 +22,7 @@ namespace E_VCSP.Formatting {
 
                 double gap = Math.Abs(best - bound) / Math.Max(1e-10, Math.Abs(best));
 
-                if (runtime >= timeLimit - 5.0 && gap > Config.GRB_TARGET_GAP && timeLimit < Config.GRB_MAX_EXTENDED_TIME) {
+                if (runtime >= timeLimit - 60.0 && gap > Config.GRB_TARGET_GAP && timeLimit < Config.GRB_MAX_EXTENDED_TIME) {
                     timeLimit += 60.0;
                     Set(GRB.DoubleParam.TimeLimit, timeLimit);
                     Console.WriteLine($"Current gap {(gap * 100).ToString("0.##")}% > target gap {Config.GRB_TARGET_GAP * 100}%, updating timelimit to {(int)timeLimit}s");

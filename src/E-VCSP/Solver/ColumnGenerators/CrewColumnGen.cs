@@ -5,6 +5,10 @@ namespace E_VCSP.Solver {
     public abstract class CrewColumnGen {
         // Information about current instance / model state
         public CrewSolutionState css;
+
+        public Dictionary<string, double> rawDualCost = new();
+        public int rawBlockSign = 1;
+
         public List<double> blockDualCosts = [];
         public double maxLongDualCost = 0;
         public double maxAvgDurationDualCost = 0;
@@ -16,6 +20,9 @@ namespace E_VCSP.Solver {
         }
 
         internal void UpdateDualCosts(Dictionary<string, double> crewConstrs, int blockSign) {
+            rawDualCost = crewConstrs;
+            rawBlockSign = blockSign;
+
             blockDualCosts = css.Blocks.Select(_ => 0.0).ToList();
 
             for (int i = 0; i < css.Blocks.Count; i++) {

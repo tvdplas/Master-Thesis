@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects.ParsedData;
+using E_VCSP.Utils;
 using System.Text.Json.Serialization;
 
 namespace E_VCSP.Objects {
@@ -130,8 +131,8 @@ namespace E_VCSP.Objects {
         public int Duration {
             get => EndTime - StartTime;
         }
-        public string Descriptor {
-            get => Utils.Descriptor.Create(StartLocation, StartTime, EndLocation, EndTime);
+        public Descriptor Descriptor {
+            get => new(StartLocation, StartTime, EndLocation, EndTime);
         }
 
         public static Block FromDescriptor(Location startLocation, int startTime, Location endLocation, int endTime) {
@@ -175,9 +176,9 @@ namespace E_VCSP.Objects {
 
         public static List<(Block block, int count)> FromVehicleTasks(List<VehicleTask> vts) {
             List<Block> selectedBlocks = vts.SelectMany(t => Block.FromVehicleTask(t)).ToList();
-            Dictionary<string, (Block firstRef, int count)> blockCounts = new();
+            Dictionary<Descriptor, (Block firstRef, int count)> blockCounts = new();
             foreach (Block block in selectedBlocks) {
-                string descriptor = block.Descriptor;
+                Descriptor descriptor = block.Descriptor;
                 blockCounts.TryAdd(descriptor, (block, 0));
                 var curr = blockCounts[descriptor];
                 blockCounts[descriptor] = (curr.firstRef, curr.count + 1);

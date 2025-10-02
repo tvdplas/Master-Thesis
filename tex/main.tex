@@ -1087,10 +1087,48 @@ Firstly, in the non-simplified version of the labor regulations we implemented, 
 Secondly, an upper bound $N_{max,lb}$ was set on the number of labels which were allowed in $cb_e$; as soon as $N_{max,lb}$ reach $cb_e$, propagation is considered complete and extraction of columns is started. Depending on the method of selecting which label will be propagated next, this can result in significant bias: in order to minimize this effect, we randomly select a label from the list of active labels to propagate. This does still result in a bias for duties with fewer blocks, as these  require fewer propagations to reach $cb_e$, however this can be negated by setting $N_{max,lb}$ reasonably high. $N_{max,lb}$ was selected such that it was roughly equal to the amount of labels required when solving the problem sequentially, thereby preventing a bad subgradient optimization round from grinding the algorithm to a halt.
 
 \subparagraph{Multiplier disruption} After performing all vehicle and crew rounds, another set of column generation rounds is done in which $\lambda$ is slightly disrupted. This is done to have an alternative way of forming secondary columns, as the disrupted $\lambda$ will hopefully cause the pricing problems to produce columns which are close but not identical to the ones which are generated with the normal $\lambda$. Disruption is done for each individual multiplier $\lambda_\chi \in \lambda$ by setting $\lambda_\chi \gets \lambda_\chi \cdot \textit{uniform}(0.8,1.2)$. During these additional disrupted rounds, the maximum amount of columns is removed as discarding based on disrupted multipliers may lead to a significantly worse quality final solution. 
-\subparagraph{}
+
+\subparagraph{Target vehicle / duty counts} During testing, it was found that adding a target number of vehicle tasks and crew duties resulted in both faster convergence and overall better final solution quality. In order to do this, let us introduce the parameters $VT_{target}$, $CD_{target}$, representing the target number of vehicles and crew members respectively. Next, let us introduce two variables $x_{slack} \geq 0$ and $y_{slack} \geq 0$, which represent deviation from the target number of tasks and duties respectively. Let us now add the following two constraints to our ILP:
+
+\begin{align}
+\sum_{vt_i \in VT} x_i - x_{slack} &\leq VT_{target} \\ 
+\sum_{cd_i \in CD} y_i - y_{slack} &\leq CD_{target}
+\end{align}
+
+Next, let us add two penalty parameters $P_{vt}$ and $P_{cd}$ respectively to our objective function for deviating from the target:
+\begin{align}
+\min \quad \dots + P_{VT} \cdot x_{slack} + P_{CD} \cdot y_{slack}
+\end{align}
 
 \section{Implementation}
-Implementation was done in .NET 8, running on a Windows 11 machine with an AMD Ryzen 3600 desktop processor and 32 GB of DDR4 3200 MHz RAM. Gurobi 12.0.2 was used for solving the LP and ILP problems. Full code is available at \url{https://github.com/tvdplas/Master-Thesis}.
+Implementation was done in .NET 8, running on a Windows 11 machine with an AMD Ryzen 3600 desktop processor with 6 cores and 12 threads, and 32 GB of DDR4 3200 MHz RAM. Gurobi 12.0.2 was used for solving the LP and ILP problems. Full source code is available at \url{https://github.com/tvdplas/Master-Thesis}.
+
+\subsection{Parallelism}
+During implementation of our methods, it was found that there were a number of components which could be easily parallelized. As this led to significant decreases in overall computation time, we will give an overview of these components, as well as highlighting some significant parts of the algorithm which cannot be parallelized.
+
+\subsection{Column generation - Labeling}
+For the labeling based approaches, two key components of the algorithm were identified as being parallelizable while also having a high impact on the overall runtime: label propagation and the generation of secondary columns. We will now discuss each of these in more detail. 
+
+\subsubsection{Label propagation}
+Given a label $l$ in a node $v$, the propagation of $l$ to all nodes $u$ such that $(v, u) \in A$ is largely independent; this could therefore be done in parallel. As the number of outgoing arcs from a node can be quite high, this would in theory result in a significant reduction in the time required to fully propagate all labels. In practice however, two problems were observed: 
+
+Firstly, in the case of vehicle column generation, a pair of nodes may be linked by multiple arcs; this in turn implies that multiple labels may be added to a single node $u$ when propagating $l$ from $v$. In order to handle this properly, additional computational work is required, either by adding a lock to the list of active labels in $u$ or by doing these arcs sequentially. Both of these options decrease the effectiveness of a parallel propagation approach. 
+
+Secondly, the overhead of thread scheduling for operations of this size is significant; even when considering batches of either arcs or labels as thread tasks, overall computation time was observed to increase instead of decrease when compared to a simple sequential approach. It was therefore concluded that the propagation of labels was not a suitable target for parallelization.
+
+\subsubsection{Secondary column generation}
+Another candidate for parallelization was the generation of secondary columns. As described in more detail in Sections \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}, batches of secondary columns are generated by running the labeling algorithm again with a subset of nodes being blocked. Each of these individual runs is independent and takes a significant amount of time, making this a prime candidate for parallelization.
+
+After implementing parallel generation of batches of secondary columns, significant performance gains were observed; given our particular hardware, a 5-10x reduction in required computation time was observed for the generation of secondary columns. We do note that this incurs significant memory usage; if not properly managed, garbage collection will dominate overall CPU time, preventing any improvements. \todo{loopt niet lekker} 
+
+\subsection{Column generation - Local search}
+For local search based approaches, the randomized sequence of operations all but guarantees that two different runs given the same input data will result in a different resulting set of column. As a result of this, it can be interesting to run multiple local search processes, each with a different random seed; this approach, commonly known as multi-start, is an ideal target for parallelization as each process is completely independent and memory efficient. 
+
+
+\subsection{Subgradient optimization}
+Cost reevaluation during subgradient optimization was found to be a significant bottleneck during initial testing, as for each column the contribution of the contained trips and blocks needs to be updated in order to find $x$ and $y$. As this process is independent for each column, it was parallelized by splitting the set of columns into batches, each of which is processed by a separate thread. This resulted in a significant decrease in overall computation time.
+
+
 \section{Results}
 \todo{Hier iets zeggen over de instanties, het feit dat daar ook gelopen mag worden tussen locaties maar dat dit verwerkt is in signon/signoff/bruttonetto break tijden}.
 

@@ -160,7 +160,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             int lastHandoverChance = ((PVETravel)Next!.PVE).DepartureTime;
             int lastSignOnOffChance = ((PVETravel)Next!.PVE).DepartureTime;
-            string currentBlockStart = Descriptor.Create(((PVETravel)Next!.PVE).StartLocation, ((PVETravel)Next!.PVE).DepartureTime);
+            DescriptorHalf currentBlockStart = new DescriptorHalf(((PVETravel)Next!.PVE).StartLocation, ((PVETravel)Next!.PVE).DepartureTime);
 
             void performCharge(int chargeTime, Location chargeLocation) {
                 // Check bounds before charge
@@ -182,11 +182,11 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     lastHandoverChance = idleEndTime;
 
                     // Finalize block
-                    string desc = $"{currentBlockStart}#{Descriptor.Create(l, idleStartTime)}";
+                    Descriptor desc = currentBlockStart.AddEnd(l, idleStartTime);
                     dualCosts -= vcg.blockDualCosts.GetValueOrDefault(desc);
 
                     // initialize new block
-                    currentBlockStart = Descriptor.Create(l, idleEndTime);
+                    currentBlockStart = new DescriptorHalf(l, idleEndTime);
                 }
 
                 // See if sign on / off can be performed
@@ -272,7 +272,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (SoCDeficit > 0) underCharge.Add(SoCDeficit);
 
             // End final block at depot
-            string desc = $"{currentBlockStart}#{Descriptor.Create(curr.PVE.StartLocation, arrivalTime)}";
+            Descriptor desc = currentBlockStart.AddEnd(curr.PVE.StartLocation, arrivalTime);
             dualCosts -= vcg.blockDualCosts.GetValueOrDefault(desc);
 
             double penaltyCost = 0;

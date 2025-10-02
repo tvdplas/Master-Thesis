@@ -1,10 +1,11 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver.SolutionState;
+using E_VCSP.Utils;
 using System.Collections;
 
 namespace E_VCSP.Solver.ColumnGenerators {
-    internal struct CSPLabel {
+    internal record CSPLabel {
         private static int ID_COUNTER = 0;
         internal readonly int Id = -1;
         public CSPLabel() {
@@ -160,10 +161,15 @@ namespace E_VCSP.Solver.ColumnGenerators {
         List<List<CSPLabel>> activeLabels = [];
         List<bool> blockedBlock = [];
 
-        internal CSPLabeling(CrewSolutionState css) : base(css) { }
+        internal CSPLabeling(CrewSolutionState css) : base(css) {
+            ResetBlockedBlocks();
+        }
 
-        private void reset() {
+        public void ResetBlockedBlocks() {
             blockedBlock = [.. css.BlockCount.Select(x => x == 0), false, false]; // Only use blocks which are active, depot start/end always active
+        }
+
+        public void ResetLabels() {
             allLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
             activeLabels = [.. Enumerable.Range(0, css.Blocks.Count + 2).Select(x => new List<CSPLabel>())];
         }
@@ -258,7 +264,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         ? timeDiff
                         : timeDiff - longActualIdleTime;
 
-
                     double costFromTime = addedTime / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
                     double costFromRc = targetBlockIndex < css.Blocks.Count ? -blockDualCosts[targetBlockIndex] : 0;
 
@@ -289,28 +294,34 @@ namespace E_VCSP.Solver.ColumnGenerators {
             }
         }
 
-        private List<(double reducedCost, CrewDuty crewDuty)> extractDuties(string source) {
+        private List<(double reducedCost, CrewDuty crewDuty)> extractDuties(string source, HashSet<(BitArray, int)> alreadyKnown) {
             // Walk back through in order to get the minimum costs
             var feasibleEnds = allLabels[^1]
                 .Where(x => x.isFeasible(css.Blocks[x.PrevBlockId].EndTime + css.Blocks[x.PrevBlockId].EndLocation.SignOffTime, true))
                 .OrderBy(x => x.Cost).ToList();
 
             List<CSPLabel> validTargets = [];
-            if (!Config.CSP_LB_ATTEMPT_DISJOINT) validTargets = feasibleEnds.Take(Config.CSP_LB_MAX_COLS).ToList();
-            else {
-                BitArray currCover = new(css.Blocks.Count);
-                // Priority on disjoint labels
-                for (int i = 0; i < feasibleEnds.Count; i++) {
-                    BitArray ba = new(currCover);
-                    if (ba.And(feasibleEnds[i].CoveredBlockIds).HasAnySet()) continue;
-                    validTargets.Add(feasibleEnds[i]);
-                    currCover.Or(feasibleEnds[i].CoveredBlockIds);
-                }
-                // Add extra labels if available
-                for (int i = 0; i < feasibleEnds.Count && validTargets.Count < Config.CSP_LB_MAX_COLS; i++) {
-                    if (validTargets.Contains(feasibleEnds[i])) continue;
-                    validTargets.Add(feasibleEnds[i]);
-                }
+            BitArray currCover = new(css.Blocks.Count);
+            // Priority on disjoint labels
+            for (int i = 0; i < feasibleEnds.Count && validTargets.Count < Config.CSP_LB_MAX_COLS; i++) {
+                var label = feasibleEnds[i];
+                var labelId = (label.CoveredBlockIds, (int)label.Type);
+                if (alreadyKnown.Contains(labelId)) continue;
+                BitArray ba = new(currCover);
+                if (ba.And(label.CoveredBlockIds).HasAnySet()) continue;
+                validTargets.Add(label);
+                alreadyKnown.Add(labelId);
+                currCover.Or(label.CoveredBlockIds);
+            }
+
+            // Add extra labels if available
+            for (int i = 0; i < feasibleEnds.Count && validTargets.Count < Config.CSP_LB_MAX_COLS; i++) {
+                var label = feasibleEnds[i];
+                var labelId = (label.CoveredBlockIds, (int)label.Type);
+                if (alreadyKnown.Contains(labelId)) continue;
+                if (validTargets.Contains(label)) continue;
+                validTargets.Add(label);
+                alreadyKnown.Add(labelId);
             }
 
             List<(double reducedCost, CrewDuty duty)> duties = new();
@@ -377,28 +388,41 @@ namespace E_VCSP.Solver.ColumnGenerators {
             return duties;
         }
 
-        public override List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties() {
-            reset();
+        public List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties(bool subprocess, HashSet<(BitArray, int)> alreadyKnown) {
+            ResetLabels();
+            if (!subprocess) ResetBlockedBlocks();
 
             runLabeling();
-            List<(double reducedCost, CrewDuty crewDuty)> primaryTasks = extractDuties("primary");
-            List<(double reducedCost, CrewDuty crewDuty)> secondaryTasks = [];
+            List<(double reducedCost, CrewDuty crewDuty)> primaryTasks = extractDuties(subprocess ? "secondary" : "primary", alreadyKnown);
 
-            for (int i = 0; i < Math.Min(primaryTasks.Count, Config.CSP_LB_SEC_COL_COUNT); i++) {
+            if (subprocess) return primaryTasks.Where(x => x.crewDuty != null).ToList();
+
+            int numberOfSubprocesses = Math.Min(primaryTasks.Count, Config.CSP_LB_SEC_COL_COUNT);
+            List<(double reducedCost, CrewDuty crewDuty)>[] secondaryTasks = new List<(double, CrewDuty)>[numberOfSubprocesses];
+            for (int i = 0; i < numberOfSubprocesses; i++) secondaryTasks[i] = [];
+
+            Parallel.For(0, numberOfSubprocesses, (i) => {
+                CSPLabeling subprocess = new CSPLabeling(css);
+                subprocess.UpdateDualCosts(rawDualCost, rawBlockSign);
+                HashSet<(BitArray, int)> alreadyKnownLocal = new(alreadyKnown, new BitArrayIntComparer());
                 var baseTask = primaryTasks[i];
 
-                for (int j = 1; j < (Config.CSP_LB_SEC_COL_ATTEMPTS + 1); j++) {
-                    reset();
-                    for (int k = 0; k < (int)((double)j * baseTask.crewDuty.BlockIndexCover.Count / (Config.CSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
-                        blockedBlock[baseTask.crewDuty.BlockIndexCover[k]] = true;
-                    }
-                    runLabeling();
-                    secondaryTasks.AddRange(extractDuties("secondary"));
-                }
-            }
+                subprocess.ResetBlockedBlocks();
 
-            primaryTasks.AddRange(secondaryTasks);
+                for (int j = 1; j < (Config.CSP_LB_SEC_COL_ATTEMPTS + 1); j++) {
+                    subprocess.ResetBlockedBlocks();
+                    for (int k = 0; k < (int)((double)j * baseTask.crewDuty.BlockIndexCover.Count / (Config.CSP_LB_SEC_COL_ATTEMPTS + 1)); k++) {
+                        subprocess.blockedBlock[baseTask.crewDuty.BlockIndexCover[k]] = true;
+                    }
+                    secondaryTasks[i].AddRange(subprocess.GenerateDuties(true, alreadyKnownLocal));
+                }
+            });
+
+            foreach (var st in secondaryTasks) primaryTasks.AddRange(st);
             return primaryTasks.Where(x => x.crewDuty != null).ToList();
         }
+
+        public override List<(double reducedCost, CrewDuty crewDuty)> GenerateDuties() =>
+            GenerateDuties(false, new(new BitArrayIntComparer()));
     }
 }

@@ -1,6 +1,7 @@
 ﻿
 using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
+using E_VCSP.Utils;
 using System.Collections;
 using System.Text.Json.Serialization;
 
@@ -41,7 +42,7 @@ namespace E_VCSP.Solver.SolutionState {
         public List<List<BlockArc>> Adj = [[], []];
         public List<List<BlockArc?>> AdjFull = [[null, null], [null, null]];
 
-        public HashSet<string> KnownBlocks = [];
+        public HashSet<Descriptor> KnownBlocks = [];
         public List<Block> Blocks = [];
         public List<int> BlockCount = [];
 
@@ -120,7 +121,7 @@ namespace E_VCSP.Solver.SolutionState {
             Adj = [[], []];
             AdjFull = [[null, null], [null, null]];
 
-            HashSet<string> oldKnownBlocks = [.. KnownBlocks];
+            HashSet<Descriptor> oldKnownBlocks = [.. KnownBlocks];
             List<Block> oldBlocks = [.. Blocks];
             List<int> oldCounts = [.. BlockCount];
             Blocks.Clear();
@@ -192,7 +193,7 @@ namespace E_VCSP.Solver.SolutionState {
         }
 
         public CrewDuty? AddBlock(Block b, int count) {
-            string desc = b.Descriptor;
+            Descriptor desc = b.Descriptor;
             if (KnownBlocks.Contains(desc))
                 return null;
 

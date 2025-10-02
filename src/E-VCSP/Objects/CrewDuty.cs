@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects.ParsedData;
+using E_VCSP.Utils;
 using System.Collections;
 using System.Text.Json.Serialization;
 
@@ -27,8 +28,8 @@ namespace E_VCSP.Objects {
         public Location StartLocation;
         [JsonInclude]
         public Location EndLocation;
-        public string Descriptor {
-            get => Utils.Descriptor.Create(StartLocation, StartTime, EndLocation, EndTime);
+        public Descriptor Descriptor {
+            get => new(StartLocation, StartTime, EndLocation, EndTime);
         }
     }
 
@@ -184,7 +185,7 @@ namespace E_VCSP.Objects {
         public List<CrewDutyElement> Elements;
         public List<int> BlockIndexCover;
 
-        public List<string> BlockDescriptorCover;
+        public List<Descriptor> BlockDescriptorCover;
         [JsonInclude]
         public int Index = -1;
 

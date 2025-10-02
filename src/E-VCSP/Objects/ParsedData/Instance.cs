@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Parsing;
+using E_VCSP.Utils;
 
 namespace E_VCSP.Objects.ParsedData {
     public class Instance {
@@ -14,8 +15,8 @@ namespace E_VCSP.Objects.ParsedData {
         public List<DeadheadTemplate> DeadheadTemplates;
         public List<DeadheadTemplate> ExtendedTemplates;
 
-        public Dictionary<string, List<int>> StartDescriptorToTripIndex = [];
-        public Dictionary<string, List<int>> EndDescriptorToTripIndex = [];
+        public Dictionary<DescriptorHalf, List<int>> StartDescriptorToTripIndex = [];
+        public Dictionary<DescriptorHalf, List<int>> EndDescriptorToTripIndex = [];
 
         public Instance(string path) {
             Path = path;
@@ -41,11 +42,11 @@ namespace E_VCSP.Objects.ParsedData {
                 Trips[i].Id = "t" + i;
 
                 // Create trip lookup based on start location + time, and end location + time
-                string startDesc = Utils.Descriptor.Create(Trips[i].StartLocation, Trips[i].StartTime);
+                DescriptorHalf startDesc = new(Trips[i].StartLocation, Trips[i].StartTime);
                 StartDescriptorToTripIndex.TryAdd(startDesc, []);
                 StartDescriptorToTripIndex[startDesc].Add(i);
 
-                string endDesc = Utils.Descriptor.Create(Trips[i].EndLocation, Trips[i].EndTime);
+                DescriptorHalf endDesc = new(Trips[i].EndLocation, Trips[i].EndTime);
                 EndDescriptorToTripIndex.TryAdd(endDesc, []);
                 EndDescriptorToTripIndex[endDesc].Add(i);
             }

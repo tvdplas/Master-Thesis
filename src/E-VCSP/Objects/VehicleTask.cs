@@ -1,4 +1,5 @@
 ﻿using E_VCSP.Objects.ParsedData;
+using E_VCSP.Utils;
 using System.Collections;
 using System.Text.Json.Serialization;
 
@@ -307,7 +308,7 @@ namespace E_VCSP.Objects {
         /// <summary>
         /// Block descriptors covered by task 
         /// </summary>
-        public List<string> BlockDescriptorCover = [];
+        public List<Descriptor> BlockDescriptorCover = [];
         /// <summary>
         /// Elements used in task
         /// </summary>

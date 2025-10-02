@@ -1,18 +1,19 @@
 ﻿using E_VCSP.Objects;
 using E_VCSP.Solver.SolutionState;
+using E_VCSP.Utils;
 
 namespace E_VCSP.Solver {
     public abstract class VehicleColumnGen(VehicleSolutionState vss) {
         // Information about current instance state
         public VehicleSolutionState vss = vss;
         public List<double> tripDualCosts = [];
-        public Dictionary<string, double> blockDualCosts = [];
-        public Dictionary<string, List<double>> blockDualCostsByStart = [];
+        public Dictionary<Descriptor, double> blockDualCosts = [];
+        public Dictionary<DescriptorHalf, List<double>> blockDualCostsByStart = [];
 
         public void UpdateDualCosts(
             List<double> newTripDualCosts,
-            Dictionary<string, double> newBlockDualCosts,
-            Dictionary<string, List<double>> newBlockDualCostsByStart
+            Dictionary<Descriptor, double> newBlockDualCosts,
+            Dictionary<DescriptorHalf, List<double>> newBlockDualCostsByStart
         ) {
             tripDualCosts = newTripDualCosts;
             blockDualCosts = newBlockDualCosts;
