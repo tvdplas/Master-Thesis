@@ -1178,7 +1178,7 @@ A collection of instances was also provided by Qbuzz. A summary of each of these
   \centering
   \begin{tabular}{lcrrrrrcc}
     \toprule
-       \textbf{Name} & \textbf{Lines} & $|\mathcal{T}|$ & $|\mathcal{L}_c|$ & $|\mathcal{L}_{rl}|$ & $|\mathcal{L}_{cb}|$ & Range & $cost_{VT,min}$ & $cost_{CR,min}$ \\
+       \textbf{Name} & \textbf{Lines} & $|\mathcal{T}|$ & $|\mathcal{L}_c|$ & $|\mathcal{L}_{rl}|$ & $|\mathcal{L}_{cb}|$ & \textbf{Range} & $cost_{VT,min}$ & $cost_{CR,min}$ \\
         \cmidrule(lr){1-1}\cmidrule(lr){2-6} \cmidrule(lr){7-7} \cmidrule(lr){8-9}
         \texttt{terschelling}   & 3 & 53 & 1 & 1 & 1 & 115km & 1150 & 2046 \\
         \texttt{leiden-1-2}  & 2 & 124 & 2 & 3 & 1 & 72km & 2597 & 7955 \\
@@ -1227,44 +1227,42 @@ The instances have been visualized in Figure \ref{fig:leiden-map}, again using d
 \end{figure}
 
 \subsection{Parameter selection}
-During our methods, we defined a number of parameters which influence the outcome of the overall algorithm. We will therefore now discuss the effects of a number of noteworthy parameters on both the E-VSP, CSP and E-VCSP solution quality. In these experiments, we will use the instance \texttt{leiden-1-2} due to its medium size and inclusion of multiple locations of interest.  
+During our methods, we defined a number of parameters which can influence the outcome of the overall algorithm. We will therefore now discuss the effects of a number of noteworthy parameters on both the E-VSP, CSP and E-VCSP solution quality. In these experiments, we will use the instance \texttt{leiden-1-2} due to its medium size and inclusion of multiple locations of interest.  
 
 \subsubsection{Secondary columns}
-As mentioned during our methods, we use a number of secondary column sources in order to increase the overall number of unique columns available during the final solve. 
+During our column generation, a number of secondary column sources is included. Their aim is to improve the final solution by making columns available which may not be optimal in the relaxation. 
 
-% # divs 
+For both labeling algorithms, we do this by selecting some number of columns with negative reduced cost, then blocking parts of these columns off in the generation graph before rerunning the labeling. The best columns found after rerunning are then included. In order to test the effectiveness of this approach. In this, let us take $N$ as the number of primary columns which are used as a base, and let $M$ be the number of different trip subsets that we block using a base. We run our tests with a maximum of 50 primary columns per round extracted, selecting a maximum of 50 secondary columns per blocked of set of trips. Additionally, a Gurobi timeout of 60 seconds is set on the final ILP; all test cases hit this limit before proving optimality. For each test case, we report the resulting model value, the gap and the number of unique columns generated. This overview can be seen in Table \ref{tab:evsp-secondary-columns}. 
 
 \begin{table}[h]
   \centering
-  \begin{tabular}{llccccccccc}
+  \begin{tabular}{llrrrrrr}
     \toprule
-    \multicolumn{2}{c}{Blocking rounds} & $0$ & $1$ & $2$ & $3$ & $4$ & $5$ & $6$ & $7$ & $8$ \\
-    \cmidrule(lr){1-2}\cmidrule(lr){3-11}
-    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    $divs=0$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    && $N=0$ & $N=1$ & $N=2$ & $N=4$ & $N=8$ & $N=16$ \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-8}
     \addlinespace[0.4em]
-    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    $divs=4$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    \addlinespace[0.4em]
-    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    $divs=8$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    \addlinespace[0.4em]
-    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    $divs=12$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    \addlinespace[0.4em]
-    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    $divs=16$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-    \bottomrule
+    & \textbf{value}  & 3621.8 & 3397.5 & 3383.7 & 3380.7 & 3395.8 & 3371.9 \\
+    $M=4$ & \textbf{gap}   & 13.3 & 7.5 & 8.9 & 8.8 & 9.6 & 10 \\
+    & \textbf{cols} & 3954 & 7858 & 8034 & 15871 & 18901 & 28007 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-8}
+    & \textbf{value}  & 3621.8 & 3404.1 & 3383.7 & 3380.7 & 3395.8 & 3371.9 \\
+    $M=8$ & \textbf{gap}   & 13.3 & 7.6 & 8.9 & 8.8 & 9.6 & 10 \\
+    & \textbf{cols} & 3954 & 7858 & 8034 & 15871 & 18901 & 28007 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-8}
+    & \textbf{value}  & 3621.8 & 3404.1 & 3383.7 & 3380.5 & 3395.8 & 3371.9 \\
+    $M=12$ & \textbf{gap}   & 13.3 & 7.6 & 8.9 & 8.8 & 9.6 & 10 \\
+    & \textbf{cols} & 3954 & 7858 & 8034 & 15871 & 18901 & 28007 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-8}
+    & \textbf{value}  & 3621.8 & 3404.1 & 3383.7 & 3380.9 & 3395.8 & 3371.9 \\
+    $M=16$ & \textbf{gap}   & 13.3 & 7.6 & 8.9 & 8.8 & 9.6 & 10 \\
+    & \textbf{cols} & 3954 & 7858 & 8034 & 15871 & 18901 & 28007 \\
+    \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effect of secondary column parameter $n$ on solution quality for \texttt{leiden-1-2}. }
-  \label{tab:secondary-columns}
+  \caption{Effect of secondary columns on \texttt{leiden-1-2}.}
+  \label{tab:evsp-secondary-columns}
 \end{table}
 
+As we can see, the number of columns we use as a base is more important than the number of ways we subdivide trips in order to block; only $N=2$ and 4 show slight variations in the objective value. Next, we see that we are generally able to find a better solution within the timelimit with higher $N$. We do however see that $N=8$ is worse than $N=2$ and 4; this is most likely caused by the number of columns causing Gurobi to make different choices in its solving strategy and heuristics. Based on this, we will use $N=16$ and $M=4$ for all vehicle labeling going forward. 
 
 \section{Discussion}
 \todo{Uitwerken; is nu gewoon een lijstje met dingen die ooit besproken zijn / mij persoonlijk nog interessant lijken.}

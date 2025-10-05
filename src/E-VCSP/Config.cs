@@ -43,8 +43,8 @@
         public static int VSP_LB_MAX_COLS = 50;
         public static int VSP_LB_MIN_TRIPS = 3; // min number of trips in a single vehicle task
         public static int VSP_LB_SOC_BINS = 101; // Charge values within epsilon of eachother will be considered the same
-        public static int VSP_LB_SEC_COL_COUNT = 9; // Number of primary columns to generate secondary columns for 
-        public static int VSP_LB_SEC_COL_ATTEMPTS = 10; // Number of attempts per secondary column
+        public static int VSP_LB_SEC_COL_COUNT = 16; // Number of primary columns to generate secondary columns for 
+        public static int VSP_LB_SEC_COL_ATTEMPTS = 4; // Number of attempts per secondary column
 
         public static Header VSP_LS_SHARED = new();
         public static bool VSP_LS_SHR_EXPAND_AVT = true;

@@ -75,12 +75,42 @@ namespace E_VCSP {
             }
         }
 
+        async void vspTargetVehicles() {
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: vsp secondary columns");
+
+            int minMaxVehicles = 5;
+            int maxMaxVehicles = 15;
+
+            reload(); // Ensure instance and solver are ready
+            if (vss == null || vspSolver == null) return;
+
+            Config.VSP_SOLVER_TIMEOUT_SEC = 60;
+
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}max vh;value;cols;mipgap;runtime");
+
+            for (int i = minMaxVehicles; i <= maxMaxVehicles; i++) {
+                Config.MAX_VEHICLES = i;
+
+                vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
+                vspSolver = new EVSPCG(vss);
+
+                ctSource = new();
+                var token = ctSource.Token;
+                bool success = false;
+                success = await Task.Run(() => vspSolver.Solve(token), token);
+                ctSource?.Dispose(); // Dispose the source
+                ctSource = null;
+                Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{vss.Costs()};{vss.Tasks.Count};{vspSolver.model.MIPGap};{vspSolver.model.Runtime}");
+            }
+        }
+
         public MainView() {
             InitializeComponent();
             splitContainer.Panel1.Controls.Add(rd);
 
             experiments.Add(none);
             experiments.Add(vspSecondaryColumns);
+            experiments.Add(vspTargetVehicles);
 
             // Add all experiments to comboBox1
             comboBox1.Items.Clear();
