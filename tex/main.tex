@@ -1230,7 +1230,40 @@ The instances have been visualized in Figure \ref{fig:leiden-map}, again using d
 During our methods, we defined a number of parameters which influence the outcome of the overall algorithm. We will therefore now discuss the effects of a number of noteworthy parameters on both the E-VSP, CSP and E-VCSP solution quality. In these experiments, we will use the instance \texttt{leiden-1-2} due to its medium size and inclusion of multiple locations of interest.  
 
 \subsubsection{Secondary columns}
-As mentioned during our methods, we use a number of secondary column sources in order to increase the overall number of unique columns available during the final solve. Th e
+As mentioned during our methods, we use a number of secondary column sources in order to increase the overall number of unique columns available during the final solve. 
+
+% # divs 
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{llccccccccc}
+    \toprule
+    \multicolumn{2}{c}{Blocking rounds} & $0$ & $1$ & $2$ & $3$ & $4$ & $5$ & $6$ & $7$ & $8$ \\
+    \cmidrule(lr){1-2}\cmidrule(lr){3-11}
+    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    $divs=0$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \addlinespace[0.4em]
+    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    $divs=4$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \addlinespace[0.4em]
+    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    $divs=8$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \addlinespace[0.4em]
+    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    $divs=12$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \addlinespace[0.4em]
+    & value  & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    $divs=16$ & cols   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    & mipgap & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+  \caption{Effect of secondary column parameter $n$ on solution quality for \texttt{leiden-1-2}. }
+  \label{tab:secondary-columns}
+\end{table}
 
 
 \section{Discussion}

@@ -11,7 +11,7 @@
         public static int THREAD_COUNT = 10;
 
         public static Header GUROBI = new();
-        public static bool GRB_EXTEND_TIME = true;
+        public static bool GRB_EXTEND_TIME = false;
         public static int GRB_MAX_EXTENDED_TIME = 60 * 60 * 2;
         public static double GRB_TARGET_GAP = 0.005;
 

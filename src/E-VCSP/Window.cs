@@ -45,8 +45,8 @@ namespace E_VCSP {
         async void vspSecondaryColumns() {
             Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: vsp secondary columns");
 
-            const int attempts = 10;
-            const int subdivisions = 2 * 10;
+            const int attempts = 16;
+            const int subdivisions = 16;
 
             reload(); // Ensure instance and solver are ready
             if (vss == null || vspSolver == null) return;
@@ -56,9 +56,9 @@ namespace E_VCSP {
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
 
 
-            for (int i = 0; i < attempts; i++) {
+            for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
                 Config.VSP_LB_SEC_COL_ATTEMPTS = i;
-                for (int j = 0; j < subdivisions; j += 4) {
+                for (int j = 0; j <= subdivisions; j += 4) {
                     Config.VSP_LB_SEC_COL_COUNT = i;
 
                     vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
