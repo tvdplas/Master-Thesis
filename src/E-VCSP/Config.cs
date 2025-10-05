@@ -3,6 +3,8 @@
     public static class Config {
         // Graph display
         public static Header DEBUG = new();
+        public static bool GLOBAL_CONSOLE_KILL = true;
+        public static string CNSL_OVERRIDE = "[CNSL]";
         public static bool CONSOLE_GUROBI = false;
         public static bool DUMP_VSP = false;
         public static bool DUMP_CSP = false;

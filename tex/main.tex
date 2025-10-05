@@ -24,7 +24,7 @@ Effective use of these new electric vehicles is however more challenging than th
 
 In the VSP and its variants, a commonly made assumption is that a vehicle can travel an entire day without having to refuel. With electric vehicles, this assumption is often not valid: recharging throughout the day is required as the range of an electric vehicle is limited. Additionally, recharging takes a long time when compared to the refueling of a combustion vehicle: refueling can be done in a matter of minutes, whereas recharging may take multiple hours for a full charge. The electrification of fleets therefore requires the VSP to be adapted to include maximum range constraints, as well as charging possibilities within a vehicle task. This extended version of the problem, often referred to as the Electric Vehicle Scheduling Problem (E-VSP), is significantly harder than its non-electric counterpart; the VSP with a single depot can be solved in polynomial time, whereas the E-VSP is NP-Hard as shown by \citet{Bunte2009} and \citet{Sassi2014} respectively.
 
-As self-driving vehicles are not in general use yet at time of writing, buses also require a driver in order to be operated. The Crew Scheduling Problem (CSP) is therefore commonly the step that follows vehicle scheduling; in this, the objective is to make an assignment of drivers such that a driver is always present when a vehicle is moving. A driver may drive multiple vehicles throughout the day, handing vehicles over to other drivers at designated relief locations. Driver shifts consisting of driving time and breaks are constructed while following local labor regulations. The CSP is also NP-Hard, as shown by \citet{Fischetti1989}.
+As self-driving vehicles are not in general use yet at time of writing, buses also require a driver in order to be operated. The Crew Scheduling Problem (CSP) is therefore commonly the step that follows vehicle scheduling; in this, the objective is to make an assignment of drivers such that a driver is always present when a vehicle is moving. A driver may drive multiple vehicles throughout the day, handing vehicles over to other drivers at designated relief points. Driver shifts consisting of driving time and breaks are constructed while following local labor regulations. The CSP is also NP-Hard, as shown by \citet{Fischetti1989}.
 
 Costs in the crew scheduling step often exceed those associated with the vehicles themselves, with an estimate by \citet{Perumal2019Crew} putting crew member costs at around 60\% of overall operational costs. Optimal solutions for the CSP are directly influenced by the selected vehicle tasks; depending on which deadhead is selected, the amount of vehicle idle time before a trip may vary. It may therefore not always be feasible for a driver to perform a handover or break between two trips depending on the deadheads used in the vehicle tasks. Sequentially minimizing costs in the VSP and CSP may therefore not result in a solution with overall lowest costs, as the crew schedules in the CSP may be improved greatly by incurring higher driving costs in the VSP. This was already pointed out in the 1980s by \citet{Bodin1983}, who instead advocated for an integrated approach; here, the costs of the VSP and CSP are minimized simultaneously, resulting in the Vehicle and Crew Scheduling Problem (VCSP). \\
 
@@ -174,8 +174,8 @@ Overall, the goal is to find a set of feasible vehicle tasks and crew duties tha
     \multicolumn{2}{l}{\textit{Helper notation}} \\
     $B_\chi \subseteq B$ & Set of blocks in $\chi$ \\ 
     $km(vt)$ & Kilometers traveled during $vt$ \\ 
-    $chg(vt)$ & KWh gained during $vt$ \\ 
-    $chl(vt)$ & KWh used during $vt$ \\ 
+    $chg(vt)$ & kWh gained during $vt$ \\ 
+    $chl(vt)$ & kWh used during $vt$ \\ 
     $br(cd)$ & Total break time in $cd$ \\ 
     $dur(\chi)$ & Total duration of $\chi$ \\ 
     $cost(\chi)$ & Cost of schedule $\chi$ \\ 
@@ -380,7 +380,7 @@ across different instances when compared to a sequential approach.
 
 \citet{Wang2022} introduce a two layered model which allows for a mix of traditional combustion and electric buses using Particle Swarm Optimization and an $\epsilon$-constraint based mechanism. The model incorporates partial depot charging, as well as measures to ensure that crew is primarily assigned to the same vehicle throughout the day. A circular bus route with a single depot in Changchun, China with 68 daily trips is used as a basis for testing, with a focus on electric versus diesel usage and driver satisfaction.
 
-\citet{Sistig2023} also offer an ALNS based approach, which aims to incorporate additional flexibility in vehicle scheduling when compared to the work presented by \citet{Perumal2021} by including partial recharges and opportunistic charging at terminal stops of trips. A set ALNS neighborhoods are used in order to solve, where each neighborhood follows a 3-step structure: first a number of improvement rounds is done on the current vehicle solution, then the current crew solution is updated to match the new vehicle solution, before finally doing a number of improvement rounds on the crew solution. The vehicle and crew improvement rounds are themselves also implemented using ALNS algorithms, resulting in nested ALNS rounds being performed. The upper level 3-step neighborhoods only differ in the number of rounds done in each of the two nested ALNS. This approach is tested using an instance of a city route in Germany, with a single depot and a total of 282 trips. Different scenarios based on possible crew break and relief locations were considered in order to compare diesel and electric TCO. Additionally, sensitivity analysis of the TCO was done for parameters such as costs for electricity and drivers.
+\citet{Sistig2023} also offer an ALNS based approach, which aims to incorporate additional flexibility in vehicle scheduling when compared to the work presented by \citet{Perumal2021} by including partial recharges and opportunistic charging at terminal stops of trips. A set ALNS neighborhoods are used in order to solve, where each neighborhood follows a 3-step structure: first a number of improvement rounds is done on the current vehicle solution, then the current crew solution is updated to match the new vehicle solution, before finally doing a number of improvement rounds on the crew solution. The vehicle and crew improvement rounds are themselves also implemented using ALNS algorithms, resulting in nested ALNS rounds being performed. The upper level 3-step neighborhoods only differ in the number of rounds done in each of the two nested ALNS. This approach is tested using an instance of a city route in Germany, with a single depot and a total of 282 trips. Different scenarios based on possible crew break and relief points were considered in order to compare diesel and electric TCO. Additionally, sensitivity analysis of the TCO was done for parameters such as costs for electricity and drivers.
 
 \citet{Shen2023} provide a minimum-cost flow based framework for the E-VCSP. They consider the single depot variant, in which partial recharges are possible. Solutions are found by first generating a subset of all feasible blocks and corresponding crew duties using a matching-based heuristic approach. Afterwards, a MIP formulation is used to select crew duties and create corresponding vehicle tasks that cover all trips. A city line in China with 270 daily trips and a single depot is used for testing, resulting in cost savings of up to 8.7\% when compared to a sequential approach.
 
@@ -469,11 +469,11 @@ With this, we have completed all modifications required in order to solve the E-
   \label{fig:evsp-graph}
 \end{figure}
 
-For all detour arcs, we assume that the time at the charging location is maximized. This means that we always perform the deadhead towards the charging location at the earliest possible time, and the deadhead to the next trip at the latest possible time. For base arcs, let us also uniquely define where we will spend our idle time by maximizing time at a charging location if one is present. If no charging location is present, instead attempt to maximize time spent at a relief location. If no relief locations are present or a tie occurs, maximize time spent at the starting location. 
+For all detour arcs, we assume that the time at the charging location is maximized. This means that we always perform the deadhead towards the charging location at the earliest possible time, and the deadhead to the next trip at the latest possible time. For base arcs, let us also uniquely define where we will spend our idle time by maximizing time at a charging location if one is present. If no charging location is present, instead attempt to maximize time spent at a relief point. If no relief points are present or a tie occurs, maximize time spent at the starting location. 
 
-For both types of arcs, we have now uniquely defined the sequence of deadheads and idles which take place before performing the next trip; as this trip is already known, let us include it into our arc as well. Each arc between trips in $A_{vt}$ can therefore be defined as containing 1 or 2 deadheads, a (charging) idle and a trip. Using this, the cost of an arc can be defined as the driving cost of all movements plus the KWh cost of the energy used during the arc. As a consequence of this formulation, we note that each trip node $t \in V_{vt}$ represents the point in time directly following its corresponding trip; nodes do not have an associated cost, as this is already included in the arcs. 
+For both types of arcs, we have now uniquely defined the sequence of deadheads and idles which take place before performing the next trip; as this trip is already known, let us include it into our arc as well. Each arc between trips in $A_{vt}$ can therefore be defined as containing 1 or 2 deadheads, a (charging) idle and a trip. Using this, the cost of an arc can be defined as the driving cost of all movements plus the kWh cost of the energy used during the arc. As a consequence of this formulation, we note that each trip node $t \in V_{vt}$ represents the point in time directly following its corresponding trip; nodes do not have an associated cost, as this is already included in the arcs. 
 
-Any feasible vehicle task can now be described as a path in $G$ from $d_s$ to $d_e$. The costs for a task can be defined as a base cost of using a vehicle plus the sum of all used arc costs. In this, we make the assumption that the cost of energy remains constant throughout the day and at different charging locations, and that vehicles will be fully recharged overnight for the same KWh cost as during the day. Additionally, note that not every path from $d_s$ to $d_e$ describes a feasible vehicle task; depending on the arcs used, the amount of time that a vehicle has to charge may not be sufficient in order to keep it within SoC bounds during the task. As we previously defined how much time is spent at a charging location during an arc, this information can be used to determine whether a given path through the graph is a feasible task or not.
+Any feasible vehicle task can now be described as a path in $G$ from $d_s$ to $d_e$. The costs for a task can be defined as a base cost of using a vehicle plus the sum of all used arc costs. In this, we make the assumption that the cost of energy remains constant throughout the day and at different charging locations, and that vehicles will be fully recharged overnight for the same kWh cost as during the day. Additionally, note that not every path from $d_s$ to $d_e$ describes a feasible vehicle task; depending on the arcs used, the amount of time that a vehicle has to charge may not be sufficient in order to keep it within SoC bounds during the task. As we previously defined how much time is spent at a charging location during an arc, this information can be used to determine whether a given path through the graph is a feasible task or not.
 
 \subsubsection{Solving}
 In order to now solve the E-VSP, a collection of feasible vehicle tasks that cover the trips $\mathcal{T}$ must be found. In order to do this, we use a column generation approach; this has previously been shown to be an effective solution method for the E-VSP by works such as \citet{vanKootenNiekerk2017}, \citet{Zhang2021} and \citet{deVos2024}. The ILP used to model this is based on a set covering formulation. In this let $VT$ represent the available set of vehicle tasks, let $x_{i}$ be a binary decision variable indicating the use of vehicle task $vt_i \in VT$, and let $k_{i,t}$ be a parameter defining whether vehicle task $vt_i$ includes the trip $t \in \mathcal{T}$.
@@ -1101,36 +1101,137 @@ Next, let us add two penalty parameters $P_{vt}$ and $P_{cd}$ respectively to ou
 \end{align}
 
 \section{Implementation}
-Implementation was done in .NET 8, running on a Windows 11 machine with an AMD Ryzen 3600 desktop processor with 6 cores and 12 threads, and 32 GB of DDR4 3200 MHz RAM. Gurobi 12.0.2 was used for solving the LP and ILP problems. Full source code is available at \url{https://github.com/tvdplas/Master-Thesis}.
+In this section, we will discuss the hardware and software used in our implementation of our methods. Additionally. we will highlight any methods which were parallelized in order to make the implementation more computationally efficient. 
+
+\subsection{Hardware and software}
+Implementation of the described algorithms was done in C\# .NET 8, running in Release mode. Additionally, Server Garbage Collection was turned on in order to improve performance when multithreading. Gurobi 12.0.2 (\citet{Gurobi2025}, Academic License) was used modeling and solving the (I)LP problems. A schedule visualization and config tool was also included, made in Windows Forms. Full source code has been made available at \url{https://github.com/tvdplas/Master-Thesis}.
+
+All experiments were run on a Windows 11 machine with an AMD Ryzen 3600 desktop processor (3.6GHz, 6 cores/12 threads) and 32 GB of DDR4 3200 MHz RAM.  
 
 \subsection{Parallelism}
-During implementation of our methods, it was found that there were a number of components which could be easily parallelized. As this led to significant decreases in overall computation time, we will give an overview of these components, as well as highlighting some significant parts of the algorithm which cannot be parallelized.
+During implementation of our methods, it was found that there were a number of components which could be easily parallelized. As this led to significant decreases in overall computation time, we will give an overview of these components, as well as highlighting parts of the algorithm where parallelism was not found to be beneficial.
 
-\subsection{Column generation - Labeling}
+\subsubsection{Column generation - Labeling}
 For the labeling based approaches, two key components of the algorithm were identified as being parallelizable while also having a high impact on the overall runtime: label propagation and the generation of secondary columns. We will now discuss each of these in more detail. 
 
-\subsubsection{Label propagation}
+\paragraph{Label propagation}
 Given a label $l$ in a node $v$, the propagation of $l$ to all nodes $u$ such that $(v, u) \in A$ is largely independent; this could therefore be done in parallel. As the number of outgoing arcs from a node can be quite high, this would in theory result in a significant reduction in the time required to fully propagate all labels. In practice however, two problems were observed: 
 
 Firstly, in the case of vehicle column generation, a pair of nodes may be linked by multiple arcs; this in turn implies that multiple labels may be added to a single node $u$ when propagating $l$ from $v$. In order to handle this properly, additional computational work is required, either by adding a lock to the list of active labels in $u$ or by doing these arcs sequentially. Both of these options decrease the effectiveness of a parallel propagation approach. 
 
 Secondly, the overhead of thread scheduling for operations of this size is significant; even when considering batches of either arcs or labels as thread tasks, overall computation time was observed to increase instead of decrease when compared to a simple sequential approach. It was therefore concluded that the propagation of labels was not a suitable target for parallelization.
 
-\subsubsection{Secondary column generation}
+\paragraph{Secondary column generation}
 Another candidate for parallelization was the generation of secondary columns. As described in more detail in Sections \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}, batches of secondary columns are generated by running the labeling algorithm again with a subset of nodes being blocked. Each of these individual runs is independent and takes a significant amount of time, making this a prime candidate for parallelization.
 
 After implementing parallel generation of batches of secondary columns, significant performance gains were observed; given our particular hardware, a 5-10x reduction in required computation time was observed for the generation of secondary columns. We do note that this incurs significant memory usage; if not properly managed, garbage collection will dominate overall CPU time, preventing any improvements. \todo{loopt niet lekker} 
 
-\subsection{Column generation - Local search}
+\subsubsection{Column generation - Local search}
 For local search based approaches, the randomized sequence of operations all but guarantees that two different runs given the same input data will result in a different resulting set of column. As a result of this, it can be interesting to run multiple local search processes, each with a different random seed; this approach, commonly known as multi-start, is an ideal target for parallelization as each process is completely independent and memory efficient. 
 
-
-\subsection{Subgradient optimization}
+\subsubsection{Subgradient optimization}
 Cost reevaluation during subgradient optimization was found to be a significant bottleneck during initial testing, as for each column the contribution of the contained trips and blocks needs to be updated in order to find $x$ and $y$. As this process is independent for each column, it was parallelized by splitting the set of columns into batches, each of which is processed by a separate thread. This resulted in a significant decrease in overall computation time.
 
 
 \section{Results}
-\todo{Hier iets zeggen over de instanties, het feit dat daar ook gelopen mag worden tussen locaties maar dat dit verwerkt is in signon/signoff/bruttonetto break tijden}.
+In this section, we will present the results of our integrated approach on a number of real-life instances. In order to do this, we will first specify the exact costs related to vehicles and crew, as well as the instances which were used for testing. Then, we will discuss parameter selection for each of the methods used, before finally discussing the results of both our sequential and integrated approaches.
+
+\subsection{Costs}
+Based on information provided by the Dutch bus transport company Qbuzz, a cost function for both vehicles and crew was formulated. For vehicles, the costs of a vehicle task $vt_i$ are defined as follows:
+\begin{equation}
+cost(vt_i) = 200 + 0.05 \cdot km(vt_i) + 0.32 \cdot chl(vt_i)  \nonumber
+\end{equation}
+Where $km(vt_i)$ is the total distance driven in kilometers and $chl(vt_i)$ is the total energy used in kWh. In this, the fixed costs of 200 incorporate factors such as insurance and depreciation, the distance costs of 0.05 represent driving related maintenance costs, and energy costs are a pessimistic estimate of the average kWh cost in the Netherlands based on data provided by the \citet{ANWB2025}.
+
+For crew duties, the costs of a duty $cd_j$ are defined as follows:
+\begin{equation}
+  cost(cd_j) =
+  \begin{cases}
+    120 + 65 \cdot dur(cd_j) & \text{if } cd_j \text{ is of type }\textit{broken} \\ 
+    100 + 65 \cdot dur(cd_j) & \text{otherwise}
+  \end{cases}
+\end{equation}
+Here, $dur(cd_j)$ represents the total duration of the duty in hours (excluding long idle time in the case of a \textit{broken} duty). Crew members are paid an additional 20 euros when driving a \textit{broken} duty as an incentive, as this duty type is generally less convenient for the driver to plan their personal life around. The rest of the fixed and variable costs are based on paid hourly wages, pensions, insurance and additional administration costs.
+
+Given these costs, we can determine a lower bound for the cost of any solution as follows. Let $\mathcal{T}$ once again be the set of all trips to be covered, and let $s(t)$ and $e(t)$ represent the start and end time of a trip $t \in \mathcal{T}$ respectively. We now that for a given point in time $a$, there must be at least as many vehicles in our solution as there are trips active during $a$. We can therefore define the minimum number of required vehicles $VT_{min} = \max_{a} |\{ t \in \mathcal{T} \:|\: s(t) \leq a < e(t) \}|$. Additionally, regardless of the deadheads driven between trips, we know that at the very least we will drive the distance of each trip. Let $km(t)$ represent the distance driven during trip $t$, and let $chl(t)$ be defined similarly for the amount of charge used. Our lower bound on vehicle costs can then be defined as follows: 
+
+\begin{equation}
+  cost_{VT,min} = VT_{min} \cdot 200 + \sum_{t \in \mathcal{T}} (0.05 \cdot km(t) + 0.32 \cdot chl(t)) \nonumber
+\end{equation}
+
+For crew costs, let us define $dur(t)$ as the duration of trip $t$. As each trip must be covered by at least one crew member, we know that the minimum number of working hours is $h_{min} = $$\sum_{t \in \mathcal{T}} dur(t)$. In order to see how many duties are required to cover these hours, we must determine the optimal duty length. For this, we have 3 cases, depending on the minimum required breaktime: 
+\begin{itemize}
+  \item A duty of at most 4 hours, where the cost per worked hour is at least $(100 + 65 \cdot 4) / 4 = 90$.
+  \item A duty of more than 4 hours but at most 5.5 hours, where we are required to have at least 20 minutes of breaktime. Here, the cost per worked hour is at least $(100 + 65 \cdot 5.5) / (5.5 - \frac{1}{3}) \approx 88.6$.
+  \item A duty of more than 5.5 hours, where we are required to have at least 40 minutes of breaktime. Here, the cost per worked hour is at least $(100 + 65 \cdot 9) / (9 - \frac{2}{3}) = 82.2$, as we can have a duty of at most 9 hours.
+\end{itemize}
+It is clear that longer duties are prefered, however as we have the constraint that the average duty length may not exceed 8 hours, we cannot only use 9 hour duties. Let us therefore instead only use 8 hour long duties, which have a cost per worked hour of $(100 + 65 \cdot 8) / (8 - \frac{2}{3}) \approx 84.54$. Assuming that we can cover all required hours with 8 hour duties, we can now define a lower bound on crew costs as follows:
+\begin{equation}
+  cost_{CD,min} = 100 \cdot \lceil h_{min} / 8 \rceil + 65 \cdot h_{min} \nonumber
+\end{equation}
+The lower bound on any solution can now be defined as $cost_{min} = cost_{VT,min} + cost_{CD,min}$. We will include this bound for our instances as a baseline for solution quality. Note that this figure may be significantly lower than the actual optimal solution, as it does not take into account required elements such as deadhead driving, charging and visiting relief points.
+
+\subsection{Instances}
+A collection of instances was also provided by Qbuzz. A summary of each of these instances was provided in Table \ref{tab:instances}. We will now discuss each of these instances in more detail, along with any modifications required in order to turn the instances into feasible input for our algorithms. 
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{lcrrrrrcc}
+    \toprule
+       \textbf{Name} & \textbf{Lines} & $|\mathcal{T}|$ & $|\mathcal{L}_c|$ & $|\mathcal{L}_{rl}|$ & $|\mathcal{L}_{cb}|$ & Range & $cost_{VT,min}$ & $cost_{CR,min}$ \\
+        \cmidrule(lr){1-1}\cmidrule(lr){2-6} \cmidrule(lr){7-7} \cmidrule(lr){8-9}
+        \texttt{terschelling}   & 3 & 53 & 1 & 1 & 1 & 115km & 1150 & 2046 \\
+        \texttt{leiden-1-2}  & 2 & 124 & 2 & 3 & 1 & 72km & 2597 & 7955 \\
+        \texttt{leiden-3-4-14}  & 3 & 199 & 2 & 3 & 1 & 72km & 2629 & 9058 \\
+        \texttt{leiden}  & 5 & 323 & 2 & 3 & 1 & 72km & 5025 & 17013 \\
+        \bottomrule
+  \end{tabular}
+  \caption{Overview of the provided test cases. Range column represents the range of the available vehicles, converted to km.}
+  \label{tab:instances}
+\end{table}
+
+\subsubsection{Terschelling}
+The instance \texttt{terschelling} represents a small island in the north of the Netherlands with around 4900 inhabitants (municipality census data, \citet{Terschelling2025}). 3 lines are included, with a total of 53 trips being driven on a daily basis. There is a single location of interest: a combination depot / charging location / crew hub located the south-east of the island in the village Halfweg. 
+
+The instance contains 2 different bus types which are present on the island totalling 6 available vehicles; as we only consider a single vehicle type without hard constraints on the number of vehicles used, the vehicle with larger action radius was selected for use in testing. The resulting vehicle has a raw capacity of 172.8 kWh or 135 km; the bottom 15\% of the battery is considered unusable, leaving us with around 149 kWh or 115 km of usable capacity. The charging of this vehicle is done at 40 kW or 31 km/h, regardless of the SoC.
+
+In real life, modified labor regulations are applied to this instance due to its small size; we will ignore these modifications, and apply the simplified Dutch labor regulations discussed previously. We note however that the original timetabling of trips may therefore not be aligned with the crew schedules we are allowed to make.
+
+A visual representation of this instance has been provided in Figure \ref{fig:terschelling-map}, using data from \citet{OpenStreetMap2025} and using \citet{QGIS2025} for map rendering. The depot is marked by three horizontal colored dots, indicating that the location is a relief point, crew hub and charging location. 
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{images/terschelling-instance.png}
+  \caption{Map overview of the \texttt{terschelling} instance, containing the lines 1 (red), 2 (green) and 9 (blue).}
+  \label{fig:terschelling-map}
+\end{figure}
+
+\subsubsection{Leiden}
+The instance \texttt{leiden} represents the city of Leiden in the Netherlands, with a population of around 130 thousand people (municipality census data, \citet{Leiden2025}). The city has a large student population due to the presence of Leiden University, with 21\% of all inhabitants being between the ages of 18-26. Additionally, public transport for students in the Netherlands is free, resulting in higher than usual demand for city bus lines. The instance considers 5 lines, all of which either remain within the city bounds or travel to the adjacent city of Leiderdorp. In total, 324 trips are driven on a daily basis. 
+
+There are 3 locations of interest in the instance: the depot, the central train station (Station Leiden Centraal) and a secondary train station (Station De Vink). The depot is also a crew hub and charging location, allowing for charging speeds of up to 150 kW. The central train station is a relief point, and is a 6-minute walk from the depot. The secondary train station is a relief point and charging location, allowing for charging speeds of up to 200 kW.
+
+Only one bus type is provided in the instance, with no limit for the number of usable vehicles. This vehicle type has a raw capacity of around 128 kWh or 90km, with the bottom 20\% of the battery being considered unusable. The usable capacity is therefore 102 kWh or 72 km. Charging between 0 and 80\% can be done with a rate of up to 200 kW or 140 km/h, decreasing to 100 kW or 70 km/h when charging between 80 and 100\%.
+
+In real life, crew duties in this instance are allowed to walk between the depot and the central train station; this is used in order to allow easier signing on and off of crew members, as there are no trips which have the depot as an endpoint. As we do not allow for crew movements without the use of a vehicle in our algorithm, we modified the instance by turning the central station into a crew hub as well; sign-on and off times for the central station incorporate the 6-minute walking time, thereby modeling a crew member signing on at the depot and then directly walking to their vehicle at the central station. 
+
+Two additional instances were created based on the \texttt{leiden} instance: \texttt{leiden-1-2} and \texttt{leiden-3-4-14}. \texttt{leiden-1-2} was created by only considering trips in the lines 1 and 2 of the original instance, leaving everything else the same. \texttt{leiden-3-4-14} was constructed similarly, now using lines 3, 4 and 14.
+
+The instances have been visualized in Figure \ref{fig:leiden-map}, again using data from \citet{OpenStreetMap2025} and using \citet{QGIS2025} for map rendering. As before, circles represent locations of interest, with charging locations being orange, relief points being pink and crew bases being light blue. Circles which are horizontally adjacent represent a single location which has multiple facilities.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{images/leiden-instance.png}
+  \caption{Map overview of the \texttt{leiden} instance, containing the lines 1 (blue), 2 (green), 3 (red), 4 (purple) and 14 (yellow). The central station is counted as a crew hub to simulate walking between locations.}
+  \label{fig:leiden-map}
+\end{figure}
+
+\subsection{Parameter selection}
+During our methods, we defined a number of parameters which influence the outcome of the overall algorithm. We will therefore now discuss the effects of a number of noteworthy parameters on both the E-VSP, CSP and E-VCSP solution quality. In these experiments, we will use the instance \texttt{leiden-1-2} due to its medium size and inclusion of multiple locations of interest.  
+
+\subsubsection{Secondary columns}
+As mentioned during our methods, we use a number of secondary column sources in order to increase the overall number of unique columns available during the final solve. Th e
+
 
 \section{Discussion}
 \todo{Uitwerken; is nu gewoon een lijstje met dingen die ooit besproken zijn / mij persoonlijk nog interessant lijken.}

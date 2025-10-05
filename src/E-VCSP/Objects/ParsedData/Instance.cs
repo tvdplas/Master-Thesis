@@ -130,6 +130,30 @@ namespace E_VCSP.Objects.ParsedData {
                         ? FrequencyChange.SingleTrip
                         : FrequencyChange.EndOfTrip;
             }
+
+
+            // Determine minimum cost of instance.
+            List<(int t, int s)> flips = [];
+            foreach (Trip t in Trips) {
+                flips.Add((t.StartTime, 1));
+                flips.Add((t.EndTime, -1));
+            }
+            flips.Sort();
+            int max = 0, sum = 0;
+            for (int i = 0; i < flips.Count; i++) {
+                sum += flips[i].s;
+                max = Math.Max(max, sum);
+            }
+
+            double totalDistanceDriven = Trips.Sum(x => x.Distance);
+            double drivingCost = totalDistanceDriven * Constants.VH_M_COST;
+            double energyCost = (totalDistanceDriven * VehicleTypes[0].DriveUsage) / 100.0 * VehicleTypes[0].Capacity * Constants.KWH_COST;
+            double totalVehicleCost = max * Config.VH_PULLOUT_COST + drivingCost + energyCost;
+
+            double totalWorkingHours = Trips.Sum(x => x.Duration) / 60.0 / 60.0;
+            double totalCrewCost = Math.Ceiling(totalWorkingHours / 8.0) * Config.CR_SHIFT_COST + totalWorkingHours * Constants.CR_HOURLY_COST;
+
+            Console.WriteLine($"Min costs: {totalVehicleCost} + {totalCrewCost} = {totalVehicleCost + totalCrewCost}");
         }
     }
 }

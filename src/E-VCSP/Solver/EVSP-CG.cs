@@ -8,7 +8,7 @@ using System.Collections;
 
 namespace E_VCSP.Solver {
     public class EVSPCG : Solver {
-        private GRBModel? model;
+        public GRBModel? model;
         public VehicleSolutionState vss;
 
         public EVSPCG(VehicleSolutionState vss) {

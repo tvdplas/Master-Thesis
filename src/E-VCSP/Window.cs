@@ -23,6 +23,8 @@ namespace E_VCSP {
 
         RosterDisplay rd = new();
 
+        List<Action> experiments = [];
+
         bool working = false;
         int __view = 0; // 0: vehicles, 1: blocks, 2: duties, 3: general
         int view {
@@ -36,14 +38,68 @@ namespace E_VCSP {
             }
         }
 
+        void none() {
+            Console.WriteLine("Nothing happened.");
+        }
+
+        async void vspSecondaryColumns() {
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: vsp secondary columns");
+
+            const int attempts = 10;
+            const int subdivisions = 2 * 10;
+
+            reload(); // Ensure instance and solver are ready
+            if (vss == null || vspSolver == null) return;
+
+            Config.VSP_SOLVER_TIMEOUT_SEC = 60;
+
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
+
+
+            for (int i = 0; i < attempts; i++) {
+                Config.VSP_LB_SEC_COL_ATTEMPTS = i;
+                for (int j = 0; j < subdivisions; j += 4) {
+                    Config.VSP_LB_SEC_COL_COUNT = i;
+
+                    vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
+                    vspSolver = new EVSPCG(vss);
+
+                    ctSource = new();
+                    var token = ctSource.Token;
+                    bool success = false;
+                    success = await Task.Run(() => vspSolver.Solve(token), token);
+                    ctSource?.Dispose(); // Dispose the source
+                    ctSource = null;
+                    Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{vss.Costs()};{vss.Tasks.Count};{vspSolver.model.MIPGap};{vspSolver.model.Runtime}");
+                }
+            }
+        }
+
         public MainView() {
             InitializeComponent();
             splitContainer.Panel1.Controls.Add(rd);
+
+            experiments.Add(none);
+            experiments.Add(vspSecondaryColumns);
+
+            // Add all experiments to comboBox1
+            comboBox1.Items.Clear();
+            foreach (var exp in experiments) {
+                comboBox1.Items.Add(exp.Method.Name);
+            }
+
             Console.SetOut(new ConsoleIntercept(consoleView));
             Console.WriteLine("Program started");
 
             activeFolderLabel.Text = activeFolder;
             GenerateConfigUI();
+        }
+
+        // Add this event handler for the runExperiment button
+        private void runExperiment_Click(object sender, EventArgs e) {
+            if (comboBox1.SelectedIndex >= 0 && comboBox1.SelectedIndex < experiments.Count) {
+                experiments[comboBox1.SelectedIndex]();
+            }
         }
 
         private void GenerateConfigUI() {
@@ -146,21 +202,12 @@ namespace E_VCSP {
             }
         }
 
-        private void stopButtonClick(object sender, EventArgs e) {
-            if (ctSource != null && !ctSource.IsCancellationRequested) {
-                Console.WriteLine("Stopping");
-                ctSource.Cancel();
-                stopButton.Enabled = false; // Disable stop button immediately
-            }
-        }
-
         private async void solveVSPClick(object sender, EventArgs e) {
             reload(); // Ensure instance and solver are ready
             if (vspSolver == null) return;
 
             working = true;
             solveVSPButton.Enabled = false;
-            stopButton.Enabled = true;
             ctSource = new();
             var token = ctSource.Token;
 
@@ -185,7 +232,6 @@ namespace E_VCSP {
             finally {
                 working = false;
                 solveVSPButton.Enabled = true;
-                stopButton.Enabled = false;
                 ctSource?.Dispose(); // Dispose the source
                 ctSource = null;
             }
@@ -197,7 +243,6 @@ namespace E_VCSP {
 
             working = true;
             solveEVCSPButton.Enabled = false;
-            stopButton.Enabled = true;
             ctSource = new CancellationTokenSource();
             var token = ctSource.Token;
 
@@ -222,7 +267,6 @@ namespace E_VCSP {
             finally {
                 working = false;
                 solveEVCSPButton.Enabled = true;
-                stopButton.Enabled = false;
                 ctSource?.Dispose(); // Dispose the source
                 ctSource = null;
             }
@@ -233,7 +277,6 @@ namespace E_VCSP {
 
             solveVSPButton.Enabled = true;
             solveEVCSPButton.Enabled = true;
-            stopButton.Enabled = false;
             viewToggleButton.Enabled = false;
             solveCSPButton.Enabled = false;
 
@@ -288,7 +331,6 @@ namespace E_VCSP {
 
             working = true;
             solveCSPButton.Enabled = false;
-            stopButton.Enabled = true;
             ctSource = new CancellationTokenSource();
             var token = ctSource.Token;
 
@@ -310,7 +352,6 @@ namespace E_VCSP {
 
                 working = false;
                 solveCSPButton.Enabled = true;
-                stopButton.Enabled = false;
                 ctSource?.Dispose(); // Dispose the source
                 ctSource = null;
             }

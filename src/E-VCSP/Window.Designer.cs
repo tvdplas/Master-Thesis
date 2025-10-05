@@ -23,14 +23,14 @@ namespace E_VCSP
             activeFolderLabel = new Label();
             consoleView = new TextBox();
             configPanel = new Panel();
-            loadEVCSPButton = new Button();
+            comboBox1 = new ComboBox();
+            runExperiment = new Button();
             solveEVCSPButton = new Button();
             loadCSPResultButton = new Button();
             loadEVSPResultButton = new Button();
             solveCSPButton = new Button();
             viewToggleButton = new Button();
             solveVSPButton = new Button();
-            stopButton = new Button();
             button2 = new Button();
             button3 = new Button();
             button4 = new Button();
@@ -79,14 +79,14 @@ namespace E_VCSP
             // 
             // configPanel
             // 
-            configPanel.Controls.Add(loadEVCSPButton);
+            configPanel.Controls.Add(comboBox1);
+            configPanel.Controls.Add(runExperiment);
             configPanel.Controls.Add(solveEVCSPButton);
             configPanel.Controls.Add(loadCSPResultButton);
             configPanel.Controls.Add(loadEVSPResultButton);
             configPanel.Controls.Add(solveCSPButton);
             configPanel.Controls.Add(viewToggleButton);
             configPanel.Controls.Add(solveVSPButton);
-            configPanel.Controls.Add(stopButton);
             configPanel.Controls.Add(loadButton);
             configPanel.Controls.Add(activeFolderLabel);
             configPanel.Dock = DockStyle.Left;
@@ -95,16 +95,23 @@ namespace E_VCSP
             configPanel.Size = new Size(304, 558);
             configPanel.TabIndex = 1;
             // 
-            // loadEVCSPButton
+            // comboBox1
             // 
-            loadEVCSPButton.Enabled = false;
-            loadEVCSPButton.Location = new Point(4, 81);
-            loadEVCSPButton.Name = "loadEVCSPButton";
-            loadEVCSPButton.Size = new Size(136, 23);
-            loadEVCSPButton.TabIndex = 9;
-            loadEVCSPButton.Text = "Load EVCSP result";
-            loadEVCSPButton.UseVisualStyleBackColor = true;
-            loadEVCSPButton.Click += loadEVCSPButton_Click;
+            comboBox1.FormattingEnabled = true;
+            comboBox1.Location = new Point(4, 107);
+            comboBox1.Name = "comboBox1";
+            comboBox1.Size = new Size(136, 23);
+            comboBox1.TabIndex = 10;
+            // 
+            // runExperiment
+            // 
+            runExperiment.Location = new Point(146, 107);
+            runExperiment.Name = "runExperiment";
+            runExperiment.Size = new Size(152, 23);
+            runExperiment.TabIndex = 9;
+            runExperiment.Text = "Run experiment";
+            runExperiment.UseVisualStyleBackColor = true;
+            runExperiment.Click += runExperiment_Click;
             // 
             // solveEVCSPButton
             // 
@@ -149,7 +156,7 @@ namespace E_VCSP
             // viewToggleButton
             // 
             viewToggleButton.Enabled = false;
-            viewToggleButton.Location = new Point(4, 107);
+            viewToggleButton.Location = new Point(4, 81);
             viewToggleButton.Name = "viewToggleButton";
             viewToggleButton.Size = new Size(136, 23);
             viewToggleButton.TabIndex = 4;
@@ -166,17 +173,6 @@ namespace E_VCSP
             solveVSPButton.Text = "Solve EVSP";
             solveVSPButton.UseVisualStyleBackColor = true;
             solveVSPButton.Click += solveVSPClick;
-            // 
-            // stopButton
-            // 
-            stopButton.Enabled = false;
-            stopButton.Location = new Point(146, 107);
-            stopButton.Name = "stopButton";
-            stopButton.Size = new Size(152, 23);
-            stopButton.TabIndex = 3;
-            stopButton.Text = "Stop Solving";
-            stopButton.UseVisualStyleBackColor = true;
-            stopButton.Click += stopButtonClick;
             // 
             // button2
             // 
@@ -267,7 +263,6 @@ namespace E_VCSP
         private Panel configPanel; // Panel for the Button and FolderBrowserDialog
         private SplitContainer splitContainer; // SplitContainer for the TextBox and GraphViewer
         private Button solveVSPButton;
-        private Button stopButton;
         private CancellationTokenSource ctSource;
         private Button viewToggleButton;
         private Button button2;
@@ -279,7 +274,8 @@ namespace E_VCSP
         private Button loadCSPResultButton;
         private Button solveCSPButton;
         private OpenFileDialog loadResultDialog;
-        private Button loadEVCSPButton;
         private Button solveEVCSPButton;
+        private ComboBox comboBox1;
+        private Button runExperiment;
     }
 }

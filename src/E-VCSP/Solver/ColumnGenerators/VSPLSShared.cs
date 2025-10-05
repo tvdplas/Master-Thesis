@@ -13,8 +13,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
         public double OverallCost(bool withPenalty) {
             if (withPenalty)
-                return DrivingCost + ChargingCost + PenaltyCost - DualCosts;
-            return DrivingCost + ChargingCost - DualCosts;
+                return DrivingCost + ChargingCost + PenaltyCost + DualCosts;
+            return DrivingCost + ChargingCost + DualCosts;
         }
     }
 
@@ -295,7 +295,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (Prev != null) throw new InvalidOperationException("Not calling on head");
             VehicleType vt = vcg.vss.VehicleType;
 
-            if (validateTail(vcg).PenaltyCost > 0) return null; // Cannot create an invalid vehicle task
+            if (validateTail(vcg).PenaltyCost > 0)
+                return null; // Cannot create an invalid vehicle task
 
             List<VehicleElement> elements = [];
             if (this.Prev != null) throw new Exception("Not on head");

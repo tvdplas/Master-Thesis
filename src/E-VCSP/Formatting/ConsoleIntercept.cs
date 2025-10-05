@@ -10,19 +10,24 @@ namespace E_VCSP.Formatting {
         }
 
         public override void Write(char value) {
-
-            Write(value.ToString());
+            Write(Config.CNSL_OVERRIDE + value.ToString());
         }
 
         public override void Write(string? value) {
             if (value == null) value = string.Empty;
+            if (Config.GLOBAL_CONSOLE_KILL && (value != Environment.NewLine && !value.StartsWith(Config.CNSL_OVERRIDE)))
+                return;
+            if (value.StartsWith(Config.CNSL_OVERRIDE)) {
+                value = value.Substring(Config.CNSL_OVERRIDE.Length);
+            }
 
             StringBuilder output = new StringBuilder();
 
             foreach (char c in value) {
                 if (_isNewLine) // Only prepend timestamp at the start of a new line
                 {
-                    output.Append(DateTime.Now.ToString("[HH:mm:ss]: "));
+                    if (Config.GLOBAL_CONSOLE_KILL && Environment.NewLine.Contains(c)) continue;
+                    if (!Config.GLOBAL_CONSOLE_KILL) output.Append(DateTime.Now.ToString("[HH:mm:ss]: "));
                     _isNewLine = false;
                 }
 

@@ -455,6 +455,10 @@ namespace E_VCSP.Solver.SolutionState {
             foreach (var vt in vehicleTasks) vt.RecalcTripCovers();
         }
 
+        public double Costs() {
+            return SelectedTasks.Sum(x => x.Cost);
+        }
+
         public void PrintCostBreakdown(int slack = 0) {
             string breakdown =
             $"""
