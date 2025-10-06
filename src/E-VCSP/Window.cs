@@ -51,7 +51,7 @@ namespace E_VCSP {
             reload(); // Ensure instance and solver are ready
             if (vss == null || vspSolver == null) return;
 
-            Config.VSP_SOLVER_TIMEOUT_SEC = 60;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
 
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
 
@@ -73,18 +73,20 @@ namespace E_VCSP {
                     Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{vss.Costs()};{vss.Tasks.Count};{vspSolver.model.MIPGap};{vspSolver.model.Runtime}");
                 }
             }
+
+            vspTargetVehicles();
         }
 
         async void vspTargetVehicles() {
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: vsp secondary columns");
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: vsp target vehicles");
 
-            int minMaxVehicles = 5;
-            int maxMaxVehicles = 15;
+            int minMaxVehicles = 8;
+            int maxMaxVehicles = 17;
 
             reload(); // Ensure instance and solver are ready
             if (vss == null || vspSolver == null) return;
 
-            Config.VSP_SOLVER_TIMEOUT_SEC = 60;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
 
             Console.WriteLine($"{Config.CNSL_OVERRIDE}max vh;value;cols;mipgap;runtime");
 
