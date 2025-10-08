@@ -56,9 +56,7 @@ namespace E_VCSP_Backend {
             Reload(); // Ensure instance and solver are ready
             if (VSPSolver == null) return false;
 
-            Console.WriteLine("Before");
             bool success = await Task.Run(() => VSPSolver.Solve());
-            Console.WriteLine("After");
 
             if (success) Console.WriteLine("Solver finished successfully.");
             else Console.WriteLine("Solver did not find a solution or was cancelled.");

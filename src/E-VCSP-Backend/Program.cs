@@ -4,7 +4,7 @@ using E_VCSP.Formatting;
 namespace E_VCSP_Backend {
     internal class Program {
         public static async Task Main(string[] args) {
-            Console.SetOut(new ConsoleIntercept(null));
+            Console.SetOut(new ConsoleIntercept());
             Console.WriteLine("Arguments: " + String.Join(" ", args));
 
             Runner runner = new Runner();

@@ -36,7 +36,7 @@ namespace E_VCSP {
                 comboBox1.Items.Add(exp.Method.Name);
             }
 
-            Console.SetOut(new ConsoleIntercept(consoleView));
+            Console.SetOut(new TextboxConsoleIntercept(consoleView));
             Console.WriteLine("Program started");
 
             activeFolderLabel.Text = runner.ActiveFolder;
