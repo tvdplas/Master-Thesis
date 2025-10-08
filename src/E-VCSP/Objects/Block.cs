@@ -169,7 +169,9 @@ namespace E_VCSP.Objects {
                 additionTarget.Elements.Add(element);
             }
 
-            var finalizedBlocks = blocks.Where(b => b.Elements.Count > 0).ToList();
+            var finalizedBlocks = blocks
+                .Where(b => b.Elements.Count > 0 && b.Elements[^1].EndTime - b.Elements[0].StartTime > 0)
+                .ToList();
             vt.BlockDescriptorCover = finalizedBlocks.Select(x => x.Descriptor).ToList();
             return finalizedBlocks;
         }
