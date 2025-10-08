@@ -1,6 +1,8 @@
 ﻿namespace E_VCSP_Backend {
     internal class Program {
         public static async Task Main(string[] args) {
+            foreach (var arg in args) Console.WriteLine(arg);
+
             Runner runner = new Runner();
             if (args.Length == 0) {
                 Console.WriteLine("Invalid arguments provided. Uses -h for help");
