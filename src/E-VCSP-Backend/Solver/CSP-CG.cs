@@ -16,10 +16,10 @@ namespace E_VCSP.Solver {
         /// </summary>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Model where first <c>n</c> constraints correspond to the <c>n</c> trips, and a list of initial vehicle task vars</returns>
-        private (GRBModel model, List<GRBVar> dutyVars) InitModel(CancellationToken ct) {
+        private (GRBModel model, List<GRBVar> dutyVars) InitModel() {
             // Env
             GRBEnv env = new() {
-                LogToConsole = 1,
+                LogToConsole = 0,
                 LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "cspcg_gurobi.log")
             };
 
@@ -37,10 +37,6 @@ namespace E_VCSP.Solver {
             model.Parameters.Presolve = 2;
             model.Parameters.Symmetry = 2;
             model.SetCallback(new CustomGRBCallback(model));
-            ct.Register(() => {
-                Console.WriteLine("Cancellation requested during crew scheduling. Terminating Gurobi model...");
-                model?.Terminate();
-            });
 
             List<GRBVar> dutyVars = [];
             GRBLinExpr maxDuties = new();
@@ -134,8 +130,8 @@ namespace E_VCSP.Solver {
             return duties;
         }
 
-        public override bool Solve(CancellationToken cancellationToken) {
-            (var model, var dutyVars) = InitModel(cancellationToken);
+        public override bool Solve() {
+            (var model, var dutyVars) = InitModel();
             model.Optimize();
 
             double z_prev = double.PositiveInfinity;
@@ -238,7 +234,7 @@ namespace E_VCSP.Solver {
 
             // Continue until max number of columns is found, model isn't feasible during solve or break
             // due to RC constraint. 
-            while (currIts < Config.CSP_MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE && !cancellationToken.IsCancellationRequested) {
+            while (currIts < Config.CSP_MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE) {
                 // Display progress
                 int percent = (int)((totalGenerated / (double)maxColumns) * 100);
                 if (percent >= lastReportedPercent + 10) {

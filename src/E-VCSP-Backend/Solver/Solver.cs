@@ -4,6 +4,6 @@
         /// Solve loaded instance
         /// </summary>
         /// <returns><c>true</c> if solving was successful; <c>false</c> otherwise</returns>
-        public abstract bool Solve(CancellationToken cancellationToken);
+        public abstract bool Solve();
     }
 }

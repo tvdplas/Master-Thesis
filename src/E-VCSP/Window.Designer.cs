@@ -52,7 +52,7 @@ namespace E_VCSP
             loadButton.TabIndex = 0;
             loadButton.Text = "Load data";
             loadButton.UseVisualStyleBackColor = true;
-            loadButton.Click += loadButtonClick;
+            loadButton.Click += loadInstanceClick;
             // 
             // activeFolderLabel
             // 
@@ -131,7 +131,7 @@ namespace E_VCSP
             loadCSPResultButton.TabIndex = 7;
             loadCSPResultButton.Text = "Load CSP result";
             loadCSPResultButton.UseVisualStyleBackColor = true;
-            loadCSPResultButton.Click += loadCSPResultButton_Click;
+            loadCSPResultButton.Click += loadCSPResultClick;
             // 
             // loadEVSPResultButton
             // 
@@ -155,7 +155,6 @@ namespace E_VCSP
             // 
             // viewToggleButton
             // 
-            viewToggleButton.Enabled = false;
             viewToggleButton.Location = new Point(4, 81);
             viewToggleButton.Name = "viewToggleButton";
             viewToggleButton.Size = new Size(136, 23);

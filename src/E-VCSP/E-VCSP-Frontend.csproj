@@ -20,11 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Gurobi.Optimizer" Version="12.0.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Solver\NewFolder\" />
+    <ProjectReference Include="..\E-VCSP-Backend\E-VCSP-Backend.csproj" />
   </ItemGroup>
 
   <ItemGroup>

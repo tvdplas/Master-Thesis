@@ -1,9 +1,14 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.12.35707.178 d17.12
+VisualStudioVersion = 17.12.35707.178
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "E-VCSP", "E-VCSP.csproj", "{315E337A-4051-493C-956C-D97540FD0858}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "E-VCSP-Frontend", "E-VCSP-Frontend.csproj", "{315E337A-4051-493C-956C-D97540FD0858}"
+	ProjectSection(ProjectDependencies) = postProject
+		{84B73A6A-5C77-4923-936A-9205133E71D0} = {84B73A6A-5C77-4923-936A-9205133E71D0}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "E-VCSP-Backend", "..\E-VCSP-Backend\E-VCSP-Backend.csproj", "{84B73A6A-5C77-4923-936A-9205133E71D0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,8 +20,15 @@ Global
 		{315E337A-4051-493C-956C-D97540FD0858}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{315E337A-4051-493C-956C-D97540FD0858}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{315E337A-4051-493C-956C-D97540FD0858}.Release|Any CPU.Build.0 = Release|Any CPU
+		{84B73A6A-5C77-4923-936A-9205133E71D0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{84B73A6A-5C77-4923-936A-9205133E71D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{84B73A6A-5C77-4923-936A-9205133E71D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{84B73A6A-5C77-4923-936A-9205133E71D0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {60E728E7-E933-4123-91D7-02A23F3D8F90}
 	EndGlobalSection
 EndGlobal

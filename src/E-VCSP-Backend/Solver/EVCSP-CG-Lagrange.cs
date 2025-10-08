@@ -8,7 +8,7 @@ using Gurobi;
 using System.Collections;
 
 namespace E_VCSP.Solver {
-    internal class EVCSPCGLagrange : Solver {
+    public class EVCSPCGLagrange : Solver {
         public readonly VehicleSolutionState vss;
         public readonly CrewSolutionState css;
 
@@ -59,12 +59,12 @@ namespace E_VCSP.Solver {
         #region Init
         private void initializeCover() {
             EVSPCG vspSolver = new(vss);
-            vspSolver.Solve(new());
+            vspSolver.Solve();
             List<(Block block, int count)> initialBlocks = Block.FromVehicleTasks(vss.SelectedTasks);
             foreach ((var b, int c) in initialBlocks)
                 css.AddBlock(b, c);
             CSPCG cspSolver = new(css);
-            cspSolver.Solve(new());
+            cspSolver.Solve();
 
             // Initial solution is (vss.SelectedTasks, css.SelectedDuties)
             costUpperBound = 0;
@@ -852,7 +852,7 @@ namespace E_VCSP.Solver {
         private void solveILP() {
             // Solve using ILP
             GRBEnv env = new() {
-                LogToConsole = 1,
+                LogToConsole = 0,
                 LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "evcspcg_gurobi.log")
             };
             GRBModel model = new(env);
@@ -1044,7 +1044,7 @@ namespace E_VCSP.Solver {
             css.PrintCostBreakdown((int)maxDutiesSlack.X, limitedAverageLengthSlack.X, noExcessiveLengthSlack.X, maxBrokenSlack.X, maxBetweenSlack.X);
         }
 
-        public override bool Solve(CancellationToken ct) {
+        public override bool Solve() {
             initializeCover();
             initializeLagrangeModel();
 

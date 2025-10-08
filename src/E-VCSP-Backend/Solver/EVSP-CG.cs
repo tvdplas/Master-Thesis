@@ -70,10 +70,10 @@ namespace E_VCSP.Solver {
         /// </summary>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Model where first <c>n</c> constraints correspond to the <c>n</c> trips, and a list of initial vehicle task vars</returns>
-        private (GRBModel model, List<GRBVar> taskVars) InitModel(CancellationToken ct) {
+        private (GRBModel model, List<GRBVar> taskVars) InitModel() {
             // Env
             GRBEnv env = new() {
-                LogToConsole = 1,
+                LogToConsole = 0,
                 LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "evspcg_gurobi.log")
             };
 
@@ -87,10 +87,6 @@ namespace E_VCSP.Solver {
             model.Parameters.NoRelHeurTime = Config.VSP_SOLVER_TIMEOUT_SEC / 4;
             model.Parameters.ImproveStartTime = 0;
             model.SetCallback(new CustomGRBCallback(model));
-            ct.Register(() => {
-                Console.WriteLine("Cancellation requested. Terminating Gurobi model...");
-                model.Terminate();
-            });
 
             // Add variable for each task/column; add to maxVehicle constraint
             GRBLinExpr maxVehicles = new();
@@ -130,8 +126,8 @@ namespace E_VCSP.Solver {
             return (model, taskVars);
         }
 
-        public override bool Solve(CancellationToken ct) {
-            (GRBModel model, List<GRBVar> taskVars) = InitModel(ct);
+        public override bool Solve() {
+            (GRBModel model, List<GRBVar> taskVars) = InitModel();
             model.Optimize();
 
             int roundsWithoutImprovement = 0;
@@ -171,9 +167,6 @@ namespace E_VCSP.Solver {
             // Continue until max number of columns is found, model isn't feasible during solve or break
             // due to RC constraint. 
             while (currIts < Config.VSP_MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE) {
-                // Terminate column generation if cancelled
-                if (ct.IsCancellationRequested) return false;
-
                 var reducedCosts = model.GetConstrs().Select(x => x.Pi);
 
                 // Generate batch of new tasks using pricing information from previous solve

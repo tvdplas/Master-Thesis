@@ -1,29 +1,17 @@
 
 using E_VCSP.Formatting;
 using E_VCSP.Objects;
-using E_VCSP.Objects.ParsedData;
-using E_VCSP.Solver;
 using E_VCSP.Solver.SolutionState;
+using E_VCSP_Backend;
 using System.Reflection;
-using System.Text;
 using System.Text.Json;
 
 namespace E_VCSP {
     public partial class MainView : Form {
+        Runner runner = new();
+
         private readonly Dictionary<string, Control> controlsMap = [];
-        public string activeFolder = "No folder selected";
-
-        Instance? instance;
-        VehicleSolutionState? vss;
-        CrewSolutionState? css;
-
-        EVSPCG? vspSolver;
-        CSPCG? cspSolver;
-        EVCSPCGLagrange? integratedSolver;
-
         RosterDisplay rd = new();
-
-        List<Action> experiments = [];
 
         bool working = false;
         int __view = 0; // 0: vehicles, 1: blocks, 2: duties, 3: general
@@ -38,129 +26,27 @@ namespace E_VCSP {
             }
         }
 
-        void none() {
-            Console.WriteLine("Nothing happened.");
-        }
-
-        async void vspSecondaryColumns() {
-            const int attempts = 32;
-            const int subdivisions = 16;
-
-            reload(); // Ensure instance and solver are ready
-            if (vss == null || vspSolver == null) return;
-
-            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
-
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
-
-
-            for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
-                Config.VSP_LB_SEC_COL_ATTEMPTS = i;
-                for (int j = 4; j <= subdivisions; j += 4) {
-                    Config.VSP_LB_SEC_COL_COUNT = i;
-
-                    vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
-                    vspSolver = new EVSPCG(vss);
-
-                    ctSource = new();
-                    var token = ctSource.Token;
-                    bool success = false;
-                    success = await Task.Run(() => vspSolver.Solve(token), token);
-                    ctSource?.Dispose(); // Dispose the source
-                    ctSource = null;
-                    Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{vss.Costs()};{vss.Tasks.Count};{vspSolver.model.MIPGap};{vspSolver.model.Runtime}");
-                }
-            }
-        }
-
-        async void vspTargetVehicles() {
-            int minMaxVehicles = 8;
-            int maxMaxVehicles = 17;
-
-            reload(); // Ensure instance and solver are ready
-            if (vss == null || vspSolver == null) return;
-
-            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
-
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}max vh;value;cols;mipgap;runtime");
-
-            for (int i = minMaxVehicles; i <= maxMaxVehicles; i++) {
-                Config.MAX_VEHICLES = i;
-
-                vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
-                vspSolver = new EVSPCG(vss);
-
-                ctSource = new();
-                var token = ctSource.Token;
-                bool success = false;
-                success = await Task.Run(() => vspSolver.Solve(token), token);
-                ctSource?.Dispose(); // Dispose the source
-                ctSource = null;
-                Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{vss.Costs()};{vss.Tasks.Count};{vspSolver.model.MIPGap};{vspSolver.model.Runtime}");
-            }
-        }
-
-        async void cspSecondaryColumns() {
-            reload();
-            // Get vsp solution
-            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
-            Config.VSP_LB_SEC_COL_ATTEMPTS = 16;
-            Config.VSP_LB_SEC_COL_COUNT = 4;
-            vss = new(instance, instance.VehicleTypes[0]);
-            vspSolver = new EVSPCG(vss);
-            ctSource = new();
-            var token = ctSource.Token;
-            bool success = await Task.Run(() => vspSolver.Solve(token), token);
-            ctSource?.Dispose(); // Dispose the source
-            ctSource = null;
-
-            const int attempts = 16;
-            const int subdivisions = 16;
-
-            for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
-                Config.CSP_LB_SEC_COL_ATTEMPTS = i;
-                for (int j = 4; j <= subdivisions; j += 4) {
-                    Config.CSP_LB_SEC_COL_COUNT = i;
-                    css = new(instance, Block.FromVehicleTasks(vss.SelectedTasks));
-                    cspSolver = new CSPCG(css);
-                    ctSource = new();
-                    token = ctSource.Token;
-                    success = false;
-                    success = await Task.Run(() => cspSolver.Solve(token), token);
-                    ctSource?.Dispose(); // Dispose the source
-                    ctSource = null;
-                    Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{css.Costs()};{css.Duties.Count};{cspSolver.model.MIPGap};{cspSolver.model.Runtime}");
-                }
-            }
-        }
-
         public MainView() {
             InitializeComponent();
             splitContainer.Panel1.Controls.Add(rd);
 
-            experiments.Add(none);
-            experiments.Add(vspSecondaryColumns);
-            experiments.Add(vspTargetVehicles);
-            experiments.Add(cspSecondaryColumns);
-
             // Add all experiments to comboBox1
             comboBox1.Items.Clear();
-            foreach (var exp in experiments) {
+            foreach (var exp in runner.Experiments) {
                 comboBox1.Items.Add(exp.Method.Name);
             }
 
             Console.SetOut(new ConsoleIntercept(consoleView));
             Console.WriteLine("Program started");
 
-            activeFolderLabel.Text = activeFolder;
+            activeFolderLabel.Text = runner.ActiveFolder;
             GenerateConfigUI();
         }
 
-        // Add this event handler for the runExperiment button
         private void runExperiment_Click(object sender, EventArgs e) {
-            if (comboBox1.SelectedIndex >= 0 && comboBox1.SelectedIndex < experiments.Count) {
-                Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: {experiments[comboBox1.SelectedIndex].Method.Name}");
-                experiments[comboBox1.SelectedIndex]();
+            if (comboBox1.SelectedIndex >= 0 && comboBox1.SelectedIndex < runner.Experiments.Count) {
+                Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: {runner.Experiments[comboBox1.SelectedIndex].Method.Name}");
+                runner.Experiments[comboBox1.SelectedIndex]();
             }
         }
 
@@ -255,168 +141,86 @@ namespace E_VCSP {
             }
         }
 
-        private void loadButtonClick(object sender, EventArgs e) {
+        private void loadInstanceClick(object sender, EventArgs e) {
             var res = loadFolderBrowser.ShowDialog();
             if (res == DialogResult.OK) {
-                activeFolder = loadFolderBrowser.SelectedPath;
-                activeFolderLabel.Text = activeFolder.Split("\\").Last();
-                Console.WriteLine($"Selected folder: {activeFolder}");
+                runner.ActiveFolder = loadFolderBrowser.SelectedPath;
+                activeFolderLabel.Text = runner.ActiveFolder.Split("\\").Last();
+                Console.WriteLine($"Selected folder: {runner.ActiveFolder}");
             }
         }
 
+        #region Solve from instance
         private async void solveVSPClick(object sender, EventArgs e) {
-            reload(); // Ensure instance and solver are ready
-            if (vspSolver == null) return;
-
             working = true;
             solveVSPButton.Enabled = false;
-            ctSource = new();
-            var token = ctSource.Token;
+            solveCSPButton.Enabled = false;
+            solveEVCSPButton.Enabled = false;
 
-            bool success = false;
-            try {
-                success = await Task.Run(() => vspSolver.Solve(token), token);
+            bool success = await runner.VSPFromInstance();
+            if (success) {
+                view = 0;
+                rd.UpdateRosterNodes(
+                    SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks)
+                );
+                solveCSPButton.Enabled = true;
+            }
 
-                if (success) {
-                    view = 0;
-                    rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(vss!.SelectedTasks));
-                    viewToggleButton.Enabled = true;
-                    solveCSPButton.Enabled = true;
-                    Console.WriteLine("Solver finished successfully.");
-                }
-                else {
-                    Console.WriteLine("Solver did not find a solution or was cancelled.");
-                }
+            working = false;
+            solveVSPButton.Enabled = true;
+            solveEVCSPButton.Enabled = true;
+        }
+        private async void solveCSPClick(object sender, EventArgs e) {
+            working = true;
+            solveVSPButton.Enabled = false;
+            solveCSPButton.Enabled = false;
+            solveEVCSPButton.Enabled = false;
+
+            bool success = await Task.Run(() => runner.CSPFromInstance());
+
+            if (success) {
+                view = 2;
+                rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(runner.css!.SelectedDuties));
             }
-            catch (OperationCanceledException) {
-                Console.WriteLine("Solver operation was cancelled.");
-            }
-            finally {
-                working = false;
-                solveVSPButton.Enabled = true;
-                ctSource?.Dispose(); // Dispose the source
-                ctSource = null;
-            }
+
+            working = false;
+            solveVSPButton.Enabled = true;
+            solveCSPButton.Enabled = true;
+            solveEVCSPButton.Enabled = true;
         }
 
         private async void solveEVCSPClick(object sender, EventArgs e) {
-            reload(); // Ensure instance and solver are ready
-            if (integratedSolver == null) return;
-
             working = true;
-            solveEVCSPButton.Enabled = false;
-            ctSource = new CancellationTokenSource();
-            var token = ctSource.Token;
-
-            bool success = false;
-            try {
-                success = await Task.Run(() => integratedSolver.Solve(token), token);
-
-                if (success) {
-                    view = 0;
-                    rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(integratedSolver.vss.SelectedTasks));
-                    viewToggleButton.Enabled = true;
-                    solveCSPButton.Enabled = true;
-                    Console.WriteLine("Solver finished successfully.");
-                }
-                else {
-                    Console.WriteLine("Solver did not find a solution or was cancelled.");
-                }
-            }
-            catch (OperationCanceledException) {
-                Console.WriteLine("Solver operation was cancelled.");
-            }
-            finally {
-                working = false;
-                solveEVCSPButton.Enabled = true;
-                ctSource?.Dispose(); // Dispose the source
-                ctSource = null;
-            }
-        }
-
-        private void reload() {
-            if (activeFolder == "No folder selected") return;
-
-            solveVSPButton.Enabled = true;
-            solveEVCSPButton.Enabled = true;
-            viewToggleButton.Enabled = false;
+            solveVSPButton.Enabled = false;
             solveCSPButton.Enabled = false;
+            solveEVCSPButton.Enabled = false;
 
-            instance = new(activeFolder);
-            vss = new(instance, instance.VehicleTypes[0]);
-            css = new(instance, []);
+            bool success = await Task.Run(() => runner.VCSPFromInstance());
+            if (success) {
+                view = 0;
+                rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks));
+            }
 
-            vspSolver = new(vss);
-            integratedSolver = new EVCSPCGLagrange(vss, css);
-
-            string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
-            Constants.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
-            Directory.CreateDirectory(Constants.RUN_LOG_FOLDER);
-
-            Type configType = typeof(Config);
-            FieldInfo[] fields = configType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            StringBuilder configDump = new();
-            foreach (FieldInfo field in fields)
-                configDump.AppendLine($"{field.Name}: {field.GetValue(null)}");
-            File.WriteAllText(Constants.RUN_LOG_FOLDER + "config.txt", configDump.ToString());
-            Console.WriteLine($"Instance reloaded. Current config state dumped to {Constants.RUN_LOG_FOLDER + "config.txt"}");
+            working = false;
+            solveVSPButton.Enabled = true;
+            solveCSPButton.Enabled = true;
+            solveEVCSPButton.Enabled = true;
         }
+        #endregion
 
         private void toggleGraphView(object sender, EventArgs e) {
-            if (instance == null || working) return;
+            if (runner.Instance == null) return;
             view = (view + 1) % 3;
 
             List<List<RosterNode>> newNodes = [];
-            if (view == 0 && vss != null && vss.SelectedTasks.Count > 0)
-                newNodes = SolutionGraph.GenerateVehicleTaskGraph(vss.SelectedTasks);
-            else if (view == 1 && vss != null && vss.SelectedTasks.Count > 0)
-                newNodes = SolutionGraph.GenerateBlockGraph(vss.SelectedTasks.Select(x => Block.FromVehicleTask(x)).ToList());
-            else if (view == 2 && css != null && css.SelectedDuties.Count > 0)
-                newNodes = SolutionGraph.GenerateCrewDutyGraph(css.SelectedDuties);
+            if (view == 0 && runner.vss != null && runner.vss.SelectedTasks.Count > 0)
+                newNodes = SolutionGraph.GenerateVehicleTaskGraph(runner.vss.SelectedTasks);
+            else if (view == 1 && runner.vss != null && runner.vss.SelectedTasks.Count > 0)
+                newNodes = SolutionGraph.GenerateBlockGraph(runner.vss.SelectedTasks.Select(x => Block.FromVehicleTask(x)).ToList());
+            else if (view == 2 && runner.css != null && runner.css.SelectedDuties.Count > 0)
+                newNodes = SolutionGraph.GenerateCrewDutyGraph(runner.css.SelectedDuties);
 
             rd.UpdateRosterNodes(newNodes);
-        }
-
-        private async void solveCSPClick(object sender, EventArgs e) {
-            if (instance == null || vss == null || vss.SelectedTasks.Count == 0) return;
-
-            if (css == null || css.Blocks.Count == 0 || vss.SelectedTasks.Count > 0) {
-                Console.WriteLine("Solving based on VSP solution");
-                css = new(instance, Block.FromVehicleTasks(vss.SelectedTasks));
-            }
-            else {
-                Console.WriteLine("Resetting existing CSP solution");
-                css.ResetFromBlocks();
-            }
-            Console.WriteLine($"Total of {css.Blocks.Count} blocks being considered");
-            cspSolver = new CSPCG(css);
-
-            working = true;
-            solveCSPButton.Enabled = false;
-            ctSource = new CancellationTokenSource();
-            var token = ctSource.Token;
-
-            bool success = false;
-            try {
-                success = await Task.Run(() => cspSolver.Solve(token), token);
-
-                if (success) {
-                    Console.WriteLine("CSP Solver finished successfully.");
-                    view = 2;
-                    rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(css.SelectedDuties));
-                }
-                else Console.WriteLine("No solution/cancelled.");
-            }
-            catch (OperationCanceledException) {
-                Console.WriteLine("Solver operation was cancelled.");
-            }
-            finally {
-
-                working = false;
-                solveCSPButton.Enabled = true;
-                ctSource?.Dispose(); // Dispose the source
-                ctSource = null;
-            }
         }
 
         private void loadEVSPResultClick(object sender, EventArgs e) {
@@ -426,41 +230,37 @@ namespace E_VCSP {
                 var dump = JsonSerializer.Deserialize<VehicleSolutionStateDump>(File.ReadAllText(loadResultDialog.FileName), new JsonSerializerOptions());
                 if (dump == null) throw new InvalidDataException("Dump not valid");
 
-                activeFolder = dump.path;
-                reload();
+                runner.ActiveFolder = dump.path;
+                runner.Reload();
 
-                vss = new(instance!, instance!.VehicleTypes[0]);
-                vss.LoadFromDump(dump);
+                runner.vss = new(runner.Instance!, runner.Instance!.VehicleTypes[0]);
+                runner.vss.LoadFromDump(dump);
                 view = 0;
-                rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(vss!.SelectedTasks));
+                rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks));
                 viewToggleButton.Enabled = true;
                 solveCSPButton.Enabled = true;
                 Console.WriteLine("Loaded " + loadResultDialog.FileName);
             }
         }
 
-        private void loadCSPResultButton_Click(object sender, EventArgs e) {
+        private void loadCSPResultClick(object sender, EventArgs e) {
             var res = loadResultDialog.ShowDialog();
             if (res == DialogResult.OK) {
                 Console.WriteLine("Starting load of " + loadResultDialog.FileName);
                 var dump = JsonSerializer.Deserialize<CrewSolutionStateDump>(File.ReadAllText(loadResultDialog.FileName), new JsonSerializerOptions());
                 if (dump == null) throw new InvalidDataException("Dump not valid");
 
-                activeFolder = dump.path;
-                reload();
+                runner.ActiveFolder = dump.path;
+                runner.Reload();
 
-                css = new(instance!, []);
-                css.LoadFromDump(dump);
+                runner.css = new(runner.Instance!, []);
+                runner.css.LoadFromDump(dump);
                 view = 2;
-                rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(css!.SelectedDuties));
+                rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(runner.css!.SelectedDuties));
                 viewToggleButton.Enabled = true;
                 solveCSPButton.Enabled = true;
                 Console.WriteLine("Loaded " + loadResultDialog.FileName);
             }
-        }
-
-        private void loadEVCSPButton_Click(object sender, EventArgs e) {
-            Console.WriteLine("Use the other two buttons, only here for symmetry");
         }
     }
 }

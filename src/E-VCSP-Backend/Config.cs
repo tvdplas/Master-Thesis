@@ -1,4 +1,7 @@
-﻿namespace E_VCSP {
+﻿using System.Reflection;
+using System.Text;
+
+namespace E_VCSP {
     public class Header { }
     public static class Config {
         // Graph display
@@ -131,5 +134,56 @@
         public static int LAGRANGE_DISRUPT_ROUNDS = 2;
         public static double LAGRANGE_DISRUPT_LWR = 0.8;
         public static double LAGRANGE_DISRUPT_UPR = 1.25;
+
+        public static void Dump() {
+            Type configType = typeof(Config);
+            FieldInfo[] fields = configType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            StringBuilder configDump = new();
+            foreach (FieldInfo field in fields)
+                configDump.AppendLine($"{field.Name}: {field.GetValue(null)}");
+            File.WriteAllText(Constants.RUN_LOG_FOLDER + "config.txt", configDump.ToString());
+        }
+
+        public static void LoadPartialDump(string dumpFilePath) {
+            if (!File.Exists(dumpFilePath))
+                return;
+
+            var lines = File.ReadAllLines(dumpFilePath);
+            Type configType = typeof(Config);
+            var fields = configType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+            foreach (var line in lines) {
+                var parts = line.Split(':', 2);
+                if (parts.Length != 2)
+                    continue;
+
+                string fieldName = parts[0].Trim();
+                string valueStr = parts[1].Trim();
+
+                var field = fields.FirstOrDefault(f => f.Name == fieldName);
+                if (field == null || field.FieldType == typeof(Header))
+                    continue;
+
+                try {
+                    object value = null;
+                    var type = field.FieldType;
+                    if (type == typeof(int))
+                        value = int.Parse(valueStr);
+                    else if (type == typeof(double))
+                        value = double.Parse(valueStr);
+                    else if (type == typeof(bool))
+                        value = bool.Parse(valueStr);
+                    else if (type == typeof(string))
+                        value = valueStr;
+                    else
+                        continue;
+
+                    field.SetValue(null, value);
+                }
+                catch {
+                    // Ignore parse errors
+                }
+            }
+        }
     }
 }
