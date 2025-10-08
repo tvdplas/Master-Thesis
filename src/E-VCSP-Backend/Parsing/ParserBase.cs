@@ -79,7 +79,7 @@ namespace E_VCSP.Parsing {
                 throw new ArgumentNullException("Invalid instantiation of ParserBase.");
             }
 
-            List<List<string>> file = File.ReadAllLines($"{path}\\{filename}")
+            List<List<string>> file = File.ReadAllLines($"{path}/{filename}")
                 .Select(line => line.Split(";").ToList()).ToList();
             var attributeIndexMapping = GetAttributeIndexMapping(file[0]);
 
