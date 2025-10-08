@@ -1,7 +1,11 @@
-﻿namespace E_VCSP_Backend {
+﻿using E_VCSP;
+using E_VCSP.Formatting;
+
+namespace E_VCSP_Backend {
     internal class Program {
         public static async Task Main(string[] args) {
-            foreach (var arg in args) Console.WriteLine(arg);
+            Console.SetOut(new ConsoleIntercept(null));
+            Console.WriteLine("Arguments: " + String.Join(" ", args));
 
             Runner runner = new Runner();
             if (args.Length == 0) {
@@ -55,7 +59,10 @@
                     Console.WriteLine("Unknown experiment. Aborting.");
                     return;
                 }
-                else task();
+                else {
+                    Config.GLOBAL_CONSOLE_KILL = true;
+                    task();
+                }
             }
         }
     }

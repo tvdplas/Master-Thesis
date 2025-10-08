@@ -45,6 +45,7 @@ namespace E_VCSP {
 
         private void runExperiment_Click(object sender, EventArgs e) {
             if (comboBox1.SelectedIndex >= 0 && comboBox1.SelectedIndex < runner.Experiments.Count) {
+                Config.GLOBAL_CONSOLE_KILL = true;
                 Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: {runner.Experiments[comboBox1.SelectedIndex].Method.Name}");
                 runner.Experiments[comboBox1.SelectedIndex]();
             }

@@ -2,10 +2,10 @@
 
 namespace E_VCSP.Formatting {
     public class ConsoleIntercept : TextWriter {
-        private readonly TextBox _textBox;
+        private readonly TextBox? _textBox;
         private bool _isNewLine = true; // Track if we are starting a new line
 
-        public ConsoleIntercept(TextBox textBox) {
+        public ConsoleIntercept(TextBox? textBox) {
             _textBox = textBox;
         }
 
@@ -46,6 +46,8 @@ namespace E_VCSP.Formatting {
         }
 
         private void AppendTextToTextBox(string text) {
+            if (_textBox == null) return;
+
             if (_textBox.InvokeRequired) {
                 _textBox.Invoke(new Action(() => {
                     _textBox.AppendText(text);
