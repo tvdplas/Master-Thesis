@@ -11,8 +11,8 @@
 
             if (args[0] == "-h" || args[0] == "h") {
                 Console.WriteLine("List experiments: evcsp -l");
-                Console.WriteLine("Run normal: evcsp [instance] [vsp/seq/int] [config?]");
-                Console.WriteLine("Run experiment: evcsp [instance] [expname] [config?]");
+                Console.WriteLine("Run normal: evcsp [vsp/seq/int] [instance] [configfile?]");
+                Console.WriteLine("Run experiment: evcsp [expname] [instance] [configfile?]");
                 return;
             }
 
@@ -27,27 +27,27 @@
             if (args.Length == 1)
                 Console.WriteLine("Invalid arguments provided. Uses -h for help");
 
-            runner.ActiveFolder = args[0];
+            runner.ActiveFolder = args[1];
 
             if (args.Length == 3) {
                 E_VCSP.Config.LoadPartialDump(args[2]);
             }
 
-            if (args[1] == "vsp") {
+            if (args[0] == "vsp") {
                 bool x = await runner.VSPFromInstance();
                 Console.WriteLine(x);
             }
-            else if (args[1] == "seq") {
+            else if (args[0] == "seq") {
                 await runner.VSPFromInstance();
                 await runner.CSPFromInstance();
             }
-            else if (args[1] == "int") {
+            else if (args[0] == "int") {
                 await runner.VCSPFromInstance();
             }
             else {
                 Action? task = null;
                 foreach (var exp in runner.Experiments) {
-                    if ("exp" + args[1] == exp.Method.Name) {
+                    if ("exp" + args[0] == exp.Method.Name) {
                         task = exp;
                     }
                 }
