@@ -43,9 +43,7 @@ namespace E_VCSP {
         }
 
         async void vspSecondaryColumns() {
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: vsp secondary columns");
-
-            const int attempts = 16;
+            const int attempts = 32;
             const int subdivisions = 16;
 
             reload(); // Ensure instance and solver are ready
@@ -58,7 +56,7 @@ namespace E_VCSP {
 
             for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
                 Config.VSP_LB_SEC_COL_ATTEMPTS = i;
-                for (int j = 0; j <= subdivisions; j += 4) {
+                for (int j = 4; j <= subdivisions; j += 4) {
                     Config.VSP_LB_SEC_COL_COUNT = i;
 
                     vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
@@ -73,13 +71,9 @@ namespace E_VCSP {
                     Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{vss.Costs()};{vss.Tasks.Count};{vspSolver.model.MIPGap};{vspSolver.model.Runtime}");
                 }
             }
-
-            vspTargetVehicles();
         }
 
         async void vspTargetVehicles() {
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: vsp target vehicles");
-
             int minMaxVehicles = 8;
             int maxMaxVehicles = 17;
 
@@ -106,6 +100,40 @@ namespace E_VCSP {
             }
         }
 
+        async void cspSecondaryColumns() {
+            reload();
+            // Get vsp solution
+            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
+            Config.VSP_LB_SEC_COL_ATTEMPTS = 16;
+            Config.VSP_LB_SEC_COL_COUNT = 4;
+            vss = new(instance, instance.VehicleTypes[0]);
+            vspSolver = new EVSPCG(vss);
+            ctSource = new();
+            var token = ctSource.Token;
+            bool success = await Task.Run(() => vspSolver.Solve(token), token);
+            ctSource?.Dispose(); // Dispose the source
+            ctSource = null;
+
+            const int attempts = 16;
+            const int subdivisions = 16;
+
+            for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
+                Config.CSP_LB_SEC_COL_ATTEMPTS = i;
+                for (int j = 4; j <= subdivisions; j += 4) {
+                    Config.CSP_LB_SEC_COL_COUNT = i;
+                    css = new(instance, Block.FromVehicleTasks(vss.SelectedTasks));
+                    cspSolver = new CSPCG(css);
+                    ctSource = new();
+                    token = ctSource.Token;
+                    success = false;
+                    success = await Task.Run(() => cspSolver.Solve(token), token);
+                    ctSource?.Dispose(); // Dispose the source
+                    ctSource = null;
+                    Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{css.Costs()};{css.Duties.Count};{cspSolver.model.MIPGap};{cspSolver.model.Runtime}");
+                }
+            }
+        }
+
         public MainView() {
             InitializeComponent();
             splitContainer.Panel1.Controls.Add(rd);
@@ -113,6 +141,7 @@ namespace E_VCSP {
             experiments.Add(none);
             experiments.Add(vspSecondaryColumns);
             experiments.Add(vspTargetVehicles);
+            experiments.Add(cspSecondaryColumns);
 
             // Add all experiments to comboBox1
             comboBox1.Items.Clear();
@@ -130,6 +159,7 @@ namespace E_VCSP {
         // Add this event handler for the runExperiment button
         private void runExperiment_Click(object sender, EventArgs e) {
             if (comboBox1.SelectedIndex >= 0 && comboBox1.SelectedIndex < experiments.Count) {
+                Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: {experiments[comboBox1.SelectedIndex].Method.Name}");
                 experiments[comboBox1.SelectedIndex]();
             }
         }

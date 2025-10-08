@@ -273,6 +273,10 @@ namespace E_VCSP.Solver.SolutionState {
             return addUnit ? Duties[^1] : null;
         }
 
+        public double Costs() {
+            return SelectedDuties.Sum(x => x.count * x.duty.Cost);
+        }
+
         public void PrintCostBreakdown(
             int countSlack = 0,
             double avgDutySlack = 0,

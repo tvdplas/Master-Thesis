@@ -8,7 +8,7 @@ using System.Data;
 
 namespace E_VCSP.Solver {
     public class CSPCG(CrewSolutionState css) : Solver {
-        private GRBModel? model;
+        public GRBModel? model;
         private CrewSolutionState css = css;
 
         /// <summary>
@@ -25,14 +25,14 @@ namespace E_VCSP.Solver {
 
             // Model
             GRBModel model = new(env);
-            model.Parameters.TimeLimit = Config.VSP_SOLVER_TIMEOUT_SEC;
+            model.Parameters.TimeLimit = Config.CSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 1; // upper bound
             model.Parameters.Heuristics = 0.8;
             model.Parameters.RINS = 10;
             model.Parameters.SubMIPNodes = 5000;
             model.Parameters.PumpPasses = 20;
-            model.Parameters.NoRelHeurTime = Config.VSP_SOLVER_TIMEOUT_SEC / 4;
-            model.Parameters.ImproveStartTime = Config.VSP_SOLVER_TIMEOUT_SEC / 4;
+            model.Parameters.NoRelHeurTime = Config.CSP_SOLVER_TIMEOUT_SEC / 4;
+            model.Parameters.ImproveStartTime = Config.CSP_SOLVER_TIMEOUT_SEC / 4;
             model.Parameters.Cuts = 1;
             model.Parameters.Presolve = 2;
             model.Parameters.Symmetry = 2;

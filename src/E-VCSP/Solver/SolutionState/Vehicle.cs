@@ -241,7 +241,8 @@ namespace E_VCSP.Solver.SolutionState {
             // Preprocessing: filter by min length, if one is found with low time only use that 
             for (int i = 0; i < Nodes.Count - 2; i++) {
                 TripNode tn1 = (TripNode)Nodes[i];
-                List<int> directArcIndexes = [];
+                HashSet<int> directArcIndexes = [];
+                HashSet<int> allowsForChargeIndexes = [];
 
                 for (int dai = 0; dai < Adj[i].Count; dai++) {
                     VSPArc arc = Adj[i][dai];
@@ -252,13 +253,25 @@ namespace E_VCSP.Solver.SolutionState {
                         if (timeDiff <= Config.VSP_PRE_DIRECT_TIME) {
                             directArcIndexes.Add(t2.Index);
                         }
+
+                        int idleTime = timeDiff - arc.DeadheadTemplate.Duration;
+                        if (tn1.Trip.EndLocation.CanCharge && idleTime > Constants.MIN_CHARGE_TIME) {
+                            // Charging can be done at the start
+                            var chargeRes = tn1.Trip.EndLocation.ChargingCurves[VehicleType.Index].MaxChargeGained(VehicleType.MinSoC, idleTime);
+                            if (chargeRes.TimeUsed == idleTime) {
+                                // Arc may be useful during charging
+                                allowsForChargeIndexes.Add(t2.Index);
+                            }
+                        }
                     }
                 }
 
-                if (directArcIndexes.Count > 0) {
+                HashSet<int> remainingIndexes = directArcIndexes.Union(allowsForChargeIndexes).ToHashSet();
+
+                if (remainingIndexes.Count > 0) {
                     totalSimplified++;
-                    Adj[i] = Adj[i].Where((x, i) => x.To.Index >= Instance.Trips.Count || directArcIndexes.Contains(x.To.Index)).ToList();
-                    AdjFull[i] = AdjFull[i].Select((x, i) => x == null || x.To.Index >= Instance.Trips.Count || directArcIndexes.Contains(x.To.Index) ? x : null).ToList();
+                    Adj[i] = Adj[i].Where((x, i) => x.To.Index >= Instance.Trips.Count || remainingIndexes.Contains(x.To.Index)).ToList();
+                    AdjFull[i] = AdjFull[i].Select((x, i) => x == null || x.To.Index >= Instance.Trips.Count || remainingIndexes.Contains(x.To.Index) ? x : null).ToList();
                 }
             }
 
