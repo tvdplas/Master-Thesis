@@ -1,0 +1,1 @@
+# attempts;# subdivs;value;#unique cols;mipgap;runtime

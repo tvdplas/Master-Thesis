@@ -104,7 +104,8 @@ namespace E_VCSP_Backend {
             Reload("VSP Secondary Columns");
             if (vss == null || VSPSolver == null) return;
 
-            Config.VSP_SOLVER_TIMEOUT_SEC = 10;
+            Config.VH_OVER_MAX_COST = 0;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
 
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
 
