@@ -13,7 +13,6 @@ namespace E_VCSP {
         private readonly Dictionary<string, Control> controlsMap = [];
         RosterDisplay rd = new();
 
-        bool working = false;
         int __view = 0; // 0: vehicles, 1: blocks, 2: duties, 3: general
         int view {
             get {
@@ -32,8 +31,8 @@ namespace E_VCSP {
 
             // Add all experiments to comboBox1
             comboBox1.Items.Clear();
-            foreach (var exp in runner.Experiments) {
-                comboBox1.Items.Add(exp.Method.Name);
+            foreach (var expName in runner.Experiments.Keys) {
+                comboBox1.Items.Add(expName.Substring("exp".Length));
             }
 
             Console.SetOut(new TextboxConsoleIntercept(consoleView));
@@ -46,8 +45,8 @@ namespace E_VCSP {
         private void runExperiment_Click(object sender, EventArgs e) {
             if (comboBox1.SelectedIndex >= 0 && comboBox1.SelectedIndex < runner.Experiments.Count) {
                 Config.GLOBAL_CONSOLE_KILL = true;
-                Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: {runner.Experiments[comboBox1.SelectedIndex].Method.Name}");
-                runner.Experiments[comboBox1.SelectedIndex]();
+                Console.WriteLine($"{Config.CNSL_OVERRIDE}Starting experiment: {comboBox1.Text}");
+                runner.Experiments[comboBox1.Text]();
             }
         }
 
@@ -153,12 +152,11 @@ namespace E_VCSP {
 
         #region Solve from instance
         private async void solveVSPClick(object sender, EventArgs e) {
-            working = true;
             solveVSPButton.Enabled = false;
             solveCSPButton.Enabled = false;
             solveEVCSPButton.Enabled = false;
 
-            bool success = await runner.VSPFromInstance();
+            bool success = await Task.Run(runner.VSPFromInstance);
             if (success) {
                 view = 0;
                 rd.UpdateRosterNodes(
@@ -167,42 +165,37 @@ namespace E_VCSP {
                 solveCSPButton.Enabled = true;
             }
 
-            working = false;
             solveVSPButton.Enabled = true;
             solveEVCSPButton.Enabled = true;
         }
         private async void solveCSPClick(object sender, EventArgs e) {
-            working = true;
             solveVSPButton.Enabled = false;
             solveCSPButton.Enabled = false;
             solveEVCSPButton.Enabled = false;
 
-            bool success = await Task.Run(() => runner.CSPFromInstance());
+            bool success = await Task.Run(runner.CSPFromInstance);
 
             if (success) {
                 view = 2;
                 rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(runner.css!.SelectedDuties));
             }
 
-            working = false;
             solveVSPButton.Enabled = true;
             solveCSPButton.Enabled = true;
             solveEVCSPButton.Enabled = true;
         }
 
         private async void solveEVCSPClick(object sender, EventArgs e) {
-            working = true;
             solveVSPButton.Enabled = false;
             solveCSPButton.Enabled = false;
             solveEVCSPButton.Enabled = false;
 
-            bool success = await Task.Run(() => runner.VCSPFromInstance());
+            bool success = await Task.Run(runner.VCSPFromInstance);
             if (success) {
                 view = 0;
                 rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks));
             }
 
-            working = false;
             solveVSPButton.Enabled = true;
             solveCSPButton.Enabled = true;
             solveEVCSPButton.Enabled = true;

@@ -12,6 +12,14 @@
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <WarningLevel>8</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <WarningLevel>8</WarningLevel>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Gurobi.Optimizer" Version="12.0.3" />
   </ItemGroup>

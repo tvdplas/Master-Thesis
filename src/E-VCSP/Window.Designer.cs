@@ -262,7 +262,6 @@ namespace E_VCSP
         private Panel configPanel; // Panel for the Button and FolderBrowserDialog
         private SplitContainer splitContainer; // SplitContainer for the TextBox and GraphViewer
         private Button solveVSPButton;
-        private CancellationTokenSource ctSource;
         private Button viewToggleButton;
         private Button button2;
         private Button button3;

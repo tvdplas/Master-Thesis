@@ -17,10 +17,10 @@ namespace E_VCSP_Backend {
         public CSPCG? CSPSolver;
         public EVCSPCGLagrange? IntegratedSolver;
 
-        public List<Action> Experiments;
+        public Dictionary<string, Action> Experiments;
 
         public Runner() {
-            Experiments = new List<Action>();
+            Experiments = [];
 
             // Add all methods starting with "exp" to the Experiments list
             var expMethods = this.GetType()
@@ -29,7 +29,7 @@ namespace E_VCSP_Backend {
 
             foreach (var method in expMethods) {
                 // Create a delegate for each method and add to the list
-                Experiments.Add((Action)Delegate.CreateDelegate(typeof(Action), this, method));
+                Experiments.Add(method.Name, (Action)Delegate.CreateDelegate(typeof(Action), this, method));
             }
         }
 
@@ -52,11 +52,11 @@ namespace E_VCSP_Backend {
             Console.WriteLine($"Instance reloaded. Current config state dumped to {Constants.RUN_LOG_FOLDER + "config.txt"}");
         }
 
-        public async Task<bool> VSPFromInstance() {
+        public bool VSPFromInstance() {
             Reload(); // Ensure instance and solver are ready
             if (VSPSolver == null) return false;
 
-            bool success = await Task.Run(() => VSPSolver.Solve());
+            bool success = VSPSolver.Solve();
 
             if (success) Console.WriteLine("Solver finished successfully.");
             else Console.WriteLine("Solver did not find a solution or was cancelled.");
@@ -64,7 +64,7 @@ namespace E_VCSP_Backend {
             return success;
         }
 
-        public async Task<bool> CSPFromInstance() {
+        public bool CSPFromInstance() {
             if (Instance == null || vss == null || vss.SelectedTasks.Count == 0) return false;
 
             if (css == null || css.Blocks.Count == 0 || vss.SelectedTasks.Count > 0) {
@@ -78,18 +78,18 @@ namespace E_VCSP_Backend {
             Console.WriteLine($"Total of {css.Blocks.Count} blocks being considered");
             CSPSolver = new CSPCG(css);
 
-            bool success = await Task.Run(() => CSPSolver.Solve());
+            bool success = CSPSolver.Solve();
 
             if (success) Console.WriteLine("Solution found");
             else Console.WriteLine("No solution/cancelled.");
             return success;
         }
 
-        public async Task<bool> VCSPFromInstance() {
+        public bool VCSPFromInstance() {
             Reload(); // Ensure instance and solver are ready
             if (IntegratedSolver == null) return false;
 
-            bool success = await Task.Run(() => IntegratedSolver.Solve());
+            bool success = IntegratedSolver.Solve();
             if (success) Console.WriteLine("Solver finished successfully.");
             else Console.WriteLine("Solver did not find a solution or was cancelled.");
             return success;
@@ -97,7 +97,7 @@ namespace E_VCSP_Backend {
 
         #region Experiments
 
-        async void expVSPSecondaryColumns() {
+        void expVSPSecondaryColumns() {
             const int attempts = 32;
             const int subdivisions = 16;
 
@@ -116,13 +116,13 @@ namespace E_VCSP_Backend {
 
                     vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
                     VSPSolver = new EVSPCG(vss);
-                    bool success = await Task.Run(() => VSPSolver.Solve());
+                    bool success = VSPSolver.Solve();
                     Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{vss.Costs()};{vss.Tasks.Count};{VSPSolver.model!.MIPGap};{VSPSolver.model.Runtime}");
                 }
             }
         }
 
-        async void expVSPTargetVehicles() {
+        void expVSPTargetVehicles() {
             int minMaxVehicles = 8;
             int maxMaxVehicles = 17;
 
@@ -139,12 +139,12 @@ namespace E_VCSP_Backend {
                 vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
                 VSPSolver = new EVSPCG(vss);
 
-                bool success = await Task.Run(() => VSPSolver.Solve());
+                bool success = VSPSolver.Solve();
                 Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{vss.Costs()};{vss.Tasks.Count};{VSPSolver.model!.MIPGap};{VSPSolver.model.Runtime}");
             }
         }
 
-        async void expCSPSecondaryColumns() {
+        void expCSPSecondaryColumns() {
             Reload();
             // Get vsp solution
             Config.VSP_SOLVER_TIMEOUT_SEC = 900;
@@ -152,7 +152,7 @@ namespace E_VCSP_Backend {
             Config.VSP_LB_SEC_COL_COUNT = 4;
             vss = new(Instance!, Instance!.VehicleTypes[0]);
             VSPSolver = new EVSPCG(vss);
-            bool success = await Task.Run(() => VSPSolver.Solve());
+            bool success = VSPSolver.Solve();
 
             const int attempts = 16;
             const int subdivisions = 16;
@@ -163,7 +163,7 @@ namespace E_VCSP_Backend {
                     Config.CSP_LB_SEC_COL_COUNT = i;
                     css = new(Instance, Block.FromVehicleTasks(vss.SelectedTasks));
                     CSPSolver = new CSPCG(css);
-                    success = await Task.Run(() => CSPSolver.Solve());
+                    success = CSPSolver.Solve();
                     Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{css.Costs()};{css.Duties.Count};{CSPSolver.model!.MIPGap};{CSPSolver.model.Runtime}");
                 }
             }
