@@ -681,7 +681,7 @@ namespace E_VCSP.Solver {
 
                     Block block = css.Blocks[i];
 
-                    List<(double cost, bool front, Location startLocation, int startTime)> candidateDescriptors = [];
+                    List<(double cost, bool atFront, Location location, int time)> expansions = [];
 
                     // Check if first element of block can be expanded
                     // Expansion as trip: add trip in front/at back (for now)
@@ -689,12 +689,12 @@ namespace E_VCSP.Solver {
                         // Check if there is a trip that can be used to extend the block backwards
                         for (int ti = 0; ti < vss.Instance.Trips.Count; ti++) {
                             Trip t = vss.Instance.Trips[ti];
-                            if (t.EndLocation != block.StartLocation || t.EndTime > block.StartTime) continue;
+                            if (!t.StartLocation.HandoverAllowed || t.EndLocation != block.StartLocation || t.EndTime > block.StartTime) continue;
 
                             // Block transition allowed; can only be done with short idle
-                            // as break / long idle start a new block
+                            // and if there is no time for handover
                             int waitingTime = block.StartTime - t.EndTime;
-                            bool transitionAllowed = Constants.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime <= Constants.CR_MAX_SHORT_IDLE_TIME;
+                            bool transitionAllowed = Constants.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime < block.StartLocation.MinHandoverTime;
                             bool overallTimeAllowed = t.Duration + waitingTime + block.Duration <= Constants.MAX_STEERING_TIME;
                             if (!transitionAllowed || !overallTimeAllowed) continue;
 
@@ -702,7 +702,7 @@ namespace E_VCSP.Solver {
                             Descriptor candidateDescriptor = new Descriptor(t.StartLocation, t.StartTime, block.EndLocation, block.EndTime);
                             if (knownBlocks.ContainsKey(candidateDescriptor)) continue;
 
-                            candidateDescriptors.Add((-lambdaTrips[t.Index], true, t.StartLocation, t.StartTime));
+                            expansions.Add((-lambdaTrips[t.Index], true, t.StartLocation, t.StartTime));
                         }
 
                         // Check if we can add an incoming deadhead; can only be done if were not directly followed
@@ -711,7 +711,7 @@ namespace E_VCSP.Solver {
                             Location curr = block.Elements[0].StartLocation;
                             for (int li = 0; li < vss.Instance.Locations.Count; li++) {
                                 DeadheadTemplate? dht = vss.LocationDHT[li][curr.Index];
-                                if (dht == null) continue;
+                                if (dht == null || !dht.StartLocation.HandoverAllowed) continue;
 
                                 Descriptor candidateDescriptor = new Descriptor(
                                     dht.StartLocation,
@@ -721,7 +721,7 @@ namespace E_VCSP.Solver {
                                 );
                                 if (knownBlocks.ContainsKey(candidateDescriptor)) continue;
                                 // Ignore driving costs
-                                candidateDescriptors.Add((0, true, dht.StartLocation, block.StartTime - dht.Duration));
+                                expansions.Add((0, true, dht.StartLocation, block.StartTime - dht.Duration));
                             }
                         }
                     }
@@ -730,12 +730,12 @@ namespace E_VCSP.Solver {
                         // Same but forwards
                         for (int ti = 0; ti < vss.Instance.Trips.Count; ti++) {
                             Trip t = vss.Instance.Trips[ti];
-                            if (t.StartLocation != block.EndLocation || block.EndTime > t.StartTime) continue;
+                            if (!t.StartLocation.HandoverAllowed || t.StartLocation != block.EndLocation || block.EndTime > t.StartTime) continue;
 
                             // Block transition allowed; can only be done with short idle
                             // as break / long idle start a new block
                             int waitingTime = t.StartTime - block.EndTime;
-                            bool transitionAllowed = Constants.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime <= Constants.CR_MAX_SHORT_IDLE_TIME;
+                            bool transitionAllowed = Constants.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime <= block.EndLocation.MinHandoverTime;
                             bool overallTimeAllowed = t.Duration + waitingTime + block.Duration <= Constants.MAX_STEERING_TIME;
                             if (!transitionAllowed || !overallTimeAllowed) continue;
 
@@ -743,7 +743,7 @@ namespace E_VCSP.Solver {
                             Descriptor candidateDescriptor = new Descriptor(block.StartLocation, block.StartTime, t.EndLocation, t.EndTime);
                             if (knownBlocks.ContainsKey(candidateDescriptor)) continue;
 
-                            candidateDescriptors.Add((-lambdaTrips[t.Index], false, t.EndLocation, t.EndTime));
+                            expansions.Add((-lambdaTrips[t.Index], false, t.EndLocation, t.EndTime));
                         }
 
                         // Check if we can add an incoming deadhead; can only be done if were not directly followed
@@ -752,7 +752,7 @@ namespace E_VCSP.Solver {
                             Location curr = block.Elements[^1].StartLocation;
                             for (int li = 0; li < vss.Instance.Locations.Count; li++) {
                                 DeadheadTemplate? dht = vss.LocationDHT[curr.Index][li];
-                                if (dht == null) continue;
+                                if (dht == null || !dht.StartLocation.HandoverAllowed) continue;
 
                                 Descriptor candidateDescriptor = new Descriptor(
                                     block.StartLocation,
@@ -762,24 +762,37 @@ namespace E_VCSP.Solver {
                                 );
                                 if (knownBlocks.ContainsKey(candidateDescriptor)) continue;
                                 // Ignore driving costs
-                                candidateDescriptors.Add((0, false, dht.EndLocation, block.EndTime + dht.Duration));
+                                expansions.Add((0, false, dht.EndLocation, block.EndTime + dht.Duration));
                             }
                         }
                     }
 
-                    candidateDescriptors = candidateDescriptors.OrderBy((x) => x.cost).ToList();
-                    for (int ci = 0; ci < candidateDescriptors.Count; ci++) {
-                        (_, bool front, Location l, int t) = candidateDescriptors[ci];
-                        Descriptor desc = front ? new Descriptor(l, t, block.EndLocation, block.EndTime) : new Descriptor(block.StartLocation, block.StartTime, l, t);
-                        if (knownBlocks.ContainsKey(desc)) continue;
-                        Block newBlock = front ? Block.FromDescriptor(l, t, block.EndLocation, block.EndTime) : Block.FromDescriptor(block.StartLocation, block.StartTime, l, t);
+                    expansions = expansions.OrderBy((x) => x.cost).ToList();
 
-                        knownBlocks[desc] = css.Blocks.Count;
-                        css.AddBlock(newBlock, 1);
-                        Y.Add(0); //unit duty from block being added
-                        lambdaBlocks.Add(0); // New block multiplier
-                        break; // only add one
-                    }
+                    List<(Descriptor desc, int idx)> descs = expansions.Select((x, i) => {
+                        (_, bool front, Location l, int t) = x;
+                        var desc = front
+                            ? new Descriptor(l, t, block.EndLocation, block.EndTime)
+                            : new Descriptor(block.StartLocation, block.StartTime, l, t);
+                        return (desc, i);
+                    }).ToList();
+
+                    List<(Descriptor desc, int idx)> unknownDescs = descs.Where(x => !knownBlocks.ContainsKey(x.desc)).ToList();
+                    (Descriptor desc, int idx)? chosenDescriptor = null;
+                    if (descs.Count > 0) chosenDescriptor = descs[0];
+                    if (unknownDescs.Count > 0) chosenDescriptor = unknownDescs[0];
+
+                    if (!chosenDescriptor.HasValue) continue;
+
+                    var expansion = expansions[chosenDescriptor.Value.idx];
+                    Block newBlock = expansion.atFront
+                        ? Block.FromDescriptor(expansion.location, expansion.time, block.EndLocation, block.EndTime)
+                        : Block.FromDescriptor(block.StartLocation, block.StartTime, expansion.location, expansion.time);
+
+                    knownBlocks[chosenDescriptor.Value.desc] = css.Blocks.Count;
+                    css.AddBlock(newBlock, 1);
+                    Y.Add(0); //unit duty from block being added
+                    lambdaBlocks.Add(0); // New block multiplier
                 }
             }
 
