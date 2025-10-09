@@ -33,7 +33,7 @@ namespace E_VCSP_Backend {
             }
         }
 
-        public void Reload() {
+        public void Reload(string runDescription = "No Description") {
             if (ActiveFolder == "No folder selected") return;
 
             Instance = new(ActiveFolder);
@@ -44,8 +44,8 @@ namespace E_VCSP_Backend {
             CSPSolver = new(css);
             IntegratedSolver = new EVCSPCGLagrange(vss, css);
 
-            string timestamp = DateTime.Now.ToString("yy-MM-dd HH.mm.ss");
-            Constants.RUN_LOG_FOLDER = $"./runs/{timestamp}/";
+            string timestamp = DateTime.Now.ToString("yy-MM-dd-HH.mm.ss");
+            Constants.RUN_LOG_FOLDER = $"./runs/{timestamp} {runDescription}/";
             Directory.CreateDirectory(Constants.RUN_LOG_FOLDER);
 
 
@@ -53,7 +53,7 @@ namespace E_VCSP_Backend {
         }
 
         public bool VSPFromInstance() {
-            Reload(); // Ensure instance and solver are ready
+            Reload("VSP From Instance");
             if (VSPSolver == null) return false;
 
             bool success = VSPSolver.Solve();
@@ -86,7 +86,7 @@ namespace E_VCSP_Backend {
         }
 
         public bool VCSPFromInstance() {
-            Reload(); // Ensure instance and solver are ready
+            Reload("Integrated From Instance");
             if (IntegratedSolver == null) return false;
 
             bool success = IntegratedSolver.Solve();
@@ -101,10 +101,10 @@ namespace E_VCSP_Backend {
             const int attempts = 32;
             const int subdivisions = 16;
 
-            Reload(); // Ensure instance and solver are ready
+            Reload("VSP Secondary Columns");
             if (vss == null || VSPSolver == null) return;
 
-            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 10;
 
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
 
@@ -126,7 +126,7 @@ namespace E_VCSP_Backend {
             int minMaxVehicles = 8;
             int maxMaxVehicles = 17;
 
-            Reload(); // Ensure instance and solver are ready
+            Reload("VSP Target Vehicles");
             if (vss == null || VSPSolver == null) return;
 
             Config.VSP_SOLVER_TIMEOUT_SEC = 900;
@@ -145,7 +145,7 @@ namespace E_VCSP_Backend {
         }
 
         void expCSPSecondaryColumns() {
-            Reload();
+            Reload("CSP Secondary Columns");
             // Get vsp solution
             Config.VSP_SOLVER_TIMEOUT_SEC = 900;
             Config.VSP_LB_SEC_COL_ATTEMPTS = 16;

@@ -57,6 +57,7 @@ namespace E_VCSP_Backend {
                     return;
                 }
                 else {
+                    Console.WriteLine("Running experiment " + args[0]);
                     Config.GLOBAL_CONSOLE_KILL = true;
                     action();
                 }

@@ -865,6 +865,7 @@ namespace E_VCSP.Solver {
         private void solveILP() {
             // Solve using ILP
             GRBEnv env = new() {
+                OutputFlag = 0,
                 LogToConsole = 0,
                 LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "evcspcg_gurobi.log")
             };

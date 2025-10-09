@@ -19,6 +19,7 @@ namespace E_VCSP.Solver {
         private (GRBModel model, List<GRBVar> dutyVars) InitModel() {
             // Env
             GRBEnv env = new() {
+                OutputFlag = 0,
                 LogToConsole = 0,
                 LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "cspcg_gurobi.log")
             };

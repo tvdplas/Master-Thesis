@@ -14,9 +14,13 @@ namespace E_VCSP.Formatting {
             if (value == null) value = string.Empty;
             if (Config.GLOBAL_CONSOLE_KILL && (value != Environment.NewLine && !value.StartsWith(Config.CNSL_OVERRIDE)))
                 return null;
+
             if (value.StartsWith(Config.CNSL_OVERRIDE)) {
                 value = value.Substring(Config.CNSL_OVERRIDE.Length);
             }
+
+            if (value.Contains("Set parameter") || value.Contains("Academic"))
+                value = "";
 
             StringBuilder output = new StringBuilder();
 

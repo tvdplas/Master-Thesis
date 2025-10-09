@@ -11,7 +11,7 @@ namespace E_VCSP {
         public static bool CONSOLE_GUROBI = false;
         public static bool DUMP_VSP = false;
         public static bool DUMP_CSP = false;
-        public static int THREAD_COUNT = 10;
+        public static int THREAD_COUNT = Environment.ProcessorCount * 2 - 1;
 
         public static Header GUROBI = new();
         public static bool GRB_EXTEND_TIME = false;

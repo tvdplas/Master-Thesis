@@ -72,7 +72,8 @@ namespace E_VCSP.Solver {
         /// <returns>Model where first <c>n</c> constraints correspond to the <c>n</c> trips, and a list of initial vehicle task vars</returns>
         private (GRBModel model, List<GRBVar> taskVars) InitModel() {
             // Env
-            GRBEnv env = new() {
+            GRBEnv env = new(null) {
+                OutputFlag = 0,
                 LogToConsole = 0,
                 LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "evspcg_gurobi.log")
             };

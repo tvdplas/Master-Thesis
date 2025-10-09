@@ -225,7 +225,7 @@ namespace E_VCSP {
                 if (dump == null) throw new InvalidDataException("Dump not valid");
 
                 runner.ActiveFolder = dump.path;
-                runner.Reload();
+                runner.Reload("Load EVSP Result");
 
                 runner.vss = new(runner.Instance!, runner.Instance!.VehicleTypes[0]);
                 runner.vss.LoadFromDump(dump);
@@ -245,7 +245,7 @@ namespace E_VCSP {
                 if (dump == null) throw new InvalidDataException("Dump not valid");
 
                 runner.ActiveFolder = dump.path;
-                runner.Reload();
+                runner.Reload("Load CSP result");
 
                 runner.css = new(runner.Instance!, []);
                 runner.css.LoadFromDump(dump);
