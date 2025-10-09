@@ -3,10 +3,14 @@ using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver;
 using E_VCSP.Solver.SolutionState;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace E_VCSP_Backend {
-    public class Runner {
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+    public class Runner
+    {
         public string ActiveFolder = "No folder selected";
 
         public Instance? Instance;
@@ -19,7 +23,8 @@ namespace E_VCSP_Backend {
 
         public Dictionary<string, Action> Experiments;
 
-        public Runner() {
+        public Runner()
+        {
             Experiments = [];
 
             // Add all methods starting with "exp" to the Experiments list
@@ -27,13 +32,15 @@ namespace E_VCSP_Backend {
                 .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                 .Where(m => m.Name.StartsWith("exp") && m.GetParameters().Length == 0);
 
-            foreach (var method in expMethods) {
+            foreach (var method in expMethods)
+            {
                 // Create a delegate for each method and add to the list
                 Experiments.Add(method.Name, (Action)Delegate.CreateDelegate(typeof(Action), this, method));
             }
         }
 
-        public void Reload(string runDescription = "No Description") {
+        public void Reload(string runDescription = "No Description")
+        {
             if (ActiveFolder == "No folder selected") return;
 
             Instance = new(ActiveFolder);
@@ -52,7 +59,8 @@ namespace E_VCSP_Backend {
             Console.WriteLine($"Instance reloaded. Current config state dumped to {Constants.RUN_LOG_FOLDER + "config.txt"}");
         }
 
-        public bool VSPFromInstance() {
+        public bool VSPFromInstance()
+        {
             Reload("VSP From Instance");
             if (VSPSolver == null) return false;
 
@@ -64,14 +72,17 @@ namespace E_VCSP_Backend {
             return success;
         }
 
-        public bool CSPFromInstance() {
+        public bool CSPFromInstance()
+        {
             if (Instance == null || vss == null || vss.SelectedTasks.Count == 0) return false;
 
-            if (css == null || css.Blocks.Count == 0 || vss.SelectedTasks.Count > 0) {
+            if (css == null || css.Blocks.Count == 0 || vss.SelectedTasks.Count > 0)
+            {
                 Console.WriteLine("Solving based on VSP solution");
                 css = new(Instance, Block.FromVehicleTasks(vss.SelectedTasks));
             }
-            else {
+            else
+            {
                 Console.WriteLine("Resetting existing CSP solution");
                 css.ResetFromBlocks();
             }
@@ -85,7 +96,8 @@ namespace E_VCSP_Backend {
             return success;
         }
 
-        public bool VCSPFromInstance() {
+        public bool VCSPFromInstance()
+        {
             Reload("Integrated From Instance");
             if (IntegratedSolver == null) return false;
 
@@ -97,7 +109,8 @@ namespace E_VCSP_Backend {
 
         #region Experiments
 
-        void expVSPSecondaryColumns() {
+        void expVSPSecondaryColumns()
+        {
             const int attempts = 32;
             const int subdivisions = 16;
 
@@ -110,9 +123,11 @@ namespace E_VCSP_Backend {
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
 
 
-            for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
+            for (int i = 0; i <= attempts; i = Math.Max(1, i * 2))
+            {
                 Config.VSP_LB_SEC_COL_ATTEMPTS = i;
-                for (int j = 4; j <= subdivisions; j += 4) {
+                for (int j = 4; j <= subdivisions; j += 4)
+                {
                     Config.VSP_LB_SEC_COL_COUNT = i;
 
                     vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
@@ -123,7 +138,8 @@ namespace E_VCSP_Backend {
             }
         }
 
-        void expVSPTargetVehicles() {
+        void expVSPTargetVehicles()
+        {
             int minMaxVehicles = 8;
             int maxMaxVehicles = 17;
 
@@ -134,7 +150,8 @@ namespace E_VCSP_Backend {
 
             Console.WriteLine($"{Config.CNSL_OVERRIDE}max vh;value;cols;mipgap;runtime");
 
-            for (int i = minMaxVehicles; i <= maxMaxVehicles; i++) {
+            for (int i = minMaxVehicles; i <= maxMaxVehicles; i++)
+            {
                 Config.MAX_VEHICLES = i;
 
                 vss = new(vss.Instance, vss.Instance.VehicleTypes[0]);
@@ -145,7 +162,8 @@ namespace E_VCSP_Backend {
             }
         }
 
-        void expCSPSecondaryColumns() {
+        void expCSPSecondaryColumns()
+        {
             Reload("CSP Secondary Columns");
             // Get vsp solution
             Config.VSP_SOLVER_TIMEOUT_SEC = 900;
@@ -158,9 +176,11 @@ namespace E_VCSP_Backend {
             const int attempts = 16;
             const int subdivisions = 16;
 
-            for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
+            for (int i = 0; i <= attempts; i = Math.Max(1, i * 2))
+            {
                 Config.CSP_LB_SEC_COL_ATTEMPTS = i;
-                for (int j = 4; j <= subdivisions; j += 4) {
+                for (int j = 4; j <= subdivisions; j += 4)
+                {
                     Config.CSP_LB_SEC_COL_COUNT = i;
                     css = new(Instance, Block.FromVehicleTasks(vss.SelectedTasks));
                     CSPSolver = new CSPCG(css);
