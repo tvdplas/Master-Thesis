@@ -40,8 +40,7 @@ namespace E_VCSP_Backend {
             }
 
             if (args[0] == "vsp") {
-                bool x = runner.VSPFromInstance();
-                Console.WriteLine(x);
+                runner.VSPFromInstance();
             }
             else if (args[0] == "seq") {
                 runner.VSPFromInstance();
