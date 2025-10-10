@@ -29,6 +29,8 @@ namespace E_VCSP.Objects.ParsedData {
         private List<CurvePiece> Pieces;
         [JsonInclude]
         public double CostPerPercentage;
+        [JsonInclude]
+        private double BatteryPrice;
 
         public ChargingCurve(List<CurvePiece> pieces, double costPerPercentage) {
             Pieces = pieces;
@@ -61,6 +63,7 @@ namespace E_VCSP.Objects.ParsedData {
 
             // Charging cost per percentage gained 
             CostPerPercentage = Constants.KWH_COST * totalCapacity / 100;
+            BatteryPrice = Constants.BATTERY_KWH_COST * totalCapacity;
         }
 
         /// <summary>
@@ -108,10 +111,16 @@ namespace E_VCSP.Objects.ParsedData {
                 timeRemaining -= usableTime;
             }
 
+            double Cost = CostPerPercentage * (currSoC - startSoC);
+            if (currSoC > startSoC) {
+                double degCost = (Math.Exp(2.519 * currSoC / 100) - Math.Exp(2.519 * startSoC / 100)) / 4825.4 * BatteryPrice;
+                Cost += degCost;
+            }
+
             return new ChargeResult() {
                 SoCGained = currSoC - startSoC,
                 TimeUsed = time - timeRemaining,
-                Cost = CostPerPercentage * (currSoC - startSoC),
+                Cost = Cost,
             };
         }
 

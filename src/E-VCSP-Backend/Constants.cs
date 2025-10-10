@@ -21,6 +21,7 @@
 
         // Driving/Charging
         public static double KWH_COST = 0.32; // based on national average price
+        public static double BATTERY_KWH_COST = 100;
         public static int MIN_CHARGE_TIME = 300;
         public static double VH_M_COST = 0.00005; // verified at qbuzz
         public static int MAX_STEERING_TIME = 60 * 60 * 4; // conitnous driving time
