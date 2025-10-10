@@ -127,6 +127,7 @@ namespace E_VCSP_Backend {
         void expVSPTargetVehicles() {
             int minMaxVehicles = 8;
             int maxMaxVehicles = 17;
+            Config.VH_OVER_MAX_COST = 5000;
 
             Reload("VSP Target Vehicles");
             if (vss == null || VSPSolver == null) return;
