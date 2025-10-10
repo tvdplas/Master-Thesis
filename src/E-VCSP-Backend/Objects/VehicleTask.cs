@@ -337,6 +337,7 @@ namespace E_VCSP.Objects {
 
                 // Costs of overnight recharge
                 cost += Math.Max(0, vehicleType.StartSoC - (double)Elements[^1]!.EndSoCInTask!) * vehicleType.Capacity / 100 * Constants.KWH_COST;
+                cost += BatteryDepreciation.Cost((double)Elements[^1]!.EndSoCInTask, vehicleType.StartSoC, vehicleType.Capacity);
 
                 // Cost of just using vehicle
                 cost += Config.VH_PULLOUT_COST;

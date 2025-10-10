@@ -473,17 +473,30 @@ namespace E_VCSP.Solver.SolutionState {
         }
 
         public void PrintCostBreakdown(int slack = 0) {
+            double overallCost = SelectedTasks.Sum(x => x.Cost);
+            double pulloutCost = SelectedTasks.Count * Config.VH_PULLOUT_COST;
+            double tripDrivingCost = SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Trip ? y.Cost : 0));
+            double tripKWHCost = SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Trip ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0));
+            double dhDrivingCost = SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Deadhead ? y.Cost : 0));
+            double dhKWHCost = SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Deadhead ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0));
+            double idleKWHCost = SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Idle ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0)); ;
+            double batteryDegCost = overallCost - pulloutCost - tripDrivingCost - tripKWHCost - dhDrivingCost - dhKWHCost - idleKWHCost;
+
             string breakdown =
             $"""
             Overall vehicle costs: {SelectedTasks.Sum(x => x.Cost) + slack * Config.VH_OVER_MAX_COST}
             Cost breakdown:
-            Vehicle tasks: {SelectedTasks.Sum(x => x.Cost)}
-                Vehicle pullout costs: {SelectedTasks.Count * Config.VH_PULLOUT_COST}
-                Trip driving costs: {SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Trip ? y.Cost : 0))}
-                Trip battery costs: {SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Trip ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0))}
-                Other driving costs: {SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type != VEType.Trip && y.Type != VEType.Charge ? y.Cost : 0))}
-                Other battery costs: {SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type != VEType.Trip && y.Type != VEType.Charge ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0))}
-            Vehicle slack penalty: {slack * Config.VH_OVER_MAX_COST}
+            Tasks: {overallCost}
+                Vehicle pullout costs: {pulloutCost}
+                Driving: 
+                    Trip: {tripDrivingCost}
+                    Deadhead: {dhDrivingCost}
+                KWh usage:
+                    Trip: {tripKWHCost}
+                    Deadhead: {dhKWHCost}
+                    Idle: {idleKWHCost}
+                Battery degredation: {batteryDegCost}
+            Slack penalty: {slack * Config.VH_OVER_MAX_COST}
             """;
 
             Console.WriteLine(breakdown);

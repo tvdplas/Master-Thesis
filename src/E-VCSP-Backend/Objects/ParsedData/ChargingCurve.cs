@@ -2,6 +2,13 @@
 using System.Text.Json.Serialization;
 
 namespace E_VCSP.Objects.ParsedData {
+    public static class BatteryDepreciation {
+        public static double Cost(double startSoC, double endSoC, double capacity) {
+            double batteryPrice = Constants.BATTERY_KWH_COST * capacity;
+            return (Math.Exp(2.519 * (100 - startSoC) / 100) - Math.Exp(2.519 * (100 - endSoC) / 100)) / 4825.4 * batteryPrice;
+        }
+    }
+
     public class ChargeResult {
         [JsonInclude]
         public double SoCGained;
@@ -30,7 +37,7 @@ namespace E_VCSP.Objects.ParsedData {
         [JsonInclude]
         public double CostPerPercentage;
         [JsonInclude]
-        private double BatteryPrice;
+        private double BatteryCapacity;
 
         public ChargingCurve(List<CurvePiece> pieces, double costPerPercentage) {
             Pieces = pieces;
@@ -63,7 +70,7 @@ namespace E_VCSP.Objects.ParsedData {
 
             // Charging cost per percentage gained 
             CostPerPercentage = Constants.KWH_COST * totalCapacity / 100;
-            BatteryPrice = Constants.BATTERY_KWH_COST * totalCapacity;
+            BatteryCapacity = totalCapacity;
         }
 
         /// <summary>
@@ -113,8 +120,7 @@ namespace E_VCSP.Objects.ParsedData {
 
             double Cost = CostPerPercentage * (currSoC - startSoC);
             if (currSoC > startSoC) {
-                double degCost = (Math.Exp(2.519 * currSoC / 100) - Math.Exp(2.519 * startSoC / 100)) / 4825.4 * BatteryPrice;
-                Cost += degCost;
+                Cost += BatteryDepreciation.Cost(startSoC, currSoC, BatteryCapacity);
             }
 
             return new ChargeResult() {

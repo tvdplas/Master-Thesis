@@ -498,6 +498,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             foreach (var finalLabel in allLabels[^1]) {
                 finalLabel.CurrCosts += Math.Max(0, vss.VehicleType.StartSoC - finalLabel.CurrActualSoC)
                     * vss.VehicleType.Capacity / 100 * Constants.KWH_COST;
+                finalLabel.CurrCosts += BatteryDepreciation.Cost(finalLabel.CurrActualSoC, vss.VehicleType.StartSoC, vss.VehicleType.Capacity);
             }
         }
 

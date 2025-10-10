@@ -261,6 +261,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Add night charging costs
             chargingCost += Math.Min(0, vcg.vss.VehicleType.StartSoC - currSoC) * vcg.vss.VehicleType.Capacity / 100 * Constants.KWH_COST;
+            chargingCost += BatteryDepreciation.Cost(currSoC, vcg.vss.VehicleType.StartSoC, vcg.vss.VehicleType.Capacity);
 
             // Finalize all times / charge at the depot
             int arrivalTime = ((PVETravel)curr.Prev!.PVE).ArrivalTime;
