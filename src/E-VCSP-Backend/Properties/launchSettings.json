@@ -2,7 +2,7 @@
   "profiles": {
     "E-VCSP-Backend": {
       "commandName": "Project",
-      "commandLineArgs": "VSPGlobalLS ../../../../../data/leiden-1-2"
+      "commandLineArgs": "VSPSingleLS ../../../../../data/leiden-1-2"
     }
   }
 }

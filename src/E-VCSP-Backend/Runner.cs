@@ -207,6 +207,41 @@ namespace E_VCSP_Backend {
             }
         }
 
+        void expVSPSingleLS() {
+            Reload("VSP Single LS");
+
+            Config.VSP_SOLVER_HEURISTIC_FRAC = 0.25;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 300;
+            Config.VSP_LB_WEIGHT = 0;
+            Config.VSP_LS_S_WEIGHT = 1;
+            Config.VSP_INSTANCES_PER_IT = 1;
+            Config.VSP_LS_S_NUM_COLS = 16;
+            Config.VH_OVER_MAX_COST = 0;
+
+            int attempts = 5;
+            List<int> rounds = [100, 200, 500, 1000, 2000, 5000];
+            List<int> maxIts = [1_000, 10_000, 50_000, 100_000, 500_000];
+
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;# its;best ilp;#unique cols;mipgap;ilp runtime;total runtime");
+
+            foreach (var r in rounds) {
+                foreach (var i in maxIts) {
+                    for (int x = 0; x < attempts; x++) {
+                        Config.VSP_MAX_COL_GEN_ITS = r;
+                        Config.VSP_OPT_IT_THRESHOLD = r;
+                        Config.VSP_LS_S_ITERATIONS = i;
+
+                        vss = new(vss!.Instance, vss.Instance.VehicleTypes[0]);
+                        VSPSolver = new EVSPCG(vss);
+                        Stopwatch sw = Stopwatch.StartNew();
+                        bool success = VSPSolver.Solve();
+                        sw.Stop();
+                        Console.WriteLine($"{Config.CNSL_OVERRIDE}{r};{i};{vss.Costs()};{vss.Tasks.Count};{VSPSolver.model!.MIPGap};{VSPSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
+                    }
+                }
+            }
+        }
+
 
         #endregion
     }
