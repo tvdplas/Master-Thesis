@@ -177,7 +177,7 @@ namespace E_VCSP_Backend {
         void expVSPGlobalLS() {
             Reload("VSP Global LS");
 
-            Config.VSP_SOLVER_HEURISTIC_FRAC = 0.1;
+            Config.VSP_SOLVER_HEURISTIC_FRAC = 0.25;
             Config.VSP_SOLVER_TIMEOUT_SEC = 300;
             Config.VSP_LB_WEIGHT = 0;
             Config.VSP_LS_G_WEIGHT = 1;
