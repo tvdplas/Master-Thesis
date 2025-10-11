@@ -184,7 +184,9 @@ namespace E_VCSP_Backend {
             int attempts = 5;
             List<int> rounds = [100, 250, 500, 1000];
             List<int> maxIts = [50_000, 100_000, 500_000, 1_000_000, 5_000_000];
+
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;# its;best direct;best ilp;#unique cols;mipgap;ilp runtime;total runtime");
+
             foreach (var r in rounds) {
                 foreach (var i in maxIts) {
                     for (int x = 0; attempts < r; x++) {
