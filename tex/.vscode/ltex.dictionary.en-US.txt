@@ -26,3 +26,5 @@ timetabled
 timetabling
 Timetabled
 Gurobi
+bitmask
+overcovered
