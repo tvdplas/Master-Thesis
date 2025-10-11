@@ -191,7 +191,7 @@ namespace E_VCSP_Backend {
 
             foreach (var r in rounds) {
                 foreach (var i in maxIts) {
-                    for (int x = 0; attempts < r; x++) {
+                    for (int x = 0; x < attempts; x++) {
                         Config.VSP_MAX_COL_GEN_ITS = r;
                         Config.VSP_OPT_IT_THRESHOLD = r;
                         Config.VSP_LS_G_ITERATIONS = i;

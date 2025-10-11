@@ -161,6 +161,7 @@ Overall, the goal is to find a set of feasible vehicle tasks and crew duties tha
     $\sigma \in [0, 1]$ & SoC of a vehicle, all vehicles start with $\sigma=1$\\
     $chl_\chi$ & Charge lost when driving a trip/deadhead $\chi$ \\
     $chg_{l,\sigma,\tau}$ & Max. charge gained at location $l$ in $\tau$ time with starting SoC $\sigma$ \\
+    $bdg_{\sigma,\sigma'}$ Battery degradation cost when charging from $\sigma$ to $\sigma'$ \\
     \addlinespace[0.6em]
     \multicolumn{2}{l}{\textit{Parameters}} \\
     $k_{i,t}$ & Binary parameter, vehicle task $vt_i$ covers trip $t$ \\ 
@@ -178,7 +179,7 @@ Overall, the goal is to find a set of feasible vehicle tasks and crew duties tha
     $B_\chi \subseteq B$ & Blocks covered by schedule $\chi$ \\ 
     $km(vt_i)$ & Kilometers traveled during $vt_i$ \\ 
     $chl(vt_i)$ & kWh used during $vt_i$ \\ 
-    $bdg(vt_i)$ & Costs due to battery degredation in $vt_i$ \\ 
+    $bdg(vt_i)$ & Costs due to battery degradation in $vt_i$ \\ 
     $dur(\chi)$ & Total duration of schedule $\chi$ \\ 
     $cost(\chi)$ & Cost of schedule $\chi$ \\ 
     $s(\chi)$ & Start time of $\chi$ \\
@@ -203,7 +204,7 @@ Next, let us define our battery behavior. Let $\sigma$ represent the state of ch
 
 A subset of the locations $\mathcal{L}_c \subseteq \mathcal{L}$ has charging equipment available; for each of these, let $chg_{l,\sigma,\tau}$ represent the maximum amount of charge gained at location $l \in \mathcal{L}_c$ when a vehicle starts at an SoC of $\sigma$ and charges for $\tau$ time; note that this explicitly allows us to model nonlinear charging behavior. If a vehicle is not fully charged when it returns to the depot at the end of the operating period, it is assumed that overnight charging will take place that brings the vehicle back to $\sigma=1$. 
 
-Inspired by \citet{vanKootenNiekerk2017}, let us incorporate battery degradation by assuming that any charge action from SoC $\sigma$ to $\sigma'$ incurs some degradation related cost based on the battery in the vehicle; let this cost be decreasing in $\sigma$ and increasing in $\sigma' - \sigma$. This cost is also applicable to overnight charging.
+Inspired by \citet{vanKootenNiekerk2017}, let us incorporate battery degradation by assuming that any charge action from SoC $\sigma$ to $\sigma'$ incurs some degradation related cost $bdg_{\sigma,\sigma'}$. More formally, let this cost be of the form $bdg_{\sigma,\sigma'} = \kappa_1 \cdot [\exp(\kappa_2 \cdot (1 - \sigma)) - \exp(\kappa_2 \cdot (1 - \sigma'))]$, where $\kappa \geq 0$ is some scalar vector dependent on the specific battery used in the vehicle. This notably implies that the cost is decreasing in $\sigma$ and increasing in $\sigma' - \sigma$. This cost is also applicable to overnight charging.
 
 Lastly, let us define relief points and crew bases. A subset $\mathcal{L}_{rl} \subseteq \mathcal{L}$ of the defined locations may serve as relief points; these locations are the only ones at which a handover or break for a crew member can take place. For each of these locations, a minimum handover time is defined. A subset of these relief points $\mathcal{L}_{cb} \subseteq \mathcal{L}_{rl}$ is a crew base; these locations are the only ones at which a crew member may start or end their duty. For each of these locations, a sign-on and sign-off time are defined in order to get on and off the vehicle at the beginning and end of a shift respectively. \newline
 
@@ -223,7 +224,7 @@ Let the set of all feasible blocks be $B$. A schedule for a vehicle throughout t
   \item For each idle time at a charging location $l \in \mathcal{L}_c$ of length $\tau$, a vehicle may charge with some value $\alpha \cdot chg_{l,\sigma,\tau}$, where $0 \leq \alpha \leq 1$ represents a fraction of the maximal charge gained. 
   \item Given a starting SoC of $\sigma=1$, the SoC of the vehicle remains within $[0, 1]$ throughout the task.
 \end{itemize}
-Let the set of all feasible vehicle tasks be $VT$. For a vehicle task $vt$, let us define its cost as being $cost(vt) = \gamma_1 + \gamma_2 \cdot km(vt) + \gamma_3 \cdot chl(vt) + bdg(vt)$, where $km(vt)$, $chl(vt)$ and represent kilometers traveled and charge lost, $\gamma$ is a vector of cost scalars, and $bdg(vt)$ represents some additional costs based on battery degradation due to the charging schedule.
+Let the set of all feasible vehicle tasks be $VT$. For a vehicle task $vt$, let us define its cost as being $cost(vt) = \gamma_1 + \gamma_2 \cdot km(vt) + \gamma_3 \cdot chl(vt) + bdg(vt)$, where $km(vt)$, $chl(vt)$ and represent kilometers traveled and charge lost, $\gamma$ is a vector of cost scalars, and $bdg(vt)$ represents the battery degradation costs of the used charging schedule.
 
 Next, let us consider crew duties. As with vehicle tasks, a crew duty primarily consists of blocks that need to be driven throughout the day. Crew members are however bound by labor regulations; in most cases, this means that we will need to include break times and a maximum overall duration in the schedule. Additionally, idle time at handover locations may be required in order to wait for an arriving vehicle, and time is spent signing on/off the vehicle at the beginning and end of the day. A \textit{crew duty} therefore consists of a sequence of blocks, idles, breaks and sign-on/off times. As with blocks and vehicle tasks, we will refer to individual parts of this sequence as \emph{duty elements}. Exact feasibility constraints for crew duties will differ per country and region based on local labor regulations, however in general the following conditions must always be met: 
 \begin{itemize}
