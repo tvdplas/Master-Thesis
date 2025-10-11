@@ -177,14 +177,13 @@ namespace E_VCSP_Backend {
         void expVSPGlobalLS() {
             Reload("VSP Global LS");
 
-            Config.VSP_SOLVER_TIMEOUT_SEC = 30;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 300;
             Config.VSP_LB_WEIGHT = 0;
             Config.VSP_LS_G_WEIGHT = 1;
 
             int attempts = 5;
             List<int> rounds = [100, 250, 500, 1000];
             List<int> maxIts = [50_000, 100_000, 500_000, 1_000_000, 5_000_000];
-            Config.GLOBAL_CONSOLE_KILL = false;
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;# its;best direct;best ilp;#unique cols;mipgap;ilp runtime;total runtime");
             foreach (var r in rounds) {
                 foreach (var i in maxIts) {
