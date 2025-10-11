@@ -3,6 +3,7 @@ using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver;
 using E_VCSP.Solver.SolutionState;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
@@ -160,6 +161,7 @@ namespace E_VCSP_Backend {
             const int attempts = 16;
             const int subdivisions = 16;
 
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
             for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
                 Config.CSP_LB_SEC_COL_ATTEMPTS = i;
                 for (int j = 4; j <= subdivisions; j += 4) {
@@ -171,6 +173,37 @@ namespace E_VCSP_Backend {
                 }
             }
         }
+
+        void expVSPGlobalLS() {
+            Reload("VSP Global LS");
+
+            Config.VSP_SOLVER_TIMEOUT_SEC = 30;
+            Config.VSP_LB_WEIGHT = 0;
+            Config.VSP_LS_G_WEIGHT = 1;
+
+            int attempts = 5;
+            List<int> rounds = [100, 250, 500, 1000];
+            List<int> maxIts = [50_000, 100_000, 500_000, 1_000_000, 5_000_000];
+            Config.GLOBAL_CONSOLE_KILL = false;
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;# its;best direct;best ilp;#unique cols;mipgap;ilp runtime;total runtime");
+            foreach (var r in rounds) {
+                foreach (var i in maxIts) {
+                    for (int x = 0; attempts < r; x++) {
+                        Config.VSP_MAX_COL_GEN_ITS = r;
+                        Config.VSP_OPT_IT_THRESHOLD = r;
+                        Config.VSP_LS_G_ITERATIONS = i;
+
+                        vss = new(vss!.Instance, vss.Instance.VehicleTypes[0]);
+                        VSPSolver = new EVSPCG(vss);
+                        Stopwatch sw = Stopwatch.StartNew();
+                        bool success = VSPSolver.Solve();
+                        sw.Stop();
+                        Console.WriteLine($"{Config.CNSL_OVERRIDE}{r};{i};{VSPSolver.bestKnownSolutionValue};{vss.Costs()};{vss.Tasks.Count};{VSPSolver.model!.MIPGap};{VSPSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
+                    }
+                }
+            }
+        }
+
 
         #endregion
     }

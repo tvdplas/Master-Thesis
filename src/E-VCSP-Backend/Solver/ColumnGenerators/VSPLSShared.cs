@@ -321,9 +321,14 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 }
                 else if (VE.Type == PVEType.Travel) {
                     PVETravel pvet = (PVETravel)VE;
-                    VEDeadhead ved = new(pvet.DeadheadTemplate, pvet.DepartureTime, pvet.ArrivalTime, vt) { StartSoCInTask = currSoC, EndSoCInTask = currSoC + VE.SoCDiff };
+
+                    // count idle soc usage
+                    double dhStartSoC = currSoC + (pvet.IdleAtStart ? pvet.SoCDiffInIdle : 0);
+                    double dhEndSoC = currSoC + pvet.SoCDiffInDeadhead + (pvet.IdleAtStart ? pvet.SoCDiffInIdle : 0);
+
+                    VEDeadhead ved = new(pvet.DeadheadTemplate, pvet.DepartureTime, pvet.ArrivalTime, vt) { StartSoCInTask = dhStartSoC, EndSoCInTask = dhEndSoC };
                     elements.Add(ved);
-                    currSoC += VE.SoCDiff;
+                    currSoC += VE.SoCDiff; // pretend that the idle already happened; we add the idle in a later stage
                 }
                 else {
                     PVETravel prevTravel = (PVETravel)curr.Prev!.PVE;
@@ -350,9 +355,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         bool chargeAfter = chargeTimeAfter >= Constants.MIN_CHARGE_TIME;
 
                         // Possible charge before
-                        if (chargeBefore) performCharge(prevTravel.ArrivalTime, chargeTimeBefore, VE.StartLocation!);
+                        if (chargeBefore)
+                            performCharge(prevTravel.ArrivalTime, chargeTimeBefore, VE.StartLocation!);
                         else if (VE.Type == PVEType.Trip) {
-                            elements.Add(new VEIdle(VE.StartLocation, prevTravel.ArrivalTime, VE.StartTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC });
+                            elements.Add(new VEIdle(VE.StartLocation, prevTravel.ArrivalTime, VE.StartTime) {
+                                StartSoCInTask = currSoC - (prevTravel.IdleAtStart ? 0 : prevTravel.SoCDiffInIdle),
+                                EndSoCInTask = currSoC
+                            });
                         }
 
                         // Perform element
@@ -369,7 +378,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         // Possible charge after
                         if (chargeAfter) performCharge(VE.EndTime, chargeTimeAfter, VE.EndLocation!);
                         else if (VE.Type == PVEType.Trip) {
-                            elements.Add(new VEIdle(VE.EndLocation, VE.EndTime, nextTravel.DepartureTime) { StartSoCInTask = currSoC, EndSoCInTask = currSoC });
+                            elements.Add(new VEIdle(VE.EndLocation, VE.EndTime, nextTravel.DepartureTime) {
+                                StartSoCInTask = currSoC,
+                                EndSoCInTask = currSoC + (nextTravel.IdleAtStart ? nextTravel.SoCDiffInIdle : 0)
+                            });
                         }
                     }
                 }

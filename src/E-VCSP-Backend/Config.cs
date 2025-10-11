@@ -77,7 +77,6 @@ namespace E_VCSP {
         public static double VSP_LS_G_ENDING_T = 0.01;
         public static double VSP_LS_G_COOLING_RATE = 0.98;
         public static double VSP_LS_G_ITERATIONS = 10_000_000;
-        public static int VSP_LS_G_NUM_COLS = 10;
         public static double VSP_LS_G_2OPT = 20;
         public static double VSP_LS_G_MOVE_RANGE = 20;
         public static double VSP_LS_G_ADD_CHARGE = 5;

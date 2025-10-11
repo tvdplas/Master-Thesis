@@ -10,6 +10,7 @@ namespace E_VCSP.Solver {
     public class EVSPCG : Solver {
         public GRBModel? model;
         public VehicleSolutionState vss;
+        public double bestKnownSolutionValue = double.PositiveInfinity;
 
         public EVSPCG(VehicleSolutionState vss) {
             this.vss = vss;
@@ -165,6 +166,8 @@ namespace E_VCSP.Solver {
 
             Random rnd = new();
 
+            List<int> knownSolutionIndexes = [];
+
             // Continue until max number of columns is found, model isn't feasible during solve or break
             // due to RC constraint. 
             while (currIts < Config.VSP_MAX_COL_GEN_ITS && model.Status != GRB.Status.INFEASIBLE) {
@@ -227,6 +230,7 @@ namespace E_VCSP.Solver {
                         // Replace existing column with this task, as it has lower costs
                         if (coverExists) {
                             VehicleTask toBeReplaced = vss.CoverTaskMapping[ba];
+
                             int index = toBeReplaced.Index;
                             newTask.Index = index;
 
@@ -260,6 +264,16 @@ namespace E_VCSP.Solver {
                             vss.VarnameTaskMapping[name] = vss.Tasks[^1];
                             vss.CoverTaskMapping[ba] = vss.Tasks[^1];
                             addedNew++;
+                        }
+                    }
+
+                    // Check if this was a solution
+                    if (selectedMethodIndex == 2) {
+                        HashSet<int> tripCover = taskSet.SelectMany(x => x.Item2.TripIndexCover).ToHashSet();
+                        double cost = taskSet.Sum(x => x.Item2.Cost);
+                        if (tripCover.Count == vss.Instance.Trips.Count && cost < bestKnownSolutionValue) {
+                            knownSolutionIndexes = taskSet.Select(x => x.Item2.Index).ToList();
+                            bestKnownSolutionValue = cost;
                         }
                     }
                 }
@@ -302,36 +316,37 @@ namespace E_VCSP.Solver {
                 model.GetVarByName("vehicle_count_slack").UB = 0;
             }
 
-            // Apply greedy set cover as initial solution
-            var covered = new bool[vss.Instance.Trips.Count];
-            var score = new double[vss.Tasks.Count];
-            var chosen = new bool[vss.Tasks.Count];
-            int uncovered = vss.Instance.Trips.Count;
+            if (knownSolutionIndexes.Count == 0) {
+                // Apply greedy set cover as initial solution
+                var covered = new bool[vss.Instance.Trips.Count];
+                var score = new double[vss.Tasks.Count];
+                int uncovered = vss.Instance.Trips.Count;
 
-            while (uncovered > 0) {
-                // compute cost per newly-covered row
-                for (int j = 0; j < vss.Tasks.Count; j++) {
-                    if (chosen[j]) { score[j] = double.PositiveInfinity; continue; }
-                    int newly = 0;
-                    foreach (var i in vss.Tasks[j].TripIndexCover)
-                        if (!covered[i]) newly++;
-                    score[j] = newly > 0
-                        ? vss.Tasks[j].Cost / newly
-                        : double.PositiveInfinity;
-                }
-
-                int best = Array.IndexOf(score, score.Min());
-                chosen[best] = true;
-
-                foreach (var i in vss.Tasks[best].TripIndexCover)
-                    if (!covered[i]) {
-                        covered[i] = true;
-                        uncovered--;
+                while (uncovered > 0) {
+                    // compute cost per newly-covered row
+                    for (int j = 0; j < vss.Tasks.Count; j++) {
+                        if (knownSolutionIndexes.Contains(j)) { score[j] = double.PositiveInfinity; continue; }
+                        int newly = 0;
+                        foreach (var i in vss.Tasks[j].TripIndexCover)
+                            if (!covered[i]) newly++;
+                        score[j] = newly > 0
+                            ? vss.Tasks[j].Cost / newly
+                            : double.PositiveInfinity;
                     }
+
+                    int best = Array.IndexOf(score, score.Min());
+                    knownSolutionIndexes.Add(best);
+
+                    foreach (var i in vss.Tasks[best].TripIndexCover)
+                        if (!covered[i]) {
+                            covered[i] = true;
+                            uncovered--;
+                        }
+                }
             }
 
             // assign starts
-            for (int j = 0; j < taskVars.Count; j++) taskVars[j].Start = chosen[j] ? 1.0 : 0.0;
+            for (int j = 0; j < taskVars.Count; j++) taskVars[j].Start = knownSolutionIndexes.Contains(j) ? 1.0 : 0.0;
 
             model.Update();
             bool configState = Config.CONSOLE_GUROBI;

@@ -99,19 +99,12 @@ namespace E_VCSP.Objects {
         /// </summary>
         public bool IdleAtStart {
             get {
-                // Prioritize time at depot
-                bool fromDepot = DeadheadTemplate.StartLocation.IsDepot;
-                if (fromDepot) return true;
-
-                bool toDepot = DeadheadTemplate.EndLocation.IsDepot;
-                if (toDepot) return false;
-
-                // Then prioritize time at handover
-                bool fromHandover = DeadheadTemplate.StartLocation.HandoverAllowed;
-                bool toHandover = DeadheadTemplate.EndLocation.HandoverAllowed;
-                return fromHandover || !fromHandover && !toHandover;
+                if (EndLocation.CanCharge && !StartLocation.CanCharge) return false;
+                if (EndLocation.HandoverAllowed && !StartLocation.HandoverAllowed) return false;
+                return true;
             }
         }
+
         public int IdleTime => EndTime - StartTime - DeadheadTemplate.Duration;
 
         /// <summary>
@@ -123,6 +116,9 @@ namespace E_VCSP.Objects {
         /// </summary>
         public int DepartureTime => IdleAtStart ? StartTime + IdleTime : StartTime;
 
+        public double SoCDiffInIdle;
+        public double SoCDiffInDeadhead;
+
         public PVETravel(DeadheadTemplate dht, int startTime, int endTime, VehicleType vt) : base() {
             Type = PVEType.Travel;
             StartTime = startTime;
@@ -132,12 +128,13 @@ namespace E_VCSP.Objects {
             EndLocation = dht.EndLocation;
 
             Location idleLocation = IdleAtStart ? DeadheadTemplate.StartLocation : DeadheadTemplate.EndLocation;
-            bool idleAtGarage = idleLocation.BreakAllowed || idleLocation.IsDepot || idleLocation.CanCharge;
-            double idleCost = idleAtGarage ? 0 : Constants.VH_IDLE_COST * IdleTime;
-            double idleSoCDiff = idleAtGarage ? 0 : -vt.IdleUsage * IdleTime;
+            double idleCost = idleLocation.FreeIdle ? 0 : Constants.VH_IDLE_COST * IdleTime;
+            double idleSoCDiff = idleLocation.FreeIdle ? 0 : -vt.IdleUsage * IdleTime;
 
             DrivingCost = dht.Distance * Constants.VH_M_COST + idleCost;
-            SoCDiff = -(dht.Distance * vt.DriveUsage) + idleSoCDiff;
+            SoCDiffInDeadhead = -(dht.Distance * vt.DriveUsage);
+            SoCDiffInIdle = idleSoCDiff;
+            SoCDiff = SoCDiffInDeadhead + SoCDiffInIdle;
         }
 
         public override string ToString() {

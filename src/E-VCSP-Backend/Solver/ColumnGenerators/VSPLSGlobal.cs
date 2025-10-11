@@ -395,7 +395,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             List<double> sums = [operations[0].chance];
             for (int i = 1; i < operations.Count; i++) sums.Add(sums[i - 1] + operations[i].chance);
-            int itsPerColumn = (int)Config.VSP_LS_G_ITERATIONS / Config.VSP_LS_G_NUM_COLS;
 
             List<(double reducedCosts, VehicleTask vehicleTask)> generatedColumns = [];
 
@@ -421,9 +420,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (currIts % Q == 0) {
                     T *= alpha;
                     ops.T = T;
-                }
-                if (currIts % itsPerColumn == 0) {
-
                 }
 
                 double r = rnd.NextDouble() * sums[^1];

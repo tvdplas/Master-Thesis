@@ -158,6 +158,7 @@ namespace E_VCSP.Objects {
                 if (
                     IDLE_TYPES.Contains(element.Type) // vehicle is idle
                     && element.StartLocation.HandoverAllowed   // handover at this location is allowed
+                    && element.EndTime - element.StartTime > 0 // there must be some idle time
                     && Math.Max(element.StartLocation.SignOffTime, element.StartLocation.SignOnTime) <= element.EndTime - element.StartTime // idle time is greater than signon/off time
                 ) {
                     // Start new block; skip this element as we dont need idle time in block
