@@ -86,7 +86,7 @@ namespace E_VCSP.Solver {
             model.Parameters.Presolve = 2; // aggresive presolve
             model.Parameters.RINS = 5;
             model.Parameters.SubMIPNodes = 5000;
-            model.Parameters.NoRelHeurTime = Config.VSP_SOLVER_TIMEOUT_SEC / 4;
+            model.Parameters.NoRelHeurTime = Config.VSP_SOLVER_TIMEOUT_SEC * Config.VSP_SOLVER_HEURISTIC_FRAC;
             model.Parameters.ImproveStartTime = 0;
             model.SetCallback(new CustomGRBCallback(model));
 
