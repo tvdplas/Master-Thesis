@@ -316,8 +316,9 @@ namespace E_VCSP.Solver {
                 model.GetVarByName("vehicle_count_slack").UB = 0;
             }
 
-            if (knownSolutionIndexes.Count == 0) {
+            if (true || knownSolutionIndexes.Count == 0) {
                 // Apply greedy set cover as initial solution
+                knownSolutionIndexes = [];
                 var covered = new bool[vss.Instance.Trips.Count];
                 var score = new double[vss.Tasks.Count];
                 int uncovered = vss.Instance.Trips.Count;
