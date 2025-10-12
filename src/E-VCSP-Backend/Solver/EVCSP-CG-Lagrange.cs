@@ -11,6 +11,8 @@ namespace E_VCSP.Solver {
     public class EVCSPCGLagrange : Solver {
         public readonly VehicleSolutionState vss;
         public readonly CrewSolutionState css;
+        public double initialSolutionQuality = double.PositiveInfinity;
+        public GRBModel? model;
 
         private readonly Random random = new();
 
@@ -72,6 +74,8 @@ namespace E_VCSP.Solver {
             costUpperBound += Math.Max(0, vss.SelectedTasks.Count - Config.MAX_VEHICLES) * Config.VH_OVER_MAX_COST;
             foreach (var cd in css.SelectedDuties) costUpperBound += cd.duty.Cost * cd.count;
             costUpperBound += Math.Max(0, css.SelectedDuties.Sum(x => x.count) - Config.MAX_DUTIES) * Config.CR_OVER_MAX_COST;
+
+            initialSolutionQuality = costUpperBound;
 
             // Index blocks in both tasks and duties; allows reuse of generated columns in integrated approach
             List<(Block b, int c)> allBlocks = Block.FromVehicleTasks(vss.Tasks);
@@ -694,7 +698,7 @@ namespace E_VCSP.Solver {
                             // Block transition allowed; can only be done with short idle
                             // and if there is no time for handover
                             int waitingTime = block.StartTime - t.EndTime;
-                            bool transitionAllowed = Constants.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime < block.StartLocation.MinHandoverTime;
+                            bool transitionAllowed = Config.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime < block.StartLocation.MinHandoverTime;
                             bool overallTimeAllowed = t.Duration + waitingTime + block.Duration <= Constants.MAX_STEERING_TIME;
                             if (!transitionAllowed || !overallTimeAllowed) continue;
 
@@ -735,7 +739,7 @@ namespace E_VCSP.Solver {
                             // Block transition allowed; can only be done with short idle
                             // as break / long idle start a new block
                             int waitingTime = t.StartTime - block.EndTime;
-                            bool transitionAllowed = Constants.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime <= block.EndLocation.MinHandoverTime;
+                            bool transitionAllowed = Config.CR_MIN_SHORT_IDLE_TIME <= waitingTime && waitingTime <= block.EndLocation.MinHandoverTime;
                             bool overallTimeAllowed = t.Duration + waitingTime + block.Duration <= Constants.MAX_STEERING_TIME;
                             if (!transitionAllowed || !overallTimeAllowed) continue;
 
@@ -869,7 +873,7 @@ namespace E_VCSP.Solver {
                 LogToConsole = 0,
                 LogFile = Path.Combine(Constants.RUN_LOG_FOLDER, "evcspcg_gurobi.log")
             };
-            GRBModel model = new(env);
+            model = new(env);
             model.Parameters.TimeLimit = Config.VCSP_SOLVER_TIMEOUT_SEC;
             model.Parameters.MIPFocus = 1; // upper bound
             model.Parameters.Heuristics = 0.8;

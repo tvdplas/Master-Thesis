@@ -221,8 +221,9 @@ namespace E_VCSP.Objects {
 
                     if (largestIdle != null) {
                         int longestIdleTime = largestIdle.EndTime - largestIdle.StartTime;
-                        if (Constants.CR_MIN_LONG_IDLE_TIME <= longestIdleTime
-                            && longestIdleTime <= Constants.CR_MAX_LONG_IDLE_TIME
+                        if (Config.CR_MIN_LONG_IDLE_TIME <= longestIdleTime
+                            && longestIdleTime <= Config
+.CR_MAX_LONG_IDLE_TIME
                         ) {
                             duration -= largestIdle.EndTime - largestIdle.StartTime;
                         }

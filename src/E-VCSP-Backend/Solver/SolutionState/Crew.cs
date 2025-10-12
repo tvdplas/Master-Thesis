@@ -147,6 +147,10 @@ namespace E_VCSP.Solver.SolutionState {
         private BlockArc? LinkBlocks(Block from, Block to) {
             if (from.EndTime > to.StartTime || from.EndLocation != to.StartLocation) return null;
 
+            if (from.Index == 50 && to.Index == 52) {
+                Console.WriteLine("h");
+            }
+
             Location idleLocation = from.EndLocation;
             BlockArc? arc = null;
             BlockArcType blockArcType = BlockArcType.Invalid;
@@ -158,24 +162,25 @@ namespace E_VCSP.Solver.SolutionState {
                 ? idleTime - idleLocation.BrutoNetto
                 : 0;
 
-            if (nettoBreakTime >= Constants.CR_MIN_BREAK_TIME && nettoBreakTime <= Constants.CR_MAX_BREAK_TIME) {
+            if (nettoBreakTime >= Config.CR_MIN_BREAK_TIME && nettoBreakTime <= Config.CR_MAX_BREAK_TIME) {
                 breakTime = idleTime - idleLocation.BrutoNetto;
                 bruttoNettoTime = idleLocation.BrutoNetto;
                 idleTime = 0;
                 blockArcType = BlockArcType.Break;
             }
 
-            // Short idle; can happen anywhere (driver remains in bus)
-            else if (Constants.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Constants.CR_MAX_SHORT_IDLE_TIME)
-                blockArcType = BlockArcType.ShortIdle;
-
             // Long idle used for split shifts
-            else if (idleLocation.CrewBase) {
-                int nettoRestTime = idleTime - idleLocation.SignOnTime - idleLocation.SignOffTime;
-                if (Constants.CR_MIN_LONG_IDLE_TIME <= nettoRestTime && nettoRestTime <= Constants.CR_MAX_LONG_IDLE_TIME) {
-                    blockArcType = BlockArcType.LongIdle;
-                }
+            else if (idleLocation.CrewBase
+                && Config.CR_MIN_LONG_IDLE_TIME <= idleTime - idleLocation.SignOnTime - idleLocation.SignOffTime
+                && idleTime - idleLocation.SignOnTime - idleLocation.SignOffTime <= Config
+.CR_MAX_LONG_IDLE_TIME
+            ) {
+                blockArcType = BlockArcType.LongIdle;
             }
+
+            // Short idle; can happen anywhere (driver remains in bus)
+            else if (Config.CR_MIN_SHORT_IDLE_TIME <= idleTime && idleTime <= Config.CR_MAX_SHORT_IDLE_TIME)
+                blockArcType = BlockArcType.ShortIdle;
 
             if (blockArcType != BlockArcType.Invalid) {
                 arc = new() {
@@ -320,7 +325,7 @@ namespace E_VCSP.Solver.SolutionState {
                     Break: {breakHours * Constants.CR_HOURLY_COST} ({breakHours.ToString("0.##")}h)
                     Other: {(workingHours - blockHours - breakHours) * Constants.CR_HOURLY_COST} ({(workingHours - blockHours - breakHours).ToString("0.##")}h)
                 Base duty cost: {SelectedDuties.Count * Config.CR_SHIFT_COST}
-                Broken duty costs: {SelectedDuties.Count * Constants.CR_BROKEN_SHIFT_COST}
+                Broken duty costs: {SelectedDuties.Count(x => x.duty.Type == DutyType.Broken) * Constants.CR_BROKEN_SHIFT_COST}
                 Single duties: {SelectedDuties.Sum(x => x.count * (x.duty.Type == DutyType.Single ? 1 : 0)) * Config.CR_SINGLE_SHIFT_COST}
             Penalties:
                 Duty slack: {countSlack * Config.CR_OVER_MAX_COST}

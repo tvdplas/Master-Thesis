@@ -182,7 +182,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             bool longIdleUsed = false;
 
             if (dt == DutyType.Broken) {
-                var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Constants.CR_MIN_LONG_IDLE_TIME);
+                var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
                 if (longestIdle != null) longIdle = (longestIdle.CDE.StartTime, longestIdle.CDE.EndTime - longestIdle.CDE.EndTime);
             }
 
@@ -287,7 +287,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (head == null || tail == null) return 0;
                 int baseDuration = tail.CDE.EndTime - head.CDE.StartTime;
                 if (Type == DutyType.Broken) {
-                    var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Constants.CR_MIN_LONG_IDLE_TIME);
+                    var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
 
                     if (longestIdle == null) return baseDuration;
                     return baseDuration - (longestIdle.CDE.EndTime - longestIdle.CDE.StartTime);

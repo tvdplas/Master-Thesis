@@ -113,7 +113,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             int duration = currentEndTime - StartTime;
             // Max shift length (normal / broken)
             if (duration > Constants.CR_MAX_SHIFT_LENGTH && Type != DutyType.Broken) return false;
-            if (duration > Constants.CR_MAX_SHIFT_LENGTH + Constants.CR_MAX_LONG_IDLE_TIME) return false; // upper bound
+            if (duration > Constants.CR_MAX_SHIFT_LENGTH + Config.CR_MAX_LONG_IDLE_TIME) return false; // upper bound
             if (Idle.startTime != -1 && duration - Idle.longIdleTime > Constants.CR_MAX_SHIFT_LENGTH) return false; // idle already known
             // No long idles in non-broken shifts
             if (Type != DutyType.Broken && Idle.startTime != -1) return false;
@@ -128,7 +128,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // prematurely abort
             if (Type == DutyType.Broken && Idle.startTime == -1) {
                 // No long idle selected yet, so check if we can still do at least one hour of work after a min-length long idle
-                if (currentEndTime + Constants.CR_MIN_LONG_IDLE_TIME + 1 * 60 * 60 > 19.5 * 60 * 60)
+                if (currentEndTime + Config.CR_MIN_LONG_IDLE_TIME + 1 * 60 * 60 > 19.5 * 60 * 60)
                     return false;
             }
 
@@ -216,7 +216,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                     l.CoveredBlockIds.Set(targetBlockIndex, true);
 
-                    if (l.isFeasible(css.Blocks[i].EndTime, false))
+                    if (l.isFeasible(css.Blocks[targetBlockIndex].EndTime, false))
                         addLabel(l, arc.ToBlock!.Index);
                 }
             }
@@ -265,7 +265,12 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         : timeDiff - longActualIdleTime;
 
                     double costFromTime = addedTime / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
+
                     double costFromRc = targetBlockIndex < css.Blocks.Count ? -blockDualCosts[targetBlockIndex] : 0;
+
+                    if (targetBlockIndex == 50) {
+                        //Console.WriteLine("huh");
+                    }
 
                     CSPLabel newLabel = new() {
                         CoveredBlockIds = newCoverage,
@@ -278,7 +283,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         StartTime = currentLabel.StartTime,
                     };
 
-                    if (!newLabel.isFeasible(currentEndTime, false)) continue;
+                    bool feasible = newLabel.isFeasible(currentEndTime, false);
+                    if (!feasible) continue;
                     else addLabel(newLabel, targetBlockIndex);
                 }
             }
@@ -286,6 +292,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
             // Adjust costs to include finalized duration
             for (int i = 0; i < allLabels[^1].Count; i++) {
                 CSPLabel l = allLabels[^1][i];
+                int count = 0;
+                for (int j = 0; j < l.CoveredBlockIds.Count; j++) if (l.CoveredBlockIds[j]) count++;
+
                 int duration = css.Blocks[l.PrevBlockId].EndTime + css.Blocks[l.PrevBlockId].EndLocation.SignOffTime - l.StartTime;
                 if (l.Type == DutyType.Broken && l.Idle.startTime != -1) duration -= l.Idle.longIdleTime;
 

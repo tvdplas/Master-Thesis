@@ -50,13 +50,16 @@ namespace E_VCSP_Backend {
                 runner.VCSPFromInstance();
             }
             else {
-                Action? action = runner.Experiments!.GetValueOrDefault("exp" + args[0], null);
-                if (action == null) {
-                    Console.WriteLine("Unknown experiment. Aborting.");
-                    return;
+                List<(string, Action)> actions = [];
+                var exps = args[0].Split(",");
+                foreach (string s in exps) {
+                    Action? action = runner.Experiments!.GetValueOrDefault("exp" + s, null);
+                    if (action != null) actions.Add((s, action));
+                    else Console.WriteLine("Experiment " + s + " not recognized.");
                 }
-                else {
-                    Console.WriteLine("Running experiment " + args[0]);
+
+                foreach ((string name, Action action) in actions) {
+                    Console.WriteLine(Config.CNSL_OVERRIDE + "Running experiment " + name);
                     Config.GLOBAL_CONSOLE_KILL = true;
                     action();
                 }

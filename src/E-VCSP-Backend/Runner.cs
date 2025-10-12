@@ -152,24 +152,26 @@ namespace E_VCSP_Backend {
             Reload("CSP Secondary Columns");
             // Get vsp solution
             Config.VSP_SOLVER_TIMEOUT_SEC = 900;
-            Config.VSP_LB_SEC_COL_ATTEMPTS = 16;
+            Config.VSP_LB_SEC_COL_ATTEMPTS = 8;
             Config.VSP_LB_SEC_COL_COUNT = 4;
             vss = new(Instance!, Instance!.VehicleTypes[0]);
             VSPSolver = new EVSPCG(vss);
             bool success = VSPSolver.Solve();
 
-            const int attempts = 16;
+            const int attempts = 32;
             const int subdivisions = 16;
 
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;mip runtime;total runtime");
             for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
                 Config.CSP_LB_SEC_COL_ATTEMPTS = i;
                 for (int j = 4; j <= subdivisions; j += 4) {
                     Config.CSP_LB_SEC_COL_COUNT = i;
                     css = new(Instance, Block.FromVehicleTasks(vss.SelectedTasks));
                     CSPSolver = new CSPCG(css);
+                    Stopwatch sw = Stopwatch.StartNew();
                     success = CSPSolver.Solve();
-                    Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{css.Costs()};{css.Duties.Count};{CSPSolver.model!.MIPGap};{CSPSolver.model.Runtime}");
+                    sw.Stop();
+                    Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{j};{css.Costs()};{css.Duties.Count};{CSPSolver.model!.MIPGap};{CSPSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
                 }
             }
         }
@@ -242,7 +244,39 @@ namespace E_VCSP_Backend {
             }
         }
 
+        void expVCSPRounds() {
+            Reload("VCSP Rounds");
 
+            Config.VSP_SOLVER_TIMEOUT_SEC = 300;
+            Config.CSP_SOLVER_TIMEOUT_SEC = 300;
+            Config.VCSP_SOLVER_TIMEOUT_SEC = 900;
+            Config.VSP_LB_SEC_COL_ATTEMPTS = 8;
+            Config.VSP_LB_SEC_COL_COUNT = 4;
+            Config.CSP_LB_SEC_COL_ATTEMPTS = 8;
+            Config.CSP_LB_SEC_COL_COUNT = 4;
+            Config.VCSP_MAX_TASKS_DURING = 100000000;
+            Config.VCSP_MAX_DUTIES_DURING = 100000000;
+            Config.LAGRANGE_DISRUPT_ROUNDS = 0;
+            Config.LAGRANGE_N = 50;
+            Config.LAGRANGE_PI_END = 0.001;
+
+            const int maxRounds = 20;
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;seq value;int value;#vsp cols;#csp cols;mipgap;mip runtime;total runtime");
+
+
+            for (int i = 2; i <= maxRounds; i += 2) {
+                Config.VCSP_ROUNDS = i;
+                vss = new(Instance, Instance.VehicleTypes[0]);
+                css = new(Instance, []);
+                IntegratedSolver = new(vss, css);
+                Stopwatch sw = Stopwatch.StartNew();
+                IntegratedSolver.Solve();
+                sw.Stop();
+                Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{IntegratedSolver.initialSolutionQuality};{IntegratedSolver.css.Costs() + IntegratedSolver.vss.Costs()};{vss.Tasks.Count};{css.Duties.Count};{IntegratedSolver.model!.MIPGap};{IntegratedSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
+            }
+        }
+
+        void expNothing() { }
         #endregion
     }
 }

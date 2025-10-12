@@ -21,7 +21,7 @@ namespace E_VCSP {
         public static Header SOLVER_HINTS = new();
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double CR_SHIFT_COST = 100; // Minimum price to pay a crew member
-        public static double CR_SINGLE_SHIFT_COST = 1_000; // penalty for use of initial shifts
+        public static double CR_SINGLE_SHIFT_COST = 10_000; // penalty for use of initial shifts
         public static int MAX_VEHICLES = 18; // Maximum number of vehicles that can be used in the solution.
         public static double VH_OVER_MAX_COST = 5000; // Cost per vehicle of going over. only used as penalty
         public static int MAX_DUTIES = 38; // Maximum number of vehicles that can be used in the solution.
@@ -29,6 +29,7 @@ namespace E_VCSP {
 
         public static Header VSP = new();
         public static bool VSP_DETERMINE_IIS = false;
+        public static bool VSP_POSTPROCESS = false;
         public static int VSP_SOLVER_TIMEOUT_SEC = 450;
         public static double VSP_SOLVER_HEURISTIC_FRAC = 0.25;
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint
@@ -90,6 +91,12 @@ namespace E_VCSP {
         public static bool CSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static int CSP_INSTANCES_PER_IT = 1;
         public static int CSP_MAX_COL_GEN_ITS = 150;
+        public static int CR_MIN_BREAK_TIME = 15 * 60; // Min break length
+        public static int CR_MAX_BREAK_TIME = 4 * 60 * 60; // Max break length
+        public static int CR_MIN_SHORT_IDLE_TIME = 0; // Min idle time which is not part of a split shift
+        public static int CR_MAX_SHORT_IDLE_TIME = 30 * 60; // Max idle time which is not part of a split shift
+        public static int CR_MIN_LONG_IDLE_TIME = (int)(1.5 * 60 * 60); // Min idle time which is part of a split shift
+        public static int CR_MAX_LONG_IDLE_TIME = 5 * 60 * 60; // Max idle time which is part of a split shift
 
         public static Header CSP_LABELING = new();
         public static double CSP_LABELING_WEIGHT = 0;
