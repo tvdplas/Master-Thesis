@@ -150,10 +150,17 @@ namespace E_VCSP_Backend {
 
         void expCSPSecondaryColumns() {
             Reload("CSP Secondary Columns");
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;mip runtime;total runtime");
+
             // Get vsp solution
             Config.VSP_SOLVER_TIMEOUT_SEC = 900;
-            Config.VSP_LB_SEC_COL_ATTEMPTS = 8;
+            Config.VSP_LB_SEC_COL_ATTEMPTS = 4;
             Config.VSP_LB_SEC_COL_COUNT = 4;
+            // Unfair testing for CSP
+            Config.CR_SINGLE_SHIFT_COST = 10_000;
+            Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
+            Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
+
             vss = new(Instance!, Instance!.VehicleTypes[0]);
             VSPSolver = new EVSPCG(vss);
             bool success = VSPSolver.Solve();
@@ -161,7 +168,6 @@ namespace E_VCSP_Backend {
             const int attempts = 32;
             const int subdivisions = 16;
 
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;mip runtime;total runtime");
             for (int i = 0; i <= attempts; i = Math.Max(1, i * 2)) {
                 Config.CSP_LB_SEC_COL_ATTEMPTS = i;
                 for (int j = 4; j <= subdivisions; j += 4) {
@@ -247,10 +253,10 @@ namespace E_VCSP_Backend {
         void expVCSPRounds() {
             Reload("VCSP Rounds");
 
-            Config.VSP_SOLVER_TIMEOUT_SEC = 300;
-            Config.CSP_SOLVER_TIMEOUT_SEC = 300;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 600;
+            Config.CSP_SOLVER_TIMEOUT_SEC = 600;
             Config.VCSP_SOLVER_TIMEOUT_SEC = 900;
-            Config.VSP_LB_SEC_COL_ATTEMPTS = 8;
+            Config.VSP_LB_SEC_COL_ATTEMPTS = 4;
             Config.VSP_LB_SEC_COL_COUNT = 4;
             Config.CSP_LB_SEC_COL_ATTEMPTS = 8;
             Config.CSP_LB_SEC_COL_COUNT = 4;
@@ -259,6 +265,11 @@ namespace E_VCSP_Backend {
             Config.LAGRANGE_DISRUPT_ROUNDS = 0;
             Config.LAGRANGE_N = 50;
             Config.LAGRANGE_PI_END = 0.001;
+
+            // Unfair testing for CSP
+            Config.CR_SINGLE_SHIFT_COST = 10_000;
+            Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
+            Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
 
             const int maxRounds = 20;
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;seq value;int value;#vsp cols;#csp cols;mipgap;mip runtime;total runtime");
