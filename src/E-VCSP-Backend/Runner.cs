@@ -260,9 +260,10 @@ namespace E_VCSP_Backend {
             Config.VSP_LB_SEC_COL_COUNT = 4;
             Config.CSP_LB_SEC_COL_ATTEMPTS = 8;
             Config.CSP_LB_SEC_COL_COUNT = 4;
+            Config.VSCP_BLOCK_ADD_CHANCE = 0; // nondeterministic
             Config.VCSP_MAX_TASKS_DURING = 100000000;
             Config.VCSP_MAX_DUTIES_DURING = 100000000;
-            Config.LAGRANGE_DISRUPT_ROUNDS = 0;
+            Config.LAGRANGE_DISRUPT_ROUNDS = 0; // nondeterministic
             Config.LAGRANGE_N = 50;
             Config.LAGRANGE_PI_END = 0.001;
 
