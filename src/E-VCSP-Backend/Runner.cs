@@ -265,7 +265,7 @@ namespace E_VCSP_Backend {
             Config.VCSP_MAX_DUTIES_DURING = 100000000;
             Config.LAGRANGE_DISRUPT_ROUNDS = 0; // nondeterministic
             Config.LAGRANGE_N = 50;
-            Config.LAGRANGE_PI_END = 0.001;
+            Config.LAGRANGE_PI_END = 0.0001;
 
             // Unfair testing for CSP
             Config.CR_SINGLE_SHIFT_COST = 10_000;
