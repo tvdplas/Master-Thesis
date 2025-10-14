@@ -667,6 +667,7 @@ namespace E_VCSP.Solver {
 
         #region Crew its
         private void runCrewIts(int round, bool disrupt = false) {
+            int rbi = 0;
             int maxIts = round == 0 ? Config.VCSP_CR_ITS_INIT : Config.VCSP_CR_ITS_ROUND;
 
             List<int> blockCount = new(css.Blocks.Count);
@@ -720,9 +721,9 @@ namespace E_VCSP.Solver {
 
             void addRandomBlocks() {
                 // Add some random blocks 
-                for (int i = 0; i < css.Blocks.Count; i++) {
+                for (int i = 0; i < css.Blocks.Count; rbi++, i++) {
                     // Block will be used as a basis for expanding
-                    if (random.NextDouble() >= Config.VSCP_BLOCK_ADD_CHANCE * css.BlockCount[i]) continue;
+                    if (rbi % Config.VCSP_BLOCK_PER_X_ADD != 0) continue;
 
                     Block block = css.Blocks[i];
 

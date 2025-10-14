@@ -128,7 +128,7 @@ namespace E_VCSP {
         public static bool VCSP_VH_CSTR_SLACK = true;
         public static bool VCSP_CR_MAX_CSTR_SLACK = true;
         public static bool VCSP_CR_OTH_CSTR_SLACK = false;
-        public static double VSCP_BLOCK_ADD_CHANCE = 0.1;
+        public static int VCSP_BLOCK_PER_X_ADD = 10;
         public static bool VCSP_NONNEGATIVE_RC_VSP = true;
         public static bool VCSP_NONNEGATIVE_RC_CSP = true;
         public static bool VCSP_SLACK_IN_FINAL_OBJ = false;
