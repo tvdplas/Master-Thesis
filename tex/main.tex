@@ -1388,9 +1388,13 @@ As we can see, for the E-VSP the number of base columns $N$ solely determines th
   \label{tab:csp-secondary-columns}
 \end{table}
 
-Here, we again see that including a larger number of secondary columns improves the final solution quality; for $N \geq 16$, the best known crew solution for the given vehicle solution is found regardless of the chosen $M$. When compared to the vehicle experiments, we do now also see significant influence of different values of $M$. This may be explained by the fact that the number of to be covered blocks is generally way lower than the number of trips (usually by a factor of $\sim2$ in our initial testing). This in turn implies that a larger proportion of the underlying graph is blocked, causing more apparent diversity in the secondary columns which are generated. We can again conclude that a reasonably high $N$ is good in general, whereas $M$ may need to be varied depending on the specific instance.
+Here, we again see that including a larger number of secondary columns improves the final solution quality; for $N \geq 16$, the best known crew solution for the given vehicle solution is found regardless of the chosen $M$. When compared to the vehicle experiments, we do now also see significant influence of different values of $M$. This may be explained by the fact that the number of to be covered blocks is generally much lower than the number of trips (usually by a factor of $\sim2$ in our initial testing). This in turn implies that a larger proportion of the underlying graph is blocked, causing more apparent diversity in the secondary columns which are generated. We can again conclude that a reasonably high $N$ is good in general, whereas $M$ may need to be varied depending on the specific instance.
 
 \subsubsection{E-VSP Local search}
+Let us now consider the two local search methods discussed for the E-VSP. 
+
+
+Let us first consider the local search used for finding an initial solution. In this, we hava already fixed the weigths, and have chosen a starting temperature of around 50 euros. We will therefore now consider the effects of differing numbers of solutions, as well as the number of operations that are attempted for each solution. Let $R$ represent the number of solutions, and let $I$ represent the number of operations. As the resulting solution is nondeterministic, we will run each set of parameters a total of 5 times and report the average results. An overview of these results can be found in Table \ref{tab:evsp-ls-global}.
 
 \begin{table}[h]
   \centering
@@ -1409,20 +1413,24 @@ Here, we again see that including a larger number of secondary columns improves 
     & \textbf{gap \%} & 1.2 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 2259.8 & 1880.4 & 1717.8 & 1641.8 & 1499.8 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-7}
-    \multirow{4}{*}{$R=500$} & \textbf{LS value}  & 4705.7 & 4345.8 & 3756.8 & 3487.3 & 3404.4 \\
+    \multirow{4}{*}{$R=500$} & \textbf{LS value}  & 4705.7 & 4345.8 & 3756.8 & 3487.3 & \underline{3404.4} \\
     & \textbf{ILP value}   & 3804.9 & 3617.5 & 3388.6 & 3387.5 & 3384.7 \\
     & \textbf{gap \%} & 2.8 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 4395 & 3590.2 & 3391.8 & 3198.2 & 2956 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-7}
     \multirow{4}{*}{$R=1000$} & \textbf{LS value}  & 4665.7 & 4292.1 & 3717.4 & 3411.2 & 3405.8 \\
-    & \textbf{ILP value}   & 3632.6 & 3591 & 3385 & 3384.6 & 3384.6 \\
+    & \textbf{ILP value}   & 3632.6 & 3591 & 3385 & \underline{3384.6} & \underline{3384.6} \\
     & \textbf{gap \%} & 0 & 3.2 & 0 & 0 & 0 \\
     & \textbf{cols} & 7019 & 5736.6 & 5425.4 & 5082.4 & 4603 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effect of number of rounds and iterations on E-VSP global local search, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number operations attempted per round. LS value is best solution in a single LS round, ILP value is after recombination.}
+  \caption{Effect of number of rounds and iterations on E-VSP global local search, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number operations attempted per round. LS value is best single LS result, ILP value is result after recombination, all avg. of 5 runs. Best solution per category \underline{underlined}.}
   \label{tab:evsp-ls-global}
 \end{table}
+
+As we can see, both $R$ and $I$ have significant influence on the solution quality. A higher $I$ seems to be the most important factor, as we can see that even with the lowest tested $R$ a solution is found of comparable quality to both the highest $R$ and best quality solution in the labeling tests. We can also see that significantly fewer columns are considered when $I$ is higher; this is most likely due to the fact that the local search converges on a local optimum, resulting in different runs producing similar columns. Next, we see that recombination can significantly improve the solution quality, in line with previous results by \citet{Bosch21}. Lastly, we also note that this approach alone resulted in a better solution than the labeling algorithm; this is most likely due to the fact that the graph does not need to be preprocessed, giving a larger solution space. We can conclude that higher $R$ and $I$ are generally better, however specific numbers will have to be based on the instance.  \\
+
+Next, let us do the same for the pricing problem local search. We again have fixed weights and a temperature of around 50 euros. In this, $R$ will represent the number of column generation rounds (dual costs being updated). Results are given in Table \ref{tab:evsp-ls-single}.
 
 \begin{table}[h]
   \centering
@@ -1451,14 +1459,16 @@ Here, we again see that including a larger number of secondary columns improves 
     & \textbf{gap \%} & 18.7 & 16.5 & 16.4 & 13.6 & 12.8 \\
     & \textbf{cols} & 10309.2 & 12011.8 & 13638.2 & 13895.2 & 13711.0 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-7}
-    \multirow{3}{*}{$R=5000$} & \textbf{value}  & 4557.0 & 4102.4 & 3928.3 & 3838.4 & 3790.5 \\
+    \multirow{3}{*}{$R=5000$} & \textbf{value}  & 4557.0 & 4102.4 & 3928.3 & 3838.4 & \underline{3790.5} \\
     & \textbf{gap \%} & 19.4 & 16.1 & 14.5 & 13.0 & 12.7 \\
     & \textbf{cols} & 24672.6 & 29898.6 & 34885.6 & 34818.4 & 33944.0 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effect of number of rounds and iterations on E-VSP singles local search, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number operations attempted per round.}
+  \caption{Effect of number of rounds and iterations on E-VSP singles local search, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number operations attempted per round. Best solution \underline{underlined}.}
   \label{tab:evsp-ls-single}
 \end{table}
+
+Here, we see that this approach is able to find a reasonable solution, however not near the quality of that of the other two approaches. For the given instance size, it therefore does not seem to be worth it to apply this method; this may however be different when instances are larger causing the labeling algorithm to become infeasible. 
 
 \section{Discussion}
 \todo{Uitwerken; is nu gewoon een lijstje met dingen die ooit besproken zijn / mij persoonlijk nog interessant lijken.}
