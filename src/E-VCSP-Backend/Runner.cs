@@ -253,9 +253,9 @@ namespace E_VCSP_Backend {
         void expVCSPRounds() {
             Reload("VCSP Rounds");
 
-            Config.VSP_SOLVER_TIMEOUT_SEC = 50;
-            Config.CSP_SOLVER_TIMEOUT_SEC = 50;
-            Config.VCSP_SOLVER_TIMEOUT_SEC = 100;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 600;
+            Config.CSP_SOLVER_TIMEOUT_SEC = 600;
+            Config.VCSP_SOLVER_TIMEOUT_SEC = 900;
             Config.VSP_LB_SEC_COL_ATTEMPTS = 4;
             Config.VSP_LB_SEC_COL_COUNT = 4;
             Config.CSP_LB_SEC_COL_ATTEMPTS = 8;
