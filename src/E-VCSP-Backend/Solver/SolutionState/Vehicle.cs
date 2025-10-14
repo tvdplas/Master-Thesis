@@ -52,6 +52,22 @@ namespace E_VCSP.Solver.SolutionState {
         public int StartTime = int.MaxValue;
         public int EndTime = int.MinValue;
 
+        public VehicleSolutionState(VehicleSolutionState vss) {
+            Instance = vss.Instance;
+            SelectedTasks = [.. vss.SelectedTasks];
+            Tasks = [.. vss.Tasks];
+            CoverTaskMapping = new(vss.CoverTaskMapping);
+            VarnameTaskMapping = new(vss.VarnameTaskMapping);
+            VehicleType = vss.VehicleType;
+            Depot = vss.Depot;
+            StartTime = vss.StartTime;
+            EndTime = vss.EndTime;
+            Nodes = new(vss.Nodes);
+            AdjFull = vss.AdjFull.Select(x => new List<VSPArc?>(x)).ToList();
+            Adj = vss.Adj.Select(x => new List<VSPArc>(x)).ToList();
+            LocationDHT = vss.LocationDHT.Select(x => new List<DeadheadTemplate?>(x)).ToList();
+        }
+
         #region Initialization
         public VehicleSolutionState(Instance instance, VehicleType vehicleType) {
             this.Instance = instance;

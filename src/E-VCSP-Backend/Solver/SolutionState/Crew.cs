@@ -51,14 +51,25 @@ namespace E_VCSP.Solver.SolutionState {
         public Dictionary<string, CrewDuty> VarnameDutyMapping = [];
         public Dictionary<(BitArray, int), CrewDuty> CoverTypeDutyMapping = new(new Utils.BitArrayIntComparer());
 
-        public int ActiveBlockCount => BlockCount.Sum(b => b);
-
         public CrewSolutionState(Instance instance, List<(Block block, int count)> initialBlocks) {
             this.Instance = instance;
 
             foreach ((Block block, int count) in initialBlocks) {
                 AddBlock(block, count);
             }
+        }
+
+        public CrewSolutionState(CrewSolutionState css) {
+            Instance = css.Instance;
+            Adj = css.Adj.Select(x => new List<BlockArc>(x)).ToList();
+            AdjFull = css.AdjFull.Select(x => new List<BlockArc?>(x)).ToList();
+            KnownBlocks = new(css.KnownBlocks);
+            Blocks = new(css.Blocks);
+            BlockCount = new(css.BlockCount);
+            SelectedDuties = new(css.SelectedDuties);
+            Duties = new(css.Duties);
+            VarnameDutyMapping = new(css.VarnameDutyMapping);
+            CoverTypeDutyMapping = new(css.CoverTypeDutyMapping);
         }
 
         #region dump

@@ -54,12 +54,15 @@ namespace E_VCSP.Solver {
         public EVCSPCGLagrange(VehicleSolutionState vss, CrewSolutionState css) {
             this.vss = vss;
             this.css = css;
-
-            ThreadPool.SetMaxThreads(10, 10);
         }
 
         #region Init
-        private void initializeCover() {
+        public (VehicleSolutionState vss, CrewSolutionState css) initializeCover() {
+            if (vss.SelectedTasks.Count > 0 && css.SelectedDuties.Count > 0) {
+                initializeExistingCover();
+                return (vss, css);
+            }
+
             EVSPCG vspSolver = new(vss);
             vspSolver.Solve();
             List<(Block block, int count)> initialBlocks = Block.FromVehicleTasks(vss.SelectedTasks);
@@ -74,7 +77,6 @@ namespace E_VCSP.Solver {
             costUpperBound += Math.Max(0, vss.SelectedTasks.Count - Config.MAX_VEHICLES) * Config.VH_OVER_MAX_COST;
             foreach (var cd in css.SelectedDuties) costUpperBound += cd.duty.Cost * cd.count;
             costUpperBound += Math.Max(0, css.SelectedDuties.Sum(x => x.count) - Config.MAX_DUTIES) * Config.CR_OVER_MAX_COST;
-
             initialSolutionQuality = costUpperBound;
 
             // Index blocks in both tasks and duties; allows reuse of generated columns in integrated approach
@@ -123,6 +125,45 @@ namespace E_VCSP.Solver {
             }
             foreach ((var duty, _) in css.SelectedDuties) {
                 duty.IsUnit = true;
+            }
+
+            return (vss, css);
+        }
+
+        private void initializeExistingCover() {
+            if (vss.SelectedTasks.Count == 0 || css.SelectedDuties.Count == 0)
+                throw new InvalidOperationException("Cannot initialize from nonexistent cover");
+
+            Console.WriteLine("Using existing cover");
+            costUpperBound = 0;
+            foreach (var vt in vss.SelectedTasks) costUpperBound += vt.Cost;
+            costUpperBound += Math.Max(0, vss.SelectedTasks.Count - Config.MAX_VEHICLES) * Config.VH_OVER_MAX_COST;
+            foreach (var cd in css.SelectedDuties) costUpperBound += cd.duty.Cost * cd.count;
+            costUpperBound += Math.Max(0, css.SelectedDuties.Sum(x => x.count) - Config.MAX_DUTIES) * Config.CR_OVER_MAX_COST;
+            initialSolutionQuality = costUpperBound;
+
+            for (int bi = 0; bi < css.Blocks.Count; bi++) {
+                knownBlocks[css.Blocks[bi].Descriptor] = bi;
+            }
+
+            for (int i = 0; i < vss.Tasks.Count; i++) {
+                VehicleTask task = vss.Tasks[i];
+                BitArray tripCover = task.ToTripBitArray(vss.Instance.Trips.Count);
+                BitArray blockCover = task.ToBlockBitArray(css.Blocks.Count);
+                if (knownVTs.ContainsKey((tripCover, blockCover))) {
+                    Console.WriteLine("Duplicate columns present in initial vh solution");
+                }
+                knownVTs.Add((tripCover, blockCover), i);
+            }
+
+            for (int i = 0; i < css.Duties.Count; i++) {
+                CrewDuty duty = css.Duties[i];
+                BitArray blockCover = duty.ToBlockBitArray(css.Blocks.Count);
+                int dutyType = (int)duty.Type;
+                if (knownCDs.ContainsKey((blockCover, dutyType))) {
+                    Console.WriteLine("Duplicate columns present in initial cr solution");
+                }
+                knownCDs.Add((blockCover, dutyType), i);
             }
         }
 

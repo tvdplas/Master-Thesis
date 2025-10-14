@@ -253,9 +253,9 @@ namespace E_VCSP_Backend {
         void expVCSPRounds() {
             Reload("VCSP Rounds");
 
-            Config.VSP_SOLVER_TIMEOUT_SEC = 600;
-            Config.CSP_SOLVER_TIMEOUT_SEC = 600;
-            Config.VCSP_SOLVER_TIMEOUT_SEC = 900;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 50;
+            Config.CSP_SOLVER_TIMEOUT_SEC = 50;
+            Config.VCSP_SOLVER_TIMEOUT_SEC = 100;
             Config.VSP_LB_SEC_COL_ATTEMPTS = 4;
             Config.VSP_LB_SEC_COL_COUNT = 4;
             Config.CSP_LB_SEC_COL_ATTEMPTS = 8;
@@ -272,18 +272,29 @@ namespace E_VCSP_Backend {
             Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
 
             const int maxRounds = 20;
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;seq value;int value;#vsp cols;#csp cols;mipgap;mip runtime;total runtime");
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;" +
+                $"seq vsp value;seq csp value;int vsp value;int csp value;" +
+                $"seq vsp cols;seq csp cols;int vsp cols;int csp cols;" +
+                $"seq vsp selected cols;seq csp selected cols;int vsp selected cols;int csp selected cols;" +
+                $"mipgap;mip runtime;total runtime");
 
+            // Initialize a cover that we will reuse for all experiments
+            vss = new(Instance!, Instance!.VehicleTypes[0]);
+            css = new(Instance, []);
+            IntegratedSolver = new(vss, css);
+            (var basevss, var basecss) = IntegratedSolver.initializeCover();
 
-            for (int i = 2; i <= maxRounds; i += 2) {
+            for (int i = 0; i <= maxRounds; i += 1) {
                 Config.VCSP_ROUNDS = i;
-                vss = new(Instance, Instance.VehicleTypes[0]);
-                css = new(Instance, []);
-                IntegratedSolver = new(vss, css);
+                IntegratedSolver = new(new(basevss), new(basecss));
                 Stopwatch sw = Stopwatch.StartNew();
                 IntegratedSolver.Solve();
                 sw.Stop();
-                Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};{IntegratedSolver.initialSolutionQuality};{IntegratedSolver.css.Costs() + IntegratedSolver.vss.Costs()};{vss.Tasks.Count};{css.Duties.Count};{IntegratedSolver.model!.MIPGap};{IntegratedSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
+                Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};" +
+                    $"{basevss.Costs()};{basecss.Costs()};{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
+                    $"{vss.Tasks.Count};{css.Duties.Count};{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
+                    $"{vss.SelectedTasks.Count};{css.SelectedDuties.Count};{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};" +
+                    $"{IntegratedSolver.model!.MIPGap};{IntegratedSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
             }
         }
 
