@@ -1222,7 +1222,9 @@ cost(vt_i) = 200 + 0.05 \cdot km(vt_i) + 0.32 \cdot chl(vt_i) + bdg(vt_i)  \nonu
 \end{equation}
 Where $km(vt_i)$ is the total distance driven in kilometers, $chl(vt_i)$ is the total energy used in kWh and $bdg(vt_i)$ represents battery degradation costs. In this, the fixed costs of 200 incorporate factors such as insurance and depreciation, the distance costs of 0.05 represent driving related maintenance costs, and energy costs are a pessimistic estimate of the average kWh cost in the Netherlands based on data provided by the \citet{ANWB2025}.
 
-Battery degradation costs are based on a base formula provided by \citet{vanKootenNiekerk2017} and an average price of approximately $100$ euros per kWh for lithium-ion batteries as mentioned in \citet{Ocatsaros2024}. We will ignore any labor costs associated with a battery replacement; batteries are projected to get cheaper per kWh in the future, potentially offsetting this cost. Let $chs(vt_i)$ represent a list of all charging actions which occur throughout the task (including the overnight charge), each given in the form $(\sigma, \sigma')$ representing a charge from $\sigma$ to $\sigma'$. We can then define the battery degradation cost of a vehicle task $vt_i$ as follows:
+Battery degradation costs are based on a base formula provided by \citet{vanKootenNiekerk2017} and an average price of approximately $100$ euros per kWh for lithium-ion batteries as mentioned in \citet{Ocatsaros2024}. We note that this formula does not entirely align with recent findings on battery degredation, as fully charging a lithium-ion battery may also hurt overall lifetime; this should however still give an accurate approximation when the battery is not fully charged throughout the day, which is often the case. 
+
+Let $chs(vt_i)$ represent a list of all charging actions which occur throughout the task (including the overnight charge), each given in the form $(\sigma, \sigma')$ representing a charge from $\sigma$ to $\sigma'$. We can then define the battery degradation cost of a vehicle task $vt_i$ as follows:
 \begin{equation}
   bdg(vt_i) = 4.8254 \cdot \textit{battery kWh} \cdot \sum_{(\sigma, \sigma') \in chs(vt_i)} [\exp(2.519 \cdot (1 - \sigma)) - \exp(2.519 \cdot (1 - \sigma'))] \nonumber
 \end{equation}
@@ -1324,7 +1326,7 @@ During initial testing, we found that Gurobi was often find quite good solutions
 \subsubsection{Secondary columns}
 During our column generation, a number of secondary column sources is included. Their aim is to improve the final solution by making columns available which may not be optimal in the relaxation. 
 
-For both labeling algorithms, we do this by selecting some number of columns with negative reduced cost, then blocking parts of these columns off in the generation graph before rerunning the labeling. The best columns found after rerunning are then included. In order to test the effectiveness of this approach. In this, let us take $N$ as the number of primary columns which are used as a base, and let $M$ be the number of different trip subsets that we block using a base. We run our tests with a maximum of 50 primary columns per round extracted, selecting a maximum of 50 secondary columns per blocked of set of trips. Additionally, a Gurobi timeout of 900 seconds is set on the final ILP. For each test case, we report the resulting model value, the gap percentage and the number of unique columns generated. This overview can be seen in Table \ref{tab:evsp-secondary-columns}. 
+For both labeling algorithms, we do this by selecting some number of columns with negative reduced cost, then blocking parts of these columns off in the generation graph before rerunning the labeling. The best columns found after rerunning are then included. In order to test the effectiveness of this approach, let us first consider our labeling algorithm for the E-VSP. In this, let us take $N$ as the number of primary columns which are used as a base, and let $M$ be the number of different trip subsets that we block in a given base. We run our tests with a maximum of 50 primary columns per round extracted, selecting a maximum of 50 secondary columns per blocked of set of trips. Additionally, a Gurobi timeout of 900 seconds is set on the final ILP. For each test case, we report the resulting model value, the ILP optimality gap and the number of unique columns generated. This overview can be seen in Table \ref{tab:evsp-secondary-columns}. 
 
 \begin{table}[h]
   \centering
@@ -1333,60 +1335,60 @@ For both labeling algorithms, we do this by selecting some number of columns wit
     && $N=0$ & $N=1$ & $N=2$ & $N=4$ & $N=8$ & $N=16$ & $N=32$\\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
     \addlinespace[0.4em]
-     & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & 3393.9 & 3401.4 & 3426.4 & 3411.4 \\
+     & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & \underline{3393.9} & 3401.4 & 3426.4 & 3411.4 \\
     $M=4$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0.6 & 1.1 \\
     & \textbf{cols} & 3014 & 6047 & 7305 & 12971 & 12083 & 14339 & 16497 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
-    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & 3393.9 & 3401.4 & 3426.4 & 3411.4 \\
+    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & \underline{3393.9} & 3401.4 & 3426.4 & 3411.4 \\
     $M=8$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0.6 & 1.1 \\
     & \textbf{cols} & 3014 & 6047 & 7305 & 12971 & 12083 & 14339 & 16497 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
-    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & 3393.9 & 3401.4 & 3426.4 & 3411.4 \\
+    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & \underline{3393.9} & 3401.4 & 3426.4 & 3411.4 \\
     $M=12$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0.6 & 1.1 \\
     & \textbf{cols} & 3014 & 6047 & 7305 & 12971 & 12083 & 14339 & 16497 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
-    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & 3393.9 & 3401.4 & 3426.4 & 3411.4 \\
+    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & \underline{3393.9} & 3401.4 & 3426.4 & 3411.4 \\
     $M=16$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0.8 & 1.1 \\
     & \textbf{cols} & 3014 & 6047 & 7305 & 12971 & 12083 & 14339 & 16497 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effect of E-VSP labeling secondary columns, tested on \texttt{leiden-1-2}. $N$ is number of base columns, $M$ is number of trip sets in base which were blocked.}
+  \caption{Effect of E-VSP labeling secondary columns, tested on \texttt{leiden-1-2}. $N$ is number of base columns, $M$ is number of trip sets in base column which were blocked. Best solution \underline{underlined}.}
   \label{tab:evsp-secondary-columns}
 \end{table}
 
-As we can see, the number of base columns $N$ solely determines the solution quality; different values of $M$ do not seem to have any significant influence. Next, we see that for larger $N$, the number of columns available to the final solution does not increase linearly; this is due to the fact that duplicate columns can be generated, making it hard to generate new columns as more bases are considered. We even see that for $N=8$ the number of unique columns decreases, indicating that the secondary columns can affect the generation of primary columns. Lastly, we see a decrease in the objective value up to $N=4$, after which we see it rise again. For $N=8$ this might be due to the lower number of available columns, whereas for $N=16$ and $N=32$ the number of columns was to large for Gurobi to prove optimality within the time limit. Seeing these results, we can conclude that a reasonably high $N$ with an $M$ of at least 4 is beneficial for the solution. \\
+As we can see, for the E-VSP the number of base columns $N$ solely determines the solution quality; different values of $M$ do not seem to have any significant influence on the solution quality. Next, we see that for larger $N$, the number of columns available to the final solution does not increase linearly; this is due to the fact that duplicate columns can be generated, making it hard to generate new columns as more bases are considered. We even see that for $N=8$ the number of unique columns decreases, indicating that the included secondary columns affected the generation of primary columns, causing the LP relaxation to be solved to optimality in fewer column generation rounds. Lastly, we see a decrease in the objective value up to $N=4$, after which we see it rise again. For $N=8$ this might be due to the lower number of available columns, whereas for $N=16$ and $N=32$ the number of columns was too large for Gurobi to prove optimality within the time limit. Given these results, we can conclude that a reasonably high $N$ with an $M$ of at least 4 is beneficial for the solution. \\
 
-\noindent For crew, a similar experiment was performed. The vehicle schedule resulting from $N=4$, $M=4$ in our previous test was selected as a base as this had the lowest overall cost. We then applied our CSP labeling algorithm with different values of $N$ and $M$, again with a Gurobi timeout of 900 seconds for the final solve. We note that in these tests, our preprocessing of break and short idle arcs was adjusted to allow a maximum duration of 4 hours. This adjustment was done due to the presence of a block in the vehicle solution which had no sign-on or sign-off block available within $\approx 3$ hours, and could therefore not feasibly be covered under the original formulation. The results of these tests are reported in Table \ref{tab:csp-secondary-columns}.
+\noindent For the CSP, a similar experiment was performed. The vehicle schedule resulting from $N=4$, $M=4$ in our previous test was selected as a base as this had the lowest overall cost. We then applied our CSP labeling algorithm with different values of $N$ and $M$, again with a Gurobi timeout of 900 seconds for the final solve. We note that in these tests, our preprocessing of break and short idle arcs was adjusted to allow for a maximum duration of 4 hours. This adjustment was done due to the presence of a block in the vehicle solution which had no sign-on or sign-off block available within $\sim3$ hours, and could therefore not feasibly be covered under the original formulation. The results of these tests are reported in Table \ref{tab:csp-secondary-columns}.
 
 \begin{table}[h]
   \centering
   \begin{tabular}{llrrrrrrr}
     \toprule
     && $N=0$ & $N=1$ & $N=2$ & $N=4$ & $N=8$ & $N=16$ & $N=32$  \\
-    \arrayrulecolor{black!30}\cmidrule(lr){1-8}
+    \arrayrulecolor{black!30}\cmidrule(lr){1-9}
     \addlinespace[0.4em]
-     & \textbf{value}  & 14313.3 & 14282.9 & 14152.9 & 14152.9 & 14100.9 & 14100.9 & 14100.9 \\
+     & \textbf{value}  & 14313.3 & 14282.9 & 14152.9 & 14152.9 & \underline{14100.9} & \underline{14100.9} & \underline{14100.9} \\
     $M=4$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 352 & 509 & 655 & 958 & 1042 & 1677 & 2294 \\
-    \arrayrulecolor{black!30}\cmidrule(lr){1-8}
-    & \textbf{value}  & 14310 & 14246.1 & 14182.2 & 14154 & 14100.9 & 14100.9 & 14100.9 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-9}
+    & \textbf{value}  & 14310 & 14246.1 & 14182.2 & 14154 & \underline{14100.9} & \underline{14100.9} & \underline{14100.9} \\
     $M=8$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 344 & 500 & 669 & 908 & 1147 & 1675 & 2302 \\
-    \arrayrulecolor{black!30}\cmidrule(lr){1-8}
-    & \textbf{value}  & 14308.9 & 14152.9 & 14182.2 & 14182.2 & 14124.8 & 14100.9 & 14100.9 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-9}
+    & \textbf{value}  & 14308.9 & 14152.9 & 14182.2 & 14182.2 & 14124.8 & \underline{14100.9} & \underline{14100.9} \\
     $M=12$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 365 & 502 & 697 & 940 & 1051 & 1660 & 2293 \\
-    \arrayrulecolor{black!30}\cmidrule(lr){1-8}
-    & \textbf{value}  & 14372.8 & 14275.3 & 14216.8 & 14152.9 & 14100.9 & 14100.9 & 14100.9 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-9}
+    & \textbf{value}  & 14372.8 & 14275.3 & 14216.8 & 14152.9 & \underline{14100.9} & \underline{14100.9} & \underline{14100.9} \\
     $M=16$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 341 & 521 & 647 & 946 & 1084 & 1695 & 2298 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effect of CSP labeling secondary columns, tested on \texttt{leiden-1-2}. $N$ is number of base columns, $M$ is number of trip sets in base which were blocked.}
+  \caption{Effect of CSP labeling secondary columns, tested on \texttt{leiden-1-2}. $N$ is number of base columns, $M$ is number of trip sets in base which were blocked. Best solution \underline{underlined}.}
   \label{tab:csp-secondary-columns}
 \end{table}
 
-Here, we 
+Here, we again see that including a larger number of secondary columns improves the final solution quality; for $N \geq 16$, the best known crew solution for the given vehicle solution is found regardless of the chosen $M$. When compared to the vehicle experiments, we do now also see significant influence of different values of $M$. This may be explained by the fact that the number of to be covered blocks is generally way lower than the number of trips (usually by a factor of $\sim2$ in our initial testing). This in turn implies that a larger proportion of the underlying graph is blocked, causing more apparent diversity in the secondary columns which are generated. We can again conclude that a reasonably high $N$ is good in general, whereas $M$ may need to be varied depending on the specific instance.
 
 \subsubsection{E-VSP Local search}
 
