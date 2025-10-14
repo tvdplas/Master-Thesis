@@ -1025,7 +1025,7 @@ For the duties, we cannot directly do the same as $y_j$ has no upper bound. We c
 
 Using this, for all $cd_j \in CD$ for which $cost_\lambda(cd_j) < 0$, set $y_j = \bar{y_{j}}$, otherwise $y_j = 0$, following the same reasoning as earlier. We can ignore the $\lambda_t$ term as it is constant for a given set of multipliers.
 
-When a Lagrangean relaxation is solved exactly, the solution provides a lower bound to the solution quality of the original ILP. In our case, the heuristic used for the solution only gives us an approximation. The quality of the approximated lower bound may however differ depending on the value of $\lambda$. Without an approximated solution, the best quality lower bound can be found by attempting the maximize the solution value for different values of $\lambda$; as initial experiments showed that our approximation did not seem to be far from the actual lower bound, we will do the same. We therefore need to solve the following problem:
+\todo{hier iets beters van maken} When a Lagrangean relaxation is solved exactly the solution provides a lower bound to the solution quality of the original ILP. Given the heuristic which we just applied, this is not directly the case; init. The quality of the approximated lower bound may however differ depending on the value of $\lambda$. Without an approximated solution, the best quality lower bound can be found by attempting the maximize the solution value for different values of $\lambda$; as initial experiments showed that our approximation did not seem to be far from the actual lower bound, we will do the same. We therefore need to solve the following problem:
 \begin{align}
 \max_{\lambda} \quad & \min \sum_{vt_i \in VT} x_{i} \cdot cost_\lambda(vt_i) + \sum_{cd_j \in CD} y_{j} \cdot cost_\lambda(cd_j) + \sum_{t \in T} \lambda_{t}
 \end{align}
@@ -1175,30 +1175,30 @@ Secondly, an upper bound $N_{max,lb}$ was set on the number of labels which were
 In this section, we will discuss the hardware and software used in our implementation of our methods. Additionally, we will highlight any methods which were parallelized in order to make the implementation more computationally efficient. 
 
 \subsection{Hardware and software}
-Implementation of the described algorithms was done in C\# .NET 8, running in Release mode. Additionally, Server Garbage Collection was turned on in order to improve performance when multithreading. Gurobi 12.0.3 (\citet{Gurobi2025}, Academic License) was used modeling and solving the LP/ILP problems. All experiments were run on using Ubuntu 24.04.3 LTS with an Intel Xeon Gold 6130 processor (2.1GHz base, 3.7 GHz boost, 16 cores, 36 threads) and 128 GB of DDR4 RAM.  
+All experiments were run on Ubuntu 24.04.3 LTS with an Intel Xeon Gold 6130 processor (2.1GHz base, 3.7 GHz boost, 16 cores, 32 threads) and 128 GB of DDR4 RAM.  Implementation of the described algorithms was done in C\# .NET 8, running in Release mode. Additionally, Server Garbage Collection was turned on in order to improve performance when multithreading. Gurobi 12.0.3 (\citet{Gurobi2025}, Academic License) was used modeling and solving the LP/ILP problems. More details on exact parameters used for the Gurobi models are provided in Section \ref{sec:parameter-selection}.
 
 Full source code has been made available at \url{https://github.com/tvdplas/Master-Thesis}. In this, two projects are included: a platform-agnostic algorithmic backend, and a Windows-specific frontend which can be used in order to configure all algorithm parameters and visualize the resulting schedules.
 
 \subsection{Parallelism}
-During implementation of our methods, it was found that there were a number of components which could be easily parallelized. As this led to significant decreases in overall computation time, we will give an overview of these components, as well as highlighting parts of the algorithm where parallelism was not found to be beneficial.
+During implementation of our methods, it was found that there were a number of components which could be easily parallelized. As this led to significant decreases in overall computation time, we will give an overview of these components, as well as highlighting parts of the algorithms where parallelism was not found to be beneficial.
 
 \subsubsection{Column generation - Labeling}
 For the labeling based approaches, two key components of the algorithm were identified as being parallelizable while also having a high impact on the overall runtime: label propagation and the generation of secondary columns. We will now discuss each of these in more detail. 
 
 \paragraph{Label propagation}
-Given a label $l$ in a node $v$, the propagation of $l$ to all nodes $u$ such that $(v, u) \in A$ is largely independent; this could therefore be done in parallel. As the number of outgoing arcs from a node can be quite high, this would in theory result in a significant reduction in the time required to fully propagate all labels. In practice however, two problems were observed: 
+Given a label $l$ in a node $v$, the propagation of $l$ to all nodes $u$ such that $(v, u) \in A_{vt}$ is largely independent; this could therefore be done in parallel. As the number of outgoing arcs from a node can be quite high, this would in theory result in a significant reduction in the time required to fully propagate all labels. In practice however, two problems were observed: 
 
-Firstly, in the case of vehicle column generation, a pair of nodes may be linked by multiple arcs; this in turn implies that multiple labels may be added to a single node $u$ when propagating $l$ from $v$. In order to handle this properly, additional computational work is required, either by adding a lock to the list of active labels in $u$ or by doing these arcs sequentially. Both of these options decrease the effectiveness of a parallel propagation approach. 
+Firstly, in the case of vehicle column generation, a pair of nodes may be linked by multiple arcs: a base arc and a number of detour arcs. This implies that multiple labels may be added to a single node $u$ when propagating $l$ from $v$. In order to handle this properly, additional computational work is required, either by adding a lock to the list of active labels in $u$ or by doing these arcs sequentially. Both of these options decrease the effectiveness of a parallel propagation approach. 
 
 Secondly, the overhead of thread scheduling for operations of this size is significant; even when considering batches of either arcs or labels as thread tasks, overall computation time was observed to increase instead of decrease when compared to a simple sequential approach. It was therefore concluded that the propagation of labels was not a suitable target for parallelization.
 
 \paragraph{Secondary column generation}
-Another candidate for parallelization was the generation of secondary columns. As described in more detail in Sections \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}, batches of secondary columns are generated by running the labeling algorithm again with a subset of nodes being blocked. Each of these individual runs is independent and takes a significant amount of time, making this a prime candidate for parallelization.
+Another candidate for parallelization was the generation of secondary columns. As described in more detail in Sections \ref{sec:evsp-methodology} and \ref{sec:csp-methodology}, batches of secondary columns are generated by running the labeling algorithm again with a subset of nodes being blocked. Each of these runs is independent and takes a significant amount of time, making this a prime candidate for parallelization.
 
-After implementing parallel generation of batches of secondary columns, significant performance gains were observed; given our particular hardware, a 5-20x reduction in required computation time was observed for the generation of secondary columns. We do note that this incurs significant memory usage; if not properly managed, garbage collection will dominate overall CPU time, preventing any improvements. \todo{loopt niet lekker} 
+After implementing parallel generation of batches of secondary columns, significant performance gains were observed: given our particular hardware, a 4-20x reduction in required computation time was observed for the generation of secondary columns. We do note that this drastically increased memory usage due to keeping track of additional label sets. In languages with garbage collection, this requires extra attention as this may dominate overall CPU time, preventing any runtime improvements.
 
 \subsubsection{Column generation - Local search}
-For local search based approaches, the randomized sequence of operations all but guarantees that two different runs given the same input data will result in a different resulting set of column. As a result of this, it can be interesting to run multiple local search processes, each with a different random seed; this approach, commonly known as multi-start, is an ideal target for parallelization as each process is completely independent and memory efficient. 
+For both the initial local search solution and the local search pricing problem, the randomized sequence of operations all but guarantees that two different runs will result in a different (set of) columns. As a result of this, it can be interesting to run multiple local search processes, each with a different random seed; this approach, commonly known as multi-start, is an ideal target for parallelization as each process is completely independent and memory efficient. 
 
 \subsubsection{Subgradient optimization}
 Cost reevaluation during subgradient optimization was found to be a significant bottleneck during initial testing, as for each column the contribution of the contained trips and blocks needs to be updated in order to find $x$ and $y$. As this process is independent for each column, it was parallelized by splitting the set of columns into batches, each of which is processed by a separate thread. This resulted in a significant decrease in overall computation time.
@@ -1217,36 +1217,38 @@ cost(vt_i) = 200 + 0.05 \cdot km(vt_i) + 0.32 \cdot chl(vt_i) + bdg(vt_i)  \nonu
 \end{equation}
 Where $km(vt_i)$ is the total distance driven in kilometers, $chl(vt_i)$ is the total energy used in kWh and $bdg(vt_i)$ represents battery degradation costs. In this, the fixed costs of 200 incorporate factors such as insurance and depreciation, the distance costs of 0.05 represent driving related maintenance costs, and energy costs are a pessimistic estimate of the average kWh cost in the Netherlands based on data provided by the \citet{ANWB2025}.
 
-Battery degradation costs are based on a base formula provided by \citet{vanKootenNiekerk2017} and an average price of approximately $100$ euros per kWh for lithium-ion batteries as mentioned in \citet{Ocatsaros2024}. As batteries are currently projected to get cheaper in the future, we will ignore any labor costs associated with a battery replacement. Let $chs(vt_i)$ represent a list of all charging actions which occur throughout the task (including the overnight charge), each given in the form $(\sigma, \sigma')$ representing a charge from $\sigma$ to $\sigma'$. We then define $bdg(vt_i) = 4.8254 \cdot \textit{battery kWh} \cdot \sum_{(\sigma, \sigma') \in chs(vt_i)} [\exp(2.519 \cdot (1 - \sigma)) - \exp(2.519 \cdot (1 - \sigma'))]$
+Battery degradation costs are based on a base formula provided by \citet{vanKootenNiekerk2017} and an average price of approximately $100$ euros per kWh for lithium-ion batteries as mentioned in \citet{Ocatsaros2024}. As batteries are currently projected to get cheaper in the future, we will ignore any labor costs associated with a battery replacement. Let $chs(vt_i)$ represent a list of all charging actions which occur throughout the task (including the overnight charge), each given in the form $(\sigma, \sigma')$ representing a charge from $\sigma$ to $\sigma'$. We can then define the battery degredation cost of a vehicle task $vt_i$ as follows:
+\begin{equation}
+  bdg(vt_i) = 4.8254 \cdot \textit{battery kWh} \cdot \sum_{(\sigma, \sigma') \in chs(vt_i)} [\exp(2.519 \cdot (1 - \sigma)) - \exp(2.519 \cdot (1 - \sigma'))] \nonumber
+\end{equation}
 
-For crew duties, the costs of a duty $cd_j$ are defined as follows:
+\noindent Let us now consider our crew duties. For an individual duty $cd_j$, its cost is defined as follows:
 \begin{equation}
   cost(cd_j) =
   \begin{cases}
     120 + 65 \cdot dur(cd_j) & \text{if } cd_j \text{ is of type }\textit{broken} \\ 
     100 + 65 \cdot dur(cd_j) & \text{otherwise}
-  \end{cases}
+  \end{cases} \nonumber
 \end{equation}
 Here, $dur(cd_j)$ represents the total duration of the duty in hours (excluding long idle time in the case of a \textit{broken} duty). Crew members are paid an additional 20 euros when driving a \textit{broken} duty as an incentive, as this duty type is generally less convenient for the driver to plan their personal life around. The rest of the fixed and variable costs are based on paid hourly wages, pensions, insurance and additional administration costs.
 
 \subsubsection{Cost lower bounds}
-Given these costs, we can determine a lower bound for the cost of any solution as follows. Let $\mathcal{T}$ once again be the set of all trips to be covered, and let $s(t)$ and $e(t)$ represent the start and end time of a trip $t \in \mathcal{T}$ respectively. We now that for a given point in time $a$, there must be at least as many vehicles in our solution as there are trips active during $a$. We can therefore define the minimum number of required vehicles $VT_{min} = \max_{a} |\{ t \in \mathcal{T} \:|\: s(t) \leq a < e(t) \}|$. Additionally, regardless of the deadheads driven between trips, we know that at the very least we will drive the distance of each trip. Let $km(t)$ represent the distance driven during trip $t$, and let $chl(t)$ be defined similarly for the number of kWh used. To minimize our battery degradation costs, we will assume that we can always charge back to $\sigma=1$ directly after a trip, and that no overnight charging occurs; in order to include this, let $chl_\sigma(t)$ represent the SoC loss of a trip $t$. Our lower bound on vehicle costs can then be defined as follows: 
-
+Given these costs, we can determine a lower bound for the cost of any solution as follows. Let $\mathcal{T}$ once again be the set of all trips to be covered, and let $s(t)$ and $e(t)$ represent the start and end time of a trip $t \in \mathcal{T}$ respectively. We know that for a given point in time $a$, there must be at least as many vehicles in our solution as there are trips active during $a$. We can therefore define the minimum number of required vehicles as $VT_{min} = \max_{a} |\{ t \in \mathcal{T} \:|\: s(t) \leq a < e(t) \}|$. Additionally, we know that any feasible solution must at the very least drive all trips in $\mathcal{T}$; we can therefore include any costs associated with driving the individual trips. Let $km(t)$ represent the distance driven during trip $t$, and let $chl(t)$ represent the number of kWh used. To minimize our battery degradation costs, we will assume that we can always charge back to $\sigma=1$ directly after a trip, and that no overnight charging occurs; in order to include this, let $chl_\sigma(t)$ represent the SoC loss of a trip $t$. Our lower bound on vehicle costs can then be defined as follows: 
 \begin{equation}
   cost_{VT,min} = VT_{min} \cdot 200 + \sum_{t \in \mathcal{T}} (0.05 \cdot km(t) + 0.32 \cdot chl(t) +  4.8254 \cdot \textit{battery kWh} \cdot [e^{2.519chl_\sigma(t)} - 1]) \nonumber
 \end{equation}
 
-For crew costs, let us define $dur(t)$ as the duration of trip $t$. As each trip must be covered by at least one crew member, we know that the minimum number of working hours is $h_{min} = $$\sum_{t \in \mathcal{T}} dur(t)$. In order to see how many duties are required to cover these hours, we must determine the optimal duty length. For this, we have 3 cases, depending on the minimum required breaktime: 
+For crew costs, let us define $dur(t)$ as the duration of trip $t$ in hours. As each trip must be covered by at least one crew member, we know that the minimum number of working hours is $h_{min} = \sum_{t \in \mathcal{T}} dur(t)$. In order to determine the costs of the duties are required to cover these hours, we must determine the optimal duty length. For this, we have 3 cases, depending on the minimum required break time: 
 \begin{itemize}
-  \item A duty of at most 4 hours, where the cost per worked hour is at least $(100 + 65 \cdot 4) / 4 = 90$.
-  \item A duty of more than 4 hours but at most 5.5 hours, where we are required to have at least 20 minutes of breaktime. Here, the cost per worked hour is at least $(100 + 65 \cdot 5.5) / (5.5 - \frac{1}{3}) \approx 88.6$.
-  \item A duty of more than 5.5 hours, where we are required to have at least 40 minutes of breaktime. Here, the cost per worked hour is at least $(100 + 65 \cdot 9) / (9 - \frac{2}{3}) = 82.2$, as we can have a duty of at most 9 hours.
+  \item Duties of at most 4 hours, where the cost per worked hour is at least $(100 + 65 \cdot 4) / 4 = 90$.
+  \item Duties between 4 and 5.5 hours, where we are required to have at least 20 minutes of break time. Here, the cost per worked hour is at least $(100 + 65 \cdot 5.5) / (5.5 - \frac{1}{3}) \approx 88.6$.
+  \item A duty of more than 5.5 hours, where we are required to have at least 40 minutes of break time. Here, the cost per worked hour is at least $(100 + 65 \cdot 9) / (9 - \frac{2}{3}) = 82.2$, as a single duty may have a length of at most 9 hours.
 \end{itemize}
-It is clear that longer duties are prefered, however as we have the constraint that the average duty length may not exceed 8 hours, we cannot only use 9 hour duties. Let us therefore instead only use 8 hour long duties, which have a cost per worked hour of $(100 + 65 \cdot 8) / (8 - \frac{2}{3}) \approx 84.54$. Assuming that we can cover all required hours with 8 hour duties, we can now define a lower bound on crew costs as follows:
+It is clear that longer duties are cheaper per worked hour, however as we have the constraint that the average duty length may not exceed 8 hours, we cannot only use 9 hour long duties. Let us therefore instead only use 8 hour long duties, which have a cost per worked hour of $(100 + 65 \cdot 8) / (8 - \frac{2}{3}) \approx 84.54$. Assuming that we can cover all required hours with 8 hour duties, we can now define a lower bound on crew costs as follows:
 \begin{equation}
-  cost_{CD,min} = 100 \cdot \lceil h_{min} / 8 \rceil + 65 \cdot h_{min} \nonumber
+  cost_{CD,min} = 84.54 \cdot h_{min} \nonumber
 \end{equation}
-The lower bound on any solution can now be defined as $cost_{min} = cost_{VT,min} + cost_{CD,min}$. We will include this bound for our instances as a baseline for solution quality. Note that this figure may be significantly lower than the actual optimal solution, as it does not take into account required elements such as deadhead driving, charging and visiting relief points.
+The lower bound on any solution can now be defined as $cost_{min} = cost_{VT,min} + cost_{CD,min}$. We will include this bound for our instances as a reference for solution quality. Note that this figure may be significantly lower than the actual optimal solution, as it does not take into account required elements such as deadhead driving, charging and visiting relief points.
 
 \subsection{Instances}
 A collection of instances was also provided by Qbuzz. A summary of each of these instances is provided in Table \ref{tab:instances}. We will now discuss each of these instances in more detail, along with any modifications required in order to turn the instances into feasible input for our algorithms. 
@@ -1272,7 +1274,7 @@ The instance \texttt{terschelling} represents a small island in the north of the
 
 The instance contains 2 different bus types which are present on the island, totalling 6 available vehicles; as we only consider a single vehicle type without hard constraints on the number of vehicles used, the vehicle with larger action radius was selected for use in testing. The resulting vehicle has a raw capacity of 172.8 kWh or 135 km; the bottom 15\% of the battery is considered unusable, leaving us with around 149 kWh or 115 km of usable capacity. The charging of this vehicle is done at 40 kW or 31 km/h, regardless of the SoC.
 
-In real life, modified labor regulations are applied to this instance due to its small size; we will ignore these modifications, and apply the simplified Dutch labor regulations discussed previously. We note however that the original timetabling of trips may therefore not be aligned with the crew schedules we are allowed to make.
+In real life, modified labor regulations are applied to this instance due to its small size; we will ignore these modifications, and apply the simplified Dutch labor regulations discussed previously. We note however that the timetabling of trips may therefore not be aligned with the crew schedules we are allowed to make.
 
 A visual representation of this instance has been provided in Figure \ref{fig:terschelling-map}, using data from \citet{OpenStreetMap2025} and using \citet{QGIS2025} for map rendering. The depot is marked by three horizontal colored dots, indicating that the location is a relief point, crew hub and charging location. 
 
@@ -1347,9 +1349,9 @@ For both labeling algorithms, we do this by selecting some number of columns wit
   \label{tab:evsp-secondary-columns}
 \end{table}
 
-As we can see, the number of base columns $N$ solely determines the solution quality; different values of $M$ do not seem to have any significant influence. Next, we see that for larger $N$, the number of columns available to the final solution does not increase linearly; this is due to the fact that duplicate columns can be generated, making it hard to generate new columns as more bases are considered. We even see that for $N=8$ the number of unique columns decreases, indicating that the secondary columns can affect the generation of primary columns. Lastly, we see a decrease in the objective value up to $N=4$, after which we see it rise again. For $N=8$ this might be due to the lower number of available columns, whereas for $N=16$ and $N=32$ the number of columns was to large for Gurobi to prove optimality within the time limit. Seeing these results, we can conclude that a reasonably high $N$ with an $M$ of at least 4 is beneficial for the solution. As larger instances might still benefit from a higher $N$, we will use $N=8$ and $M=4$ going forward. \\
+As we can see, the number of base columns $N$ solely determines the solution quality; different values of $M$ do not seem to have any significant influence. Next, we see that for larger $N$, the number of columns available to the final solution does not increase linearly; this is due to the fact that duplicate columns can be generated, making it hard to generate new columns as more bases are considered. We even see that for $N=8$ the number of unique columns decreases, indicating that the secondary columns can affect the generation of primary columns. Lastly, we see a decrease in the objective value up to $N=4$, after which we see it rise again. For $N=8$ this might be due to the lower number of available columns, whereas for $N=16$ and $N=32$ the number of columns was to large for Gurobi to prove optimality within the time limit. Seeing these results, we can conclude that a reasonably high $N$ with an $M$ of at least 4 is beneficial for the solution. \\
 
-\noindent For crew, a similar experiment was performed; the vehicle schedule resulting from $N=8$, $M=4$ was selected as a base, before again testing different values of $N$ and $M$ for CSP labeling. The results of these tests are reported in Table \ref{tab:csp-secondary-columns} 
+\noindent For crew, a similar experiment was performed. The vehicle schedule resulting from $N=4$, $M=4$ in our previous test was selected as a base as this had the lowest overall cost. We then applied our CSP labeling algorithm with different values of $N$ and $M$, again with a Gurobi timeout of 900 seconds for the final solve. We note that in these tests, our preprocessing of break and short idle arcs was adjusted to allow a maximum duration of 4 hours. This adjustment was done due to the presence of a block in the vehicle solution which had no sign-on or sign-off block available within $\approx 3$ hours, and could therefore not feasibly be covered under the original formulation. The results of these tests are reported in Table \ref{tab:csp-secondary-columns}.
 
 \begin{table}[h]
   \centering
@@ -1358,51 +1360,28 @@ As we can see, the number of base columns $N$ solely determines the solution qua
     && $N=0$ & $N=1$ & $N=2$ & $N=4$ & $N=8$ & $N=16$ & $N=32$  \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-8}
     \addlinespace[0.4em]
-     & \textbf{value}  & -- & -- & -- & -- & -- & -- & -- \\
-    $M=4$ & \textbf{gap}   & -- & -- & -- & -- & -- & -- & -- \\
-    & \textbf{cols} & -- & -- & -- & -- & -- & -- & -- \\
+     & \textbf{value}  & 14313.3 & 14282.9 & 14152.9 & 14152.9 & 14100.9 & 14100.9 & 14100.9 \\
+    $M=4$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    & \textbf{cols} & 352 & 509 & 655 & 958 & 1042 & 1677 & 2294 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-8}
-    & \textbf{value}  & -- & -- & -- & -- & -- & -- & -- \\
-    $M=8$ & \textbf{gap}   & -- & -- & -- & -- & -- & -- & -- \\
-    & \textbf{cols} & -- & -- & -- & -- & -- & -- & -- \\
+    & \textbf{value}  & 14310 & 14246.1 & 14182.2 & 14154 & 14100.9 & 14100.9 & 14100.9 \\
+    $M=8$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    & \textbf{cols} & 344 & 500 & 669 & 908 & 1147 & 1675 & 2302 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-8}
-    & \textbf{value}  & -- & -- & -- & -- & -- & -- & -- \\
-    $M=12$ & \textbf{gap}   & -- & -- & -- & -- & -- & -- & -- \\
-    & \textbf{cols} & -- & -- & -- & -- & -- & -- & -- \\
+    & \textbf{value}  & 14308.9 & 14152.9 & 14182.2 & 14182.2 & 14124.8 & 14100.9 & 14100.9 \\
+    $M=12$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    & \textbf{cols} & 365 & 502 & 697 & 940 & 1051 & 1660 & 2293 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-8}
-    & \textbf{value}  & -- & -- & -- & -- & -- & -- & -- \\
-    $M=16$ & \textbf{gap}   & -- & -- & -- & -- & -- & -- & -- \\
-    & \textbf{cols} & -- & -- & -- & -- & -- & -- & -- \\
+    & \textbf{value}  & 14372.8 & 14275.3 & 14216.8 & 14152.9 & 14100.9 & 14100.9 & 14100.9 \\
+    $M=16$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    & \textbf{cols} & 341 & 521 & 647 & 946 & 1084 & 1695 & 2298 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
   \caption{Effect of CSP labeling secondary columns, tested on \texttt{leiden-1-2}. $N$ is number of base columns, $M$ is number of trip sets in base which were blocked.}
   \label{tab:csp-secondary-columns}
 \end{table}
 
-
-\subsubsection{Target vehicles/duties}
-During initial testing, it also seemed beneficial to add a soft constraint on the number of vehicles / duties in the solution. This was theorized to weigh the other dual costs such that solutions with fewer selected schedules were easier to find during the final integer solve. In order to confirm this theory, tests were run on both the E-VSP and CSP using an upper bound on the number of selected schedules.
-
-For the E-VSP, this was tested by using a varying target number of vehicles $N$. For the \texttt{leiden-1-2} instance, the minimum number of required vehicles was found to be 8 using the method described in Section \ref{sec:results-costs}. Test cases with even fewer vehicles were not performed, as this bound is already very optimistic. In earlier testing, schedules with a minimum of 11 vehicles were found for this instance; the final relaxation value should therefore not change if we set $N$ to this or higher. 
-
-In order to test, we only apply labeling as this method does not include any randomization. We set a Gurobi timelimit of 900 seconds, and report the model value, gap and number of columns generated for each test case.
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{crrrcrrr}
-    \toprule
-    $N$ & \textbf{value} & \textbf{gap} & \textbf{cols} & $N$ & \textbf{value} & \textbf{gap} & \textbf{cols}\\
-    \cmidrule(lr){1-4}\cmidrule(lr){5-8}
-    8   & 3352.6 & 29   & 28366 & 12 & 3159.7 & 3.3  & 22163 \\
-    9   & 3363.3 & 39.6 & 28439 & 13 & 3332.9 & 8.1  & 26062 \\
-    10  & 3367.4 & 63.3 & 24025 & 14 & 3332.4 & 8    & 22212 \\
-    11  & 3370.2 & 8.9  & 21745 & 15 & 3369.5 & 8.3  & 19347 \\
-    \arrayrulecolor{black}\bottomrule
-  \end{tabular}
-  \caption{Effects of a soft constraint on number of schedules, tested on \texttt{leiden-1-2}.}
-  \label{tab:evsp-schedule-cap}
-\end{table}
-
+Here, we 
 
 \subsubsection{E-VSP Local search}
 
@@ -1436,6 +1415,42 @@ In order to test, we only apply labeling as this method does not include any ran
   \end{tabular}
   \caption{Effect of number of rounds and iterations on E-VSP global local search, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number operations attempted per round. LS value is best solution in a single LS round, ILP value is after recombination.}
   \label{tab:evsp-ls-global}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{llrrrrr}
+    \toprule
+    && $I=1e3$ & $I=1e4$ & $I=5e4$ & $I=1e6$ & $I=5e6$  \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \addlinespace[0.4em]
+    \multirow{3}{*}{$R=100$} & \textbf{value}  & 5900.8 & 5074.9 & 4853.1 & 4743.4 & 4647.4 \\
+    & \textbf{gap \%} & 1.2 & 7.0 & 12.0 & 11.6 & 12.1 \\
+    & \textbf{cols} & 669.6 & 547.8 & 572.4 & 590.8 & 619.8 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{3}{*}{$R=200$} & \textbf{value}  & 5309.9 & 4782.9 & 4502.7 & 4465.0 & 4411.3 \\
+    & \textbf{gap \%} & 6.7 & 17.3 & 17.5 & 17.2 & 17.7 \\
+    & \textbf{cols} & 1261.0 & 1084.0 & 1212.2 & 1251.0 & 1284.6 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{3}{*}{$R=500$} & \textbf{value}  & 5082.9 & 4509.2 & 4196.5 & 4191.5 & 4107.8 \\
+    & \textbf{gap \%} & 14.8 & 18.5 & 16.1 & 16.6 & 15.8 \\
+    & \textbf{cols} & 2837.4 & 2814.4 & 3288.6 & 3295.6 & 3374.2 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{3}{*}{$R=1000$} & \textbf{value}  & 4854.8 & 4362.2 & 4145.8 & 4081.0 & 3945.0 \\
+    & \textbf{gap \%} & 18.4 & 18.4 & 16.7 & 16.1 & 13.9 \\
+    & \textbf{cols} & 5487.4 & 5843.6 & 6651.0 & 6785.8 & 6776.8 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{3}{*}{$R=2000$} & \textbf{value}  & 4666.6 & 4189.1 & 4068.6 & 3913.6 & 3840.4 \\
+    & \textbf{gap \%} & 18.7 & 16.5 & 16.4 & 13.6 & 12.8 \\
+    & \textbf{cols} & 10309.2 & 12011.8 & 13638.2 & 13895.2 & 13711.0 \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{3}{*}{$R=5000$} & \textbf{value}  & 4557.0 & 4102.4 & 3928.3 & 3838.4 & 3790.5 \\
+    & \textbf{gap \%} & 19.4 & 16.1 & 14.5 & 13.0 & 12.7 \\
+    & \textbf{cols} & 24672.6 & 29898.6 & 34885.6 & 34818.4 & 33944.0 \\
+    \arrayrulecolor{black}\bottomrule
+  \end{tabular}
+  \caption{Effect of number of rounds and iterations on E-VSP singles local search, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number operations attempted per round.}
+  \label{tab:evsp-ls-single}
 \end{table}
 
 \section{Discussion}
