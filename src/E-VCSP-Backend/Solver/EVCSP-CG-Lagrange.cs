@@ -908,7 +908,7 @@ namespace E_VCSP.Solver {
 
         #endregion
 
-        private void solveILP() {
+        public void SolveILP() {
             // Solve using ILP
             GRBEnv env = new() {
                 OutputFlag = 0,
@@ -1104,6 +1104,12 @@ namespace E_VCSP.Solver {
             css.PrintCostBreakdown((int)maxDutiesSlack.X, limitedAverageLengthSlack.X, noExcessiveLengthSlack.X, maxBrokenSlack.X, maxBetweenSlack.X);
         }
 
+        public void DoRound(int roundNumber, bool disrupt = false) {
+            runVehicleIts(roundNumber, disrupt);
+            runCrewIts(roundNumber, disrupt);
+            Console.WriteLine($"{roundNumber}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}");
+        }
+
         public override bool Solve() {
             initializeCover();
             initializeLagrangeModel();
@@ -1113,26 +1119,16 @@ namespace E_VCSP.Solver {
             gradientDescent();
 
             int round = 0;
-            for (; round < Config.VCSP_ROUNDS; round++) {
-                runVehicleIts(round);
-                runCrewIts(round);
+            for (; round < Config.VCSP_ROUNDS; round++) DoRound(round);
 
-                Console.WriteLine($"{round}\t{objVal.val:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}");
-            }
-
-            if (Config.LAGRANGE_DISRUPT_ROUNDS < 1) {
-                Console.WriteLine("Skipping disruption rounds");
-            }
+            if (Config.LAGRANGE_DISRUPT_ROUNDS < 1) Console.WriteLine("Skipping disruption rounds");
             else {
                 Console.WriteLine($"Doing {Config.LAGRANGE_DISRUPT_ROUNDS} additional round{((Config.LAGRANGE_DISRUPT_ROUNDS > 1) ? "s" : "")} with disrupted lambda");
-                for (int i = 0; i < Config.LAGRANGE_DISRUPT_ROUNDS; i++) {
-                    runVehicleIts(round + i, true);
-                    runCrewIts(round + i, true);
-                }
+                for (int i = 0; i < Config.LAGRANGE_DISRUPT_ROUNDS; i++) DoRound(round + i, true);
             }
 
             // Actually solve
-            solveILP();
+            SolveILP();
 
             return true;
         }

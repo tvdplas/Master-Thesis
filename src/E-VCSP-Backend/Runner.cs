@@ -283,18 +283,38 @@ namespace E_VCSP_Backend {
             vss = new(Instance!, Instance!.VehicleTypes[0]);
             css = new(Instance, []);
             IntegratedSolver = new(vss, css);
-            (var basevss, var basecss) = IntegratedSolver.initializeCover();
+            IntegratedSolver.initializeCover();
+            List<VehicleTask> baseVTCover = [.. vss.SelectedTasks];
+            List<(CrewDuty, int)> baseCDCover = [.. css.SelectedDuties];
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}-1;" +
+                $"{vss.Costs()};{css.Costs()};-;-;" +
+                $"{vss.Tasks.Count};{css.Duties.Count};-;-;" +
+                $"{vss.SelectedTasks.Count};{css.SelectedDuties.Count};-;-;" +
+                $"-;-;-");
 
-            for (int i = 0; i <= maxRounds; i += 1) {
+            Config.VCSP_ROUNDS = 0;
+            IntegratedSolver = new(vss, css);
+            IntegratedSolver.Solve();
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}0;" +
+                $"-;-;{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
+                $"-;-;{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
+                $"-;-;{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};" +
+                $"{IntegratedSolver.model!.MIPGap};{IntegratedSolver.model.Runtime};-");
+
+
+            for (int i = 1; i <= maxRounds; i += 1) {
                 Config.VCSP_ROUNDS = i;
-                IntegratedSolver = new(new(basevss), new(basecss));
+                // Unselect previous ILP
+                IntegratedSolver.vss.SelectedTasks = [.. baseVTCover];
+                IntegratedSolver.css.SelectedDuties = [.. baseCDCover];
                 Stopwatch sw = Stopwatch.StartNew();
-                IntegratedSolver.Solve();
+                IntegratedSolver.DoRound(i, false);
+                IntegratedSolver.SolveILP();
                 sw.Stop();
                 Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};" +
-                    $"{basevss.Costs()};{basecss.Costs()};{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
-                    $"{vss.Tasks.Count};{css.Duties.Count};{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
-                    $"{vss.SelectedTasks.Count};{css.SelectedDuties.Count};{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};" +
+                    $"-;-;{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
+                    $"-;-;{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
+                    $"-;-;{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};" +
                     $"{IntegratedSolver.model!.MIPGap};{IntegratedSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
             }
         }

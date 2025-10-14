@@ -118,6 +118,8 @@ namespace E_VCSP {
 
         public static Header VCSP = new();
         public static int VCSP_SOLVER_TIMEOUT_SEC = 900;
+        public static int VCSP_SOLVE_PER_ROUNDS = -1;       // Solves the ILP every X rounds, -1 to only do at end
+        public static int VCSP_SOLVE_PER_DIST_ROUNDS = -1;  // Solves the ILP every X disruption rounds, -1 to only do at end
         public static int VCSP_ROUNDS = 10;
         public static int VCSP_VH_ITS_INIT = 10;
         public static int VCSP_VH_ITS_ROUND = 10;
