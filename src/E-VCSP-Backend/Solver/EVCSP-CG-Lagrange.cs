@@ -57,6 +57,11 @@ namespace E_VCSP.Solver {
         }
 
         #region Init
+        public void Initialize() {
+            initializeCover();
+            initializeLagrangeModel();
+        }
+
         public (VehicleSolutionState vss, CrewSolutionState css) initializeCover() {
             if (vss.SelectedTasks.Count > 0 && css.SelectedDuties.Count > 0) {
                 initializeExistingCover();
@@ -129,7 +134,6 @@ namespace E_VCSP.Solver {
 
             return (vss, css);
         }
-
         private void initializeExistingCover() {
             if (vss.SelectedTasks.Count == 0 || css.SelectedDuties.Count == 0)
                 throw new InvalidOperationException("Cannot initialize from nonexistent cover");
@@ -1110,8 +1114,7 @@ namespace E_VCSP.Solver {
         }
 
         public override bool Solve() {
-            initializeCover();
-            initializeLagrangeModel();
+            Initialize();
 
             // Initialize dual cost
             Console.WriteLine($"I\t{costUpperBound:0.##}\t{X.Sum(x => x)}\t{X.Count}\t{Y.Sum(y => y)}\t{Y.Count}");

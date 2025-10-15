@@ -318,6 +318,64 @@ namespace E_VCSP_Backend {
             }
         }
 
+        void expVCSPDisruption() {
+            Reload("VCSP Disruption");
+
+            const int attempts = 5;
+            const int normalRounds = 20;
+            const int disruptionRounds = 5;
+
+            Config.VSP_SOLVER_TIMEOUT_SEC = 600;
+            Config.CSP_SOLVER_TIMEOUT_SEC = 600;
+            Config.VCSP_SOLVER_TIMEOUT_SEC = 900;
+            Config.VSP_LB_SEC_COL_ATTEMPTS = 16;
+            Config.VSP_LB_SEC_COL_COUNT = 8;
+            Config.CSP_LB_SEC_COL_ATTEMPTS = 16;
+            Config.CSP_LB_SEC_COL_COUNT = 8;
+            Config.VCSP_MAX_TASKS_DURING = 100000000;
+            Config.VCSP_MAX_DUTIES_DURING = 100000000;
+            Config.LAGRANGE_DISRUPT_ROUNDS = 0; // nondeterministic
+            Config.LAGRANGE_N = 50;
+            Config.LAGRANGE_PI_END = 0.0001;
+
+            // Unfair testing for CSP
+            Config.CR_SINGLE_SHIFT_COST = 10_000;
+            Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
+            Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
+
+            // Initialize a cover that we will reuse for all experiments
+            vss = new(Instance!, Instance!.VehicleTypes[0]);
+            css = new(Instance, []);
+            IntegratedSolver = new(vss, css);
+            IntegratedSolver.Initialize();
+            for (int i = 0; i < normalRounds; i++) IntegratedSolver.DoRound(i, false);
+            var basevss = vss;
+            var basecss = css;
+
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# rounds;" +
+                $"int vsp value;int csp value;" +
+                $"int vsp cols;int csp cols;" +
+                $"int vsp selected cols;int csp selected cols;" +
+                $"mipgap;mip runtime;total runtime");
+
+            for (int i = 0; i <= disruptionRounds; i++) {
+                for (int j = 0; i < attempts; j++) {
+                    // Unselect previous ILP
+                    IntegratedSolver = new(new(basevss), new(basecss));
+                    IntegratedSolver.Initialize();
+                    Stopwatch sw = Stopwatch.StartNew();
+                    for (int r = 0; r < disruptionRounds; r++) IntegratedSolver.DoRound(i, true);
+                    IntegratedSolver.SolveILP();
+                    sw.Stop();
+                    Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};" +
+                        $"{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
+                        $"{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
+                        $"{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};" +
+                        $"{IntegratedSolver.model!.MIPGap};{IntegratedSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
+                }
+            }
+        }
+
         void expNothing() { }
         #endregion
     }

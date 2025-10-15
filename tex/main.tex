@@ -985,7 +985,7 @@ On the crew side, this can most likely be traced back to Algorithm \ref{alg:E-VC
 The same argument partially applies to the generation of vehicle tasks: blocks in duties which were unlikely to occur in final solutions could be partially selected, resulting in dual costs for these blocks which can negatively influence the direction of vehicle task column generation. 
 
 \paragraph{Lagrangean relaxation} \label{sec:lagrangean-relaxation}
-In order to resolve the issues that arise from directly using the LP relaxation, let us instead apply a Lagrangean relaxation to our original ILP. In this, we replace constraints with penalties in the objective function when the constraint is not met. This allows us to fully relax the block linking Constraint (\ref{form:methods-integrated-all-blocks-covered}), allowing us to once again consider the vehicle and crew parts as separate problems. 
+In order to resolve the issues that arise from directly using the LP relaxation, let us instead apply a Lagrangean relaxation (LR) to our original ILP. In this, we replace constraints with penalties in the objective function when the constraint is not met. This allows us to fully relax the block linking Constraint (\ref{form:methods-integrated-all-blocks-covered}), allowing us to once again consider the vehicle and crew parts as separate problems. 
 
 Previous work by \citet{vanKootenNiekerk2017} has also shown that relaxing the trip coverage Constraint (\ref{form:methods-integrated-all-trips-covered}) leads to a problem which is computationally easier to solve while maintaining high quality final solutions. As such, we have decided to fully relax our problem. That is, Constraints (\ref{form:methods-integrated-all-trips-covered}-\ref{form:methods-integrated-max-between-shifts}) are all relaxed. For each relaxed constraint, let us define our penalty factor (more commonly known as a Lagrangean multiplier $\lambda$) and contribution to the objective function as follows: 
 \begin{align}
@@ -1025,7 +1025,7 @@ For the duties, we cannot directly do the same as $y_j$ has no upper bound. We c
 
 Using this, for all $cd_j \in CD$ for which $cost_\lambda(cd_j) < 0$, set $y_j = \bar{y_{j}}$, otherwise $y_j = 0$, following the same reasoning as earlier. We can ignore the $\lambda_t$ term as it is constant for a given set of multipliers.
 
-\todo{hier iets beters van maken} When a Lagrangean relaxation is solved exactly the solution provides a lower bound to the solution quality of the original ILP. Given the heuristic which we just applied, this is not directly the case; init. The quality of the approximated lower bound may however differ depending on the value of $\lambda$. Without an approximated solution, the best quality lower bound can be found by attempting the maximize the solution value for different values of $\lambda$; as initial experiments showed that our approximation did not seem to be far from the actual lower bound, we will do the same. We therefore need to solve the following problem:
+\todo{hier iets beters van maken} When the LR is solved exactly the solution provides a lower bound to the solution quality of the original ILP. Given the heuristic which we just applied, this is not directly the case; init. The quality of the approximated lower bound may however differ depending on the value of $\lambda$. Without an approximated solution, the best quality lower bound can be found by attempting the maximize the solution value for different values of $\lambda$; as initial experiments showed that our approximation did not seem to be far from the actual lower bound, we will do the same. We therefore need to solve the following problem:
 \begin{align}
 \max_{\lambda} \quad & \min \sum_{vt_i \in VT} x_{i} \cdot cost_\lambda(vt_i) + \sum_{cd_j \in CD} y_{j} \cdot cost_\lambda(cd_j) + \sum_{t \in T} \lambda_{t}
 \end{align}
@@ -1152,7 +1152,7 @@ In order to more quickly allow blocks to be found which are good for the crew so
 
 Let us consider our set of to be covered blocks $B'$ when entering a crew column generation round. For an individual block $b \in B'$, performing a deadhead or trip directly before or after $b$ may result in a different feasible block $b_{alt}$. More formally, $b_{alt}$ is feasible if the idle time between the $b$ and the added element is less than the minimum handover time, the start and end location of $b_{alt}$ are relief points and the total duration of $b_{alt}$ is less than or equal to the maximum continuous driving time.
 
-Using this, let $B_{alt,b}$ be the feasible alternative blocks which can be created from $b$, and let $B_{alt} = \bigcup_{b \in B'} B_{alt,b}$. From $B_{alt}$, let us select a number of blocks which are currently not in $B'$, prioritizing ones which are currently unknown. We will now include these blocks in $B'$ before starting our column generation process; if an alternative block is useful for the crew solution, it will be used in the newly generated duties. If this occurs, all previously unknown blocks become known, and dual costs can be determined for use in a future column  generation step. We have therefore now created a way for blocks which are good for crew solution quality to be created without relying on an unknown path in vehicle task generation.
+Let us now arbitrarily select some subset $B'' \subseteq B'$; we will use $10\%$ the blocks in $B'$, selected at random. Now, for each $b \in B''$, let $B_{alt,b}$ be the feasible alternative blocks which can be created, and let $B_{alt} = \bigcup_{b \in B''} B_{alt,b}$. From $B_{alt}$, let us select a number of blocks which are currently not in $B'$, prioritizing ones which are currently unknown. We will now include these blocks in $B'$ before starting our column generation process; if an alternative block is useful for the crew solution, it will be used in the newly generated duties. If this occurs, all previously unknown blocks become known, and dual costs can be determined for use in a future column  generation step. We have therefore now created a way for blocks which are good for crew solution quality to be created without relying on an unknown path in vehicle task generation.
 
 \paragraph{Additional heuristics}
 A number of other heuristics were included, both in an attempt to improve the solution quality and to make sure that the problem remains computationally feasible.
@@ -1316,14 +1316,18 @@ The instances have been visualized in Figure \ref{fig:leiden-map}, again using d
 During our methods, we defined a number of parameters which can influence the outcome of the overall algorithm. Additionally, we use Gurobi in order to solve the LP and ILP problems that we formulate, which has its own set of parameters. We will therefore now discuss the effects of a number of noteworthy parameters on the solution quality of the E-VSP, CSP and E-VCSP. In these experiments, we will use the instance \texttt{leiden-1-2} due to its medium size and inclusion of multiple locations of interest.  
 
 \subsubsection{Gurobi}
-During initial testing, we found that Gurobi was often find quite good solutions using only heuristics and presolving. In order to encourage this further, the following parameters were set for all models: 
+During initial testing, we found that Gurobi was often able to find good quality solutions using only heuristics and presolving. In order to encourage this further, the following parameters were set for all models: 
 \begin{itemize}
   \item \textbf{MIPFocus = 1}: Focus on upper bound instead of proving optimality, as we primarily want good quality solutions. 
   \item \textbf{Heuristics = 0.5}: Spend 50\% of time during branch and bound on heuristics. 
   \item \textbf{NoRelHeurTime = Timelimit / 4}: Spend the first quarter of the search time only using a heuristic approach. 
 \end{itemize} 
 
-\subsubsection{Secondary columns}
+\noindent In addition, Gurobi also allows for an initial solution to be provided for a ILP/MIP model, providing an initial upper bound for the branch-and-bound process. For the E-VSP and CSP, this was done based on the best solution found using the global local search. If this method was not used in an experiment, the initial solution for the E-VSP was instead given by a greedy set-covering algorithm; for the CSP, no solution was passed. For the E-VCSP, the solution to the sequential problem was simply provided.
+
+For the E-VCSP, this has significant impact on the quality of the eventual solution. During initial testing using the instance \texttt{leiden}, it was found that with a timelimit of 30 minutes, the sequential solution quality could not be matched without providing this upper bound. 
+
+\subsubsection{Secondary labeling columns}
 During our column generation, a number of secondary column sources is included. Their aim is to improve the final solution by making columns available which may not be optimal in the relaxation. 
 
 For both labeling algorithms, we do this by selecting some number of columns with negative reduced cost, then blocking parts of these columns off in the generation graph before rerunning the labeling. The best columns found after rerunning are then included. In order to test the effectiveness of this approach, let us first consider our labeling algorithm for the E-VSP. In this, let us take $N$ as the number of primary columns which are used as a base, and let $M$ be the number of different trip subsets that we block in a given base. We run our tests with a maximum of 50 primary columns per round extracted, selecting a maximum of 50 secondary columns per blocked of set of trips. Additionally, a Gurobi timeout of 900 seconds is set on the final ILP. For each test case, we report the resulting model value, the ILP optimality gap and the number of unique columns generated. This overview can be seen in Table \ref{tab:evsp-secondary-columns}. 
@@ -1368,19 +1372,19 @@ As we can see, for the E-VSP the number of base columns $N$ solely determines th
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
     \addlinespace[0.4em]
      & \textbf{value}  & 14313.3 & 14282.9 & 14152.9 & 14152.9 & \underline{14100.9} & \underline{14100.9} & \underline{14100.9} \\
-    $M=4$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    $M=4$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 352 & 509 & 655 & 958 & 1042 & 1677 & 2294 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
     & \textbf{value}  & 14310 & 14246.1 & 14182.2 & 14154 & \underline{14100.9} & \underline{14100.9} & \underline{14100.9} \\
-    $M=8$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    $M=8$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 344 & 500 & 669 & 908 & 1147 & 1675 & 2302 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
     & \textbf{value}  & 14308.9 & 14152.9 & 14182.2 & 14182.2 & 14124.8 & \underline{14100.9} & \underline{14100.9} \\
-    $M=12$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    $M=12$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 365 & 502 & 697 & 940 & 1051 & 1660 & 2293 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
     & \textbf{value}  & 14372.8 & 14275.3 & 14216.8 & 14152.9 & \underline{14100.9} & \underline{14100.9} & \underline{14100.9} \\
-    $M=16$ & \textbf{gap}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    $M=16$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
     & \textbf{cols} & 341 & 521 & 647 & 946 & 1084 & 1695 & 2298 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
@@ -1392,7 +1396,6 @@ Here, we again see that including a larger number of secondary columns improves 
 
 \subsubsection{E-VSP Local search}
 Let us now consider the two local search methods discussed for the E-VSP. 
-
 
 Let us first consider the local search used for finding an initial solution. In this, we hava already fixed the weigths, and have chosen a starting temperature of around 50 euros. We will therefore now consider the effects of differing numbers of solutions, as well as the number of operations that are attempted for each solution. Let $R$ represent the number of solutions, and let $I$ represent the number of operations. As the resulting solution is nondeterministic, we will run each set of parameters a total of 5 times and report the average results. An overview of these results can be found in Table \ref{tab:evsp-ls-global}.
 
@@ -1469,6 +1472,37 @@ Next, let us do the same for the pricing problem local search. We again have fix
 \end{table}
 
 Here, we see that this approach is able to find a reasonable solution, however not near the quality of that of the other two approaches. For the given instance size, it therefore does not seem to be worth it to apply this method; this may however be different when instances are larger causing the labeling algorithm to become infeasible. 
+
+\subsubsection{Integrated Methods}
+Next, let us consider our integrated methods. In this, let us consider two main things: the number of normal rounds that we perform, and the number of rounds with disrupted lambda that we perform afterwards. 
+
+We will first consider the effects of varying the number of normal rounds using LR. In order to do this, we first create a sequential solution by using only our labeling algorithms. In this, we will use $N=16$ and $M=8$ for both the E-VSP and CSP in order to create secondary columns; we note that this selection differs from the one used in Sec this is different when compared to our previous tests, allowing us to also see the effects of a different vehicle solution on the sequential problem.  We shall refer to this solution as being round $R = I$.
+
+Next, we report different solution values of the integrated ILP for varying numbers of preceding LR rounds $R$; for $R=0$, we only allow the columns of the sequential solution in the integrated ILP. We generally do not expect this to result in a better solution due to the fact that no blocks other than the ones in the sequentially selected vehicle tasks are included in previously generated crew duties. For all other rounds $R \geq 1$, we note that the result is not deterministic due to our construction of $B_{alt}$. A single run was presented here in which previously generated columns were maintained between rounds, however a subsequent run may have given different results. 
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{cccrrrccrr}
+    \toprule
+       \textbf{R} & $|VT^*|$ & $|CD^*|$ & \textbf{VH cost} & \textbf{CR cost} & \textbf{$\Delta$\%} & $|VT|$ & $|CD|$ & \textbf{gap \%} & CG runtime (s) \\
+       \cmidrule(lr){1-1} \cmidrule(lr){2-6} \cmidrule(lr){7-8} \cmidrule(lr){9-10}
+        I   & 10 & 23 & 3403.7 & 12620.3 & -    & 13140 & 2128 & - & -      \\
+        0   & 10 & 23 & 3403.7 & 12620.3 & 0    & 13140 & 2128 & 0 & 0      \\
+        1   & 10 & 22 & 3403.7 & 12400.1 & 1.4  & 28150 & 4947 & 0 & 53.6   \\
+        2   & 11 & 22 & 3651.5 & 12056.7 & 2    & 31730 & 6236 & 0 & 123.7  \\
+        3   & 11 & 21 & 3607.9 & 12009.8 & 2.5  & 33441 & 6748 & 0 & 201.1  \\
+            & .. & .. & .. & .. & .. & \\
+        13  & 11 & 21 & 3607.9 & 12005.4 & 2.6  & 38497 & 8995 & 0 & 1009.8 \\
+        14  & 11 & 21 & 3607.9 & 12001.1 & 2.6  & 39923 & 9525 & 0 & 1097.3 \\
+        15  & 10 & 21 & 3421.1 & 12028.2 & 3.6  & 41338 & 9563 & 0 & 1185.1 \\
+            & .. & .. & .. & .. & .. & \\
+        20  & 10 & 21 & 3421.1 & 12023.8 & 3.6  & 43240 & 9815 & 0 & 1648.3 \\
+        \bottomrule
+  \end{tabular}
+  \caption{Effects of the number of rounds on the E-VCSP. Only rounds with changed objective value reported. $\Delta$\% shows solution value difference when compared to sequential. }
+  \label{tab:evcsp-rounds}
+\end{table}
+
 
 \section{Discussion}
 \todo{Uitwerken; is nu gewoon een lijstje met dingen die ooit besproken zijn / mij persoonlijk nog interessant lijken.}
