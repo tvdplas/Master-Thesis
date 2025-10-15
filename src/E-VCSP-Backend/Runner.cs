@@ -364,7 +364,7 @@ namespace E_VCSP_Backend {
                     IntegratedSolver = new(new(basevss), new(basecss));
                     IntegratedSolver.Initialize();
                     Stopwatch sw = Stopwatch.StartNew();
-                    for (int r = 0; r < disruptionRounds; r++) IntegratedSolver.DoRound(i, true);
+                    for (int r = 0; r < i; r++) IntegratedSolver.DoRound(i + r, true);
                     IntegratedSolver.SolveILP();
                     sw.Stop();
                     Console.WriteLine($"{Config.CNSL_OVERRIDE}{i};" +
