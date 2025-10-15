@@ -359,7 +359,8 @@ namespace E_VCSP_Backend {
                 $"mipgap;mip runtime;total runtime");
 
             for (int i = 0; i <= disruptionRounds; i++) {
-                for (int j = 0; i < attempts; j++) {
+                for (int j = 0; j < attempts; j++) {
+                    if (i == 0 && j > 0) continue;
                     // Unselect previous ILP
                     IntegratedSolver = new(new(basevss), new(basecss));
                     IntegratedSolver.Initialize();
