@@ -107,7 +107,7 @@ namespace E_VCSP_Backend {
             if (vss == null || VSPSolver == null) return;
 
             Config.VH_OVER_MAX_COST = 0;
-            Config.VSP_SOLVER_TIMEOUT_SEC = 900;
+            Config.VSP_SOLVER_TIMEOUT_SEC = 600;
 
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;runtime");
 
