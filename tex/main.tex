@@ -17,6 +17,9 @@
 
 \subfile{titlepage.tex}
 
+\tableofcontents
+\newpage
+
 \section{Introduction}
 Electric vehicles are beginning to make up large portions of the fleet for public transport providers. In The Netherlands for example, approximately 21\% of all registered buses utilize an electric drivetrain, as reported by the \citet{RDW}. To comply with strict Dutch and \citet{europaRegulation20181999} on climate and sustainability, this proportion must increase substantially; from 2025 onward, the procurement of new buses powered by non-renewable energy sources will no longer be permitted, with the objective that by 2030, all public transport buses operate with zero emissions. Individual line operators such as \citet{qbuzzQbuzz} are therefore rapidly replacing their remaining buses that use fossil fuels, resulting in primarily electric-powered fleets.
 
@@ -34,28 +37,32 @@ A lot of work has already been done on the VSP, CSP and VCSP. Both the sequentia
 
 The rest of this work is organized as follows. In Section 2, we will give more background information on the E-VCSP and provide a formal problem definition. Next, in Section 3, we review literature related to the E-VCSP and identify gaps in the current research. In Section 4, we discuss the methodology used in order to solve the E-VCSP. \dots. An overview of nomenclature and abbreviations used throughout this work has been included in Tables \ref{tab:nomenclature} and \ref{tab:abbrev}.
 
+\todo{ordering van deze tabel}
 \begin{table}[h]
   \centering
   \begin{tabular}{ll}
     \toprule
     \multicolumn{1}{l}{\textbf{Term}} & \multicolumn{1}{l}{\textbf{Definition}} \\
+    \cmidrule(lr){1-1} \cmidrule(lr){2-2}
     Timetable & A set of travels between two locations with start and end times. \\  
     Trip & Timetabled travel with passengers between two locations. \\
     Deadhead & Travel without passengers between two locations at a given time. \\
-    Deadhead template & Pair of locations between which a deadhead may occur, with given distance and duration. \\
+    Deadhead template & Pair of locations with distance and duration to drive between them. \\
     Movement & Generic term for a vehicle moving; is either a trip or a deadhead. \\
     Depot & Starting/ending location for vehicles. \\
+    Charging location & A location with charging equipment for vehicles. \\
+    Relief point & Location where a crew member may perform a handover or break. \\
+    Crew base & Location where a crew member may start/end their day. \\  
+    Schedule & Generic term for a vehicle task / crew duty \\ 
     Vehicle task & Day schedule for a vehicle. Includes movements, charging and idle time. \\
-    Block & Sequence of trips, deadheads and idles that must be performed by a single driver. \\
+    Block & Sequence of trips / deadheads / idles without relief opportunity. \\
     Crew duty & Day schedule for a crew member. Includes blocks, breaks and idle time. \\
-    Schedule & Generic term for a vehicle task / duty \\ 
     Duty type & Category of duty with specific constraints. \\
     Handover & Crew member switching vehicle. \\ 
-    Relief point & Location where a crew member may perform a handover or break. \\
-    Crew base & Location where a crew member may start/end their day. \\    
     Break & Paid period of crew member rest at a relief point. \\ 
     Idle & A period where a vehicle / crew member remains at the same location. \\
-    Short idle & Paid period of idle where a crew member remains with a vehicle. \\ 
+    Charging idle & Vehicle idle at a charging location. \\
+    Short idle & Paid period of crew member idle. \\ 
     Long idle & Unpaid period of crew member idle during \textit{broken} duty. \\
     \addlinespace[0.2em]
     \bottomrule
@@ -134,7 +141,7 @@ When considering electric vehicles, the time between trips is not only used for 
 
 For conductive charging, recharging stations are often available at the depot, with additional stations sometimes being present at the starting or ending locations of trips (also called the terminal trip stops). Charging stations in the middle of a trip are generally not present. Recharging a vehicle at one of these locations follows a charging curve; this curve defines the charging rate when a vehicle is at a certain state of charge. For the most commonly used battery chemistry, lithium-ion, this curve is generally split into two phases: from 0 to around 80\%, in which the charging rate is roughly constant, and from 80 to 100\%, where it slows significantly. These phases often take similar amounts of time, and depending on the infrastructure available a full charge may take on the order of hours. Fast-charging infrastructure has become more prevalent in recent years with charging speeds of up to $\sim$350km/hour, however this still results in significant time spent charging during a vehicle task.
 
-The batteries of electric vehicles also degrade over time. With use, the overall capacity of a battery decreases, usually being considered spent once the maximum capacity reaches 80\% of that when the battery was new; once this occurs, the battery needs to be replaced, incurring significant costs. Battery lifetime is most commonly stated as a number of full recharge cycles, however in practice the \emph{depth of discharge} (DoD) of the battery before being charged also plays a significant role. As an example, charging from 80 to 100\% 5 times is much better for the lifetime of the battery when compared to charging from 0 to 100\% once. Taking this into account when planning charging moments can therefore also be useful in order to minimize lifetime battery replacement costs.
+The batteries of electric vehicles also degrade over time. With use, the overall capacity of a battery decreases, usually being considered spent once the maximum capacity reaches 80\% of that when the battery was new; once this occurs, the battery needs to be replaced, incurring significant costs. Battery lifetime is most commonly stated as a number of full recharge cycles, however in practice the \emph{depth of discharge} (DoD) of the battery before being charged also plays a significant role. As an example, charging from 60 to 80\% 5 times is much better for the lifetime of the battery when compared to charging from 0 to 100\% once. Taking this into account when planning charging moments can therefore also be useful in order to minimize lifetime battery replacement costs.
 
 The vehicle downtime resulting from charging also necessitates careful planning of \emph{crew duties}. Crew members must follow local labor regulations, which often consist of maximum driving times throughout the day and required breaks. Combining these breaks with charging time for the vehicle can be beneficial, as this implies that both the crew member and vehicle experience useful idle time. In order to make even better use of paid crew time, crew members may transfer between vehicles throughout the day.
 
@@ -142,7 +149,7 @@ These vehicle \emph{handovers} are often only possible at a predetermined set of
 
 As not all location visits are suitable for handovers, a sequence of trips and deadheads which does not visit a relief point (or not for long enough to perform a handover) must be driven by a single driver. Such a sequence is called a \emph{block}, and represents the smallest unit of work that can be performed by a driver. Both vehicle and crew schedules can be seen as a collection of blocks, with possible idle, charging and break times to connect the blocks.
 
-Overall, the goal is to find a set of feasible vehicle tasks and crew duties that minimizes costs. In this, the vehicle tasks must ensure that each trip is driven while minimizing costs incurred by driving and power use. These tasks must also ensure that enough charging takes place such that the state of charge of the vehicles stays within acceptable levels. Crew duties, on the other hand, must ensure that each driven block has a driver associated with it without breaking local labor regulations. The goal here is minimizing the overall number of paid hours.
+Overall, the goal is to find a set of feasible vehicle tasks and crew duties that minimizes costs. In this, the vehicle tasks must ensure that each trip is driven while minimizing costs incurred by driving, power use and battery degradation. These tasks must also ensure that enough charging takes place such that the state of charge of the vehicles stays within acceptable levels. Crew duties, on the other hand, must ensure that each driven block has a driver associated with it without breaking local labor regulations. The goal here is minimizing the overall number of paid hours.
 
 \begin{table}[h]
   \centering
@@ -151,14 +158,18 @@ Overall, the goal is to find a set of feasible vehicle tasks and crew duties tha
     \multicolumn{1}{l}{\textbf{Notation}} & \multicolumn{1}{l}{\textbf{Definition}}               \\
     \cmidrule(lr){1-1}\cmidrule(lr){2-2}
     \multicolumn{2}{l}{\textit{Given}} \\
-    $\mathcal{D}$ & The depot \\ 
+    $l \in \mathcal{L}$ & Set of all locations, $l$ a single location \\ 
+    $\mathcal{D} \in \mathcal{L}$ & The depot \\ 
+    $\mathcal{L}_c \subseteq \mathcal{L}$ & Set of all charging locations \\ 
+    $\mathcal{L}_{rl} \subseteq \mathcal{L}$ & Set of all relief points \\ 
+    $\mathcal{L}_{cb} \subseteq \mathcal{L}_{rl}$ & Set of all crew bases \\ 
     $t \in \mathcal{T}$ & Set of all trips, $t$ a single trip \\
     $dht \in \mathcal{DHT}$ & Set of deadhead templates, $dht$ a single template \\ 
     $dh \in \mathcal{DH}$ & Set of all feasible deadheads, $dh$ a single deadhead \\ 
     $b \in B$ & Set of all blocks, $b$ a single block \\
     $vt_i \in VT$ & Set of all vehicle tasks, $vt_i$ single vehicle task \\
     $cd_j \in CD$ & Set of all crew duties, $cd_j$ single crew duty \\
-    $\sigma \in [0, 1]$ & SoC of a vehicle, all vehicles start with $\sigma=1$\\
+    $\sigma \in [0, 1]$ & Acceptable SoC range of a vehicle, all vehicles start with $\sigma=1$\\
     $chl_\chi$ & Charge lost when driving a trip/deadhead $\chi$ \\
     $chg_{l,\sigma,\tau}$ & Max. charge gained at location $l$ in $\tau$ time with starting SoC $\sigma$ \\
     $bdg_{\sigma,\sigma'}$ & Battery degradation cost when charging from $\sigma$ to $\sigma'$ \\
@@ -173,10 +184,10 @@ Overall, the goal is to find a set of feasible vehicle tasks and crew duties tha
     \addlinespace[0.6em]
     \multicolumn{2}{l}{\textit{Decision variables}} \\
     $x_{i} \in \{ 0, 1 \}$ & Usage of vehicle task $vt_i$  \\ 
-    $y_{j} \in \{ 0, 1 \}\text{ or }\mathbb{N}$ & Usage of crew duty $cd_j$ \\ 
+    $y_{j} \in \{ 0, 1 \}\text{ or }\mathbb{N}_0$ & Usage of crew duty $cd_j$ \\ 
     \addlinespace[0.6em]
     \multicolumn{2}{l}{\textit{Helper notation}} \\
-    $B_\chi \subseteq B$ & Blocks covered by schedule $\chi$ \\ 
+    $B_\chi \subseteq B$ & Blocks contained in / covered by schedule $\chi$ \\ 
     $km(vt_i)$ & Kilometers traveled during $vt_i$ \\ 
     $chl(vt_i)$ & kWh used during $vt_i$ \\ 
     $chs(vt_i)$ & Charging operations in $vt_i$, each charging from $\sigma$ to $\sigma'$ \\ 
@@ -195,11 +206,11 @@ Overall, the goal is to find a set of feasible vehicle tasks and crew duties tha
 \end{table}
 
 \subsection{Formal problem definition}
-We will now formally define the E-VCSP. In this, we consider a variant with a single depot, single vehicle type and charging stations without vehicle capacity limitations. Additionally, partial and non-linear charging are considered. For crew members, we will include a simplified version of the Dutch labor regulations. A summary of the notation used has been provided in Table \ref{tab:notation}.
+We will now formally define the E-VCSP. In this, we consider a variant with a single depot, single vehicle type and charging stations without vehicle capacity limitations. Additionally, partial and non-linear charging are considered. For crew members, we will include a simplified version of the Dutch labor regulations. A summary of the notation used has been provided in Table \ref{tab:notation}. This notation will be used throughout the rest of this work.
 
 Let $\mathcal{L}$ be a given set of locations; of these, exactly one location $\mathcal{D} \in \mathcal{L}$ is the depot. Next, a set of trips $\mathcal{T}$ is given based on the timetables of the considered lines; each of these trips starts and ends at a location in $\mathcal{L}$. Let $\mathcal{DHT}$ be a set of \emph{deadhead templates}; these represent locations between which we are allowed to perform a deadhead. They are provided as pairs of locations in $\mathcal{L}$ with associated distances and driving times. We will assume that at least the pairs of the form $(l, \mathcal{D})$ and $(\mathcal{D}, l)$ exist for all $l \in \mathcal{L}$. For ease of notation, we will also assume that staying at the same location can be represented by a dummy deadhead template $(l, l)$ with no distance or driving time. 
 
-A deadhead template can be used to construct actual deadheads by selecting a time at which a template will be driven; let the set of all possibly driven deadheads be referred to as $\mathcal{DH}$. In constructing $\mathcal{DH}$, we will make the assumption that the template driving times and distances are unaffected by the time of day. Additionally, we note that a template may be used more than once throughout the day. 
+A deadhead template can be used to construct a deadhead by selecting a time at which the template will be driven; let the set of all possibly driven deadheads be referred to as $\mathcal{DH}$. In constructing $\mathcal{DH}$, we will make the assumption that the template driving times and distances are unaffected by the time of day. Additionally, we note that a template may be used more than once throughout the day. 
 
 Next, let us define our battery behavior. Let $\sigma$ represent the state of charge (SoC) of a vehicle, and let $\sigma \in [0, 1]$ represent the acceptable SoC operating range for the given vehicle type. All vehicles start the operating period with $\sigma=1$. For each trip $t$ and deadhead $dh$, let $chl_t$ and $chl_{dh}$ respectively the amount of charge lost used during the movement. 
 
@@ -428,13 +439,13 @@ Our approach for solving the E-VSP can roughly be broken up into 3 steps:
   \item \textit{Postprocessing}, in which duplicate trips are transformed into deadheads in order to reduce the total number of driving hours required. 
 \end{itemize} 
 \subsubsection{Preprocessing}
-Given are a set of trips $\mathcal{T}$, a set of locations $\mathcal{L}$, and a set of possible deadheads $\mathcal{DH}$ connecting pairs of locations. Exactly one location $\mathcal{D} \in \mathcal{L}$ is the depot. Additionally, a subset of the locations $\mathcal{L}_c \subseteq \mathcal{L}$ has charging equipment installed. In order to keep notation compact, let us use $s(t)$ and $e(t)$ to refer to the start and end time of a trip $t \in \mathcal{T}$; let us also use $o(t)$ and $d(t)$ to refer to the origin and destination location of $t$.
+Given are a set of trips $\mathcal{T}$, a set of locations $\mathcal{L}$, and a set of possible deadhead templates $\mathcal{DHT}$ connecting pairs of locations. Exactly one location $\mathcal{D} \in \mathcal{L}$ is the depot. Additionally, a subset of the locations $\mathcal{L}_c \subseteq \mathcal{L}$ has charging equipment installed. In order to keep notation compact, let us use $s(t)$ and $e(t)$ to refer to the start and end time of a trip $t \in \mathcal{T}$; let us also use $o(t)$ and $d(t)$ to refer to the origin and destination location of $t$.
 
 We now transform this data into a graph $G_{vt} = (V_{vt}, A_{vt})$. Let $V_{vt} = \{ d_{s}, d_{e} \} \cup \mathcal{T}$, where $d_{s}$ and $d_{e}$ represent the depot at the start and end of the day respectively. For each node $t \in \mathcal{T}$, add an arc to $A_{vt}$ from $d_{s}$ to $t$ and from $t$ to $d_{e}$ if there is a deadhead template in $\mathcal{DHT}$ connecting the depot to $o(t)$ and $d(t)$ respectively. Next, add an arc to $A_{vt}$ between each pair of trips $t, t'$ if there is a deadhead template $dht \in \mathcal{DHT}$ that connects the $d(t)$ to $o(t')$ and the duration of $dht$ does not exceed $s(t') - e(t)$. This graph corresponds roughly to the one found in the standard VSP formulation as described in Section \ref{sec:evsp-litrev}. Before giving a visualization, we will first modify it slightly in order to be more computationally efficient and include to additional charging capabilities.
 
 Let us begin by reducing the overall size of the graph. In order to do this, let us first consider a single line within the provided timetable. Throughout the day, the number of trips traveling in one direction along the line will be roughly equal to the number of trips traveling the other direction. When this is the case, planned trips are often staggered such that a bus arriving at one end of the line can directly be used in order to drive to the other end, minimizing the amount of vehicle downtime. When considering the timetable as a whole, this pattern may also be found when combining multiple lines: a vehicle arriving after driving a trip on line A may be perfectly timed in order to then drive a trip on line B, assuming A and B share an endpoint. As these connections are often very good to include in a vehicle task due to short idle times, a timetable which contains these patterns can be used to substantially reduce the number of arcs in the graph by forcing the use of these short turnarounds. 
 
-More formally: for each trip node $t$, let $A_t \subset A_{vt}$ be the set of all outgoing arcs from $t$ to other trip nodes. Let $A_{t,st} \subseteq A_t$ be the collection of arcs in which for each arc from $t$ to $t'$ in $A_{t,st}$, $d(t) = o(t')$ and $s(t') - e(t) \leq \delta$ for some threshold $\delta$. If $|A_{t,st}| \geq 1$, replace $A_t$ with $A_{t,st}$ in $A_{vt}$. Otherwise, leave the original set of outgoing arcs the same. A $\delta$ in the order of $0$ to $0.5$ hours was found to be reasonable during initial testing, providing a balance between the number of arcs in the graph and the solution quality.
+\todo{Dit moet nog even met die idle gebeuren} More formally: for each trip node $t$, let $A_t \subset A_{vt}$ be the set of all outgoing arcs from $t$ to other trip nodes. Let $A_{t,st} \subseteq A_t$ be the collection of arcs in which for each arc from $t$ to $t'$ in $A_{t,st}$, $d(t) = o(t')$ and $s(t') - e(t) \leq \delta$ for some threshold $\delta$. If $|A_{t,st}| \geq 1$, replace $A_t$ with $A_{t,st}$ in $A_{vt}$. Otherwise, leave the original set of outgoing arcs the same. A $\delta$ in the order of $0$ to $0.5$ hours was found to be reasonable during initial testing, providing a balance between the number of arcs in the graph and the solution quality.
 
 Once this initial reduction of arcs between trips has been performed, we will extend the remaining arcs in order to better accommodate charging. Let us first assume that charging never occurs when driving to or from the depot; all charging operations will therefore take place in the time between pairs of trips. Additionally, let us assume that whenever we are idle at a charging station, we will charge. This will automatically minimize DoD and therefore battery degradation related costs. Given the current state of our graph $G_{vt}$, this implies that charging exclusively takes place if a trip starts or ends at a charging location, and a connecting trip allows for more idle time than the minimum charging time. Depending on the trips provided, this might not however not be sufficient to make a good set of vehicle tasks as there is no guarantee that $d(t)$ or $o(t)$ are in $\mathcal{L}_c$.
 
@@ -864,15 +875,17 @@ In this relaxed problem, let the dual cost of Constraints (\ref{form:block-cover
 An initial set of columns for the LP relaxation can once again be found by running a number of local searches, each of which attempts to cover all blocks. After this initial set, the pricing problem is again repeatedly solved using a labeling algorithm; this is repeated until the relaxed problem is solved to optimality or until a predefined time limit is hit. Finally, Constraint (\ref{form:y-integer}) is reinstated, and an integer solution is found using branch-and-bound.
 
 \paragraph{Initial solution - Local search}
-As with the E-VSP, an initial set of crew duties can be constructed using a simulated annealing algorithm. In this, let us start with a set of crew duties each containing exactly one block. As crew duties must have a duty type, a type which is feasible given the start and end time of the block is randomly selected. We note that this initial solution may not be feasible as a whole, as the start and end locations of blocks are not required to be a crew base. In order to deal with this, we apply a penalty to each duty which does not start and end at a single crew base. Additionally, Constraints (\ref{form:max-avg-shift-length}-\ref{form:max-between-shifts}) are each relaxed by applying a penalty if the overall set of duties does not satisfy the constraint. This penalty is based on a percentage difference between the target and value in the duty set.
+As with the E-VSP, an initial set of crew duties can be constructed using a simulated annealing algorithm. In this, let us start with a set of crew duties each containing exactly one block; we will not yet assign these duties a type, as this will remain flexible during our search. This initial set may be infeasible, as the start and end locations of blocks are not required to be a crew base. In order to deal with this, we apply a penalty to each duty which does not start and end at a single crew base.
 
-Next, the following set of operations is applied in order to recombine the duties. We note that the operators used in this local search are almost identical to those described earlier in Section \ref{sec:evsp-initial-local-search}. The key difference is the use of blocks as the main elements within a duty as opposed to trips for a vehicle task. We will therefore refer back to the illustration provided earlier for a visual representation of the operations, substituting trips for blocks and tasks for duties where applicable. Similarly to the E-VSP local searches, it can also be beneficial to include the unfiltered arcs during the search in order to allow for longer breaks/idle time, thereby increasing the solution space.
+During our search, let us also apply penalties for infeasible breaks and overall duty duration; this enables more operations to be performed. We will do the same for start and end time requirements as well. These penalties will be based on the type which incurs the lowest penalty overall, modeling a type which is matched closely. All penalties scale over time, making it less likely that infeasibilities are accepted later in the search process. 
+
+During the search, the following set of operations is applied in order to recombine the duties. We note that the operators used in this local search are almost identical to those described earlier in Section \ref{sec:evsp-initial-local-search}. The key difference is the use of blocks as the main elements within a duty as opposed to trips for a vehicle task. We will therefore refer back to the illustration provided earlier for a visual representation of the operations, substituting trips for blocks and tasks for duties where applicable. Similarly to the E-VSP local searches, it can also be beneficial to include the unfiltered arcs during the search in order to allow for longer breaks/idle time, thereby increasing the solution space.
 
 \noindent\subparagraph{2-Opt (or tail swap)} Two different duties $cd$ and $cd'$ are selected at random from the available set of duties. Next, a time $t$ between the minimum start and maximum end time of $cd$ and $cd'$ is selected. All blocks after $t$ in $cd$ are moved to $cd'$, while at the same time moving all blocks after $t$ in $cd'$ to $cd$. If no arcs in $A_{cd}$ exist to reconnect the swapped tails of the duties, the change is rejected. If the resulting schedules contain a different infeasibility (such as a start or end time which conflicts with the current duty type), an additional check is done to see if changing a duty type might make the change feasible. A new duty is then selected from the list of feasible duty types, prioritizing types which are not constrained. If this is not possible, the change is rejected. If one of the duties becomes empty due to the operation, it is removed from the set of available duties. A visual representation can be found in Figure \ref{fig:2opt-vt}.
 \noindent\subparagraph{Range move} Two different duties $cd$ and $cd'$ are selected at random from the available set of duties. Next, from $cd'$, a random continuous range of blocks $r$ is selected; $r$ is removed from $cd'$ and is added to $cd$. If no arcs exist to connect $r$ in $cd$ or remove $r$ from $cd'$, the change is rejected. Next, as with 2-Opt, an attempt is made to make the duties feasible by changing the types; if this fails, the change is rejected. If $cd'$ becomes empty due to the operation, it is removed from the set of available duties. A visual representation can be found in Figure \ref{fig:rangemove-vt}.
 \noindent\subparagraph{Single block move} Same as the range move, however we now only select a single block from $cd'$. This is done as blocks can be quite long, therefore moving a range might be difficult if it contains a single long block. \\
 
-\noindent After termination, the generated duties may still be infeasible if the soft constraints are still violated. This can either be because the set of generated duties does not match the duty type / duration requirements, or because some of the duties do not properly start and end at the same crew base. In order to resolve both of these problems, a set of dummy columns is added to the LP formulation: each covers exactly one block without any constraints, however the use of one of these columns is discouraged by giving it significant costs. This still allows for a solution to the LP relaxation to be found, allowing for dual costs to be determined. This in turn allows the column generation phase to resolve the remaining uncovered blocks.
+\noindent After termination, the generated duties may still be infeasible if there are duties which violate the soft constraints. Any duty which breaks these soft constraints is discarded; in its place, a set of dummy columns is added to the LP formulation. Each dummy column covers exactly one block without any constraints, however its use is discouraged by giving it significant costs. This still allows for a solution to the LP relaxation to be found, allowing for dual costs to be determined. This in turn allows the column generation phase to resolve the remaining uncovered blocks.
 
 \paragraph{Pricing problem - Labeling}
 Let us consider our previously defined graph $G_{cd} = (V_{cd}, A_{cd})$. As with the labeling algorithm described in the E-VSP section, we can once again attempt to find a path of minimum cost through our graph $G_{cd}$ in order to generate a crew duty with minimum reduced cost. In order to do this, we once again modify the costs of the arcs in $A_{cd}$ in order to include the dual costs, adding the dual cost for duty length and type during the evaluation of $cb_e$. For a more detailed overview of the algorithm, we refer to Section \ref{sec:labeling-evsp}, however we will discuss details specific to label propagation in the crew duty variant here. 
@@ -1323,14 +1336,16 @@ During initial testing, we found that Gurobi was often able to find good quality
   \item \textbf{NoRelHeurTime = Timelimit / 4}: Spend the first quarter of the search time only using a heuristic approach. 
 \end{itemize} 
 
-\noindent In addition, Gurobi also allows for an initial solution to be provided for a ILP/MIP model, providing an initial upper bound for the branch-and-bound process. For the E-VSP and CSP, this was done based on the best solution found using the global local search. If this method was not used in an experiment, the initial solution for the E-VSP was instead given by a greedy set-covering algorithm; for the CSP, no solution was passed. For the E-VCSP, the solution to the sequential problem was simply provided.
+\noindent In addition, Gurobi also allows for an initial solution to be provided for an ILP/MIP model, providing an initial upper bound for the branch-and-bound process. For the E-VSP and CSP, this was done based on the best solution found using the global LS. If this method was not used in an experiment, the initial solution for the E-VSP was instead given by a greedy set-covering algorithm; for the CSP, no initial solution was passed. 
 
-For the E-VCSP, this has significant impact on the quality of the eventual solution. During initial testing using the instance \texttt{leiden}, it was found that with a timelimit of 30 minutes, the sequential solution quality could not be matched without providing this upper bound. 
+For the E-VCSP, the solution to the sequential problem is always provided as an upper bound. During initial testing, it was found that this has significant impact on the quality of the eventual solution. For instance, when testing with \texttt{leiden}, it was found that with a timelimit of 30 minutes the sequential solution quality could not even be matched without providing this upper bound.
 
-\subsubsection{Secondary labeling columns}
-During our column generation, a number of secondary column sources is included. Their aim is to improve the final solution by making columns available which may not be optimal in the relaxation. 
+\subsubsection{E-VSP/CSP Labeling} \label{sec:params-sec-label-columns}
+For labeling, we do not define many parameters. The E-VSP labeling algorithm includes a discretization of the SoC during the propagation which can be adjusted, however we fix this at 101 buckets within the acceptable SoC levels. For the CSP we set a limit on the number of labels in the sink node, however this is primarily done for performance reasons and will not be tested further. In both instances however, we can generate a varying number of secondary columns. Their aim, as mentioned in more detail in Section \ref{sec:evsp-methodology}, is to improve the final solution by making columns available which may not be optimal in the relaxation. 
 
-For both labeling algorithms, we do this by selecting some number of columns with negative reduced cost, then blocking parts of these columns off in the generation graph before rerunning the labeling. The best columns found after rerunning are then included. In order to test the effectiveness of this approach, let us first consider our labeling algorithm for the E-VSP. In this, let us take $N$ as the number of primary columns which are used as a base, and let $M$ be the number of different trip subsets that we block in a given base. We run our tests with a maximum of 50 primary columns per round extracted, selecting a maximum of 50 secondary columns per blocked of set of trips. Additionally, a Gurobi timeout of 900 seconds is set on the final ILP. For each test case, we report the resulting model value, the ILP optimality gap and the number of unique columns generated. This overview can be seen in Table \ref{tab:evsp-secondary-columns}. 
+For both labeling algorithms, we do this by selecting some number of generated columns with negative reduced cost, then blocking parts of these columns off in the generation graph before rerunning the labeling algorithm. The best columns found after rerunning are then included in the set of generated columns for that round.
+
+In order to test the effectiveness of this approach, let us first consider our labeling algorithm for the E-VSP. In this, let us take $N$ as the number of primary columns which are used as a base, and let $M$ be the number of different trip subsets that we block in a given base. We run our tests with a maximum of 50 primary columns per round extracted, selecting a maximum of 50 secondary columns extracted per blocked off set of trips. Additionally, a Gurobi timeout of 900 seconds is set on the final ILP. For each test case, we report the resulting model value, the ILP optimality gap and the number of unique columns generated. This overview can be seen in Table \ref{tab:evsp-secondary-columns}. 
 
 \begin{table}[h]
   \centering
@@ -1339,20 +1354,20 @@ For both labeling algorithms, we do this by selecting some number of columns wit
     && $N=0$ & $N=1$ & $N=2$ & $N=4$ & $N=8$ & $N=16$ & $N=32$\\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
     \addlinespace[0.4em]
-     & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & \underline{3393.9} & 3401.4 & 3426.4 & 3411.4 \\
-    $M=4$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0.6 & 1.1 \\
+     & \textbf{value}  & 3447.9 & 3432 & 3418.9 & \underline{3396.1} & 3403.7 & 3429.6 & 3414.2 \\
+    $M=4$ & \textbf{gap \%}   & 0 & 0 & 0 & 0.5 & 0 & 2.6 & 1.6 \\
     & \textbf{cols} & 3014 & 6047 & 7305 & 12971 & 12083 & 14339 & 16497 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
-    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & \underline{3393.9} & 3401.4 & 3426.4 & 3411.4 \\
-    $M=8$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0.6 & 1.1 \\
+    & \textbf{value}  & 3447.9 & 3432 & 3418.9 & \underline{3396.1} & 3403.7 & 3429.6 & 3414.2 \\
+    $M=8$ & \textbf{gap \%}   & 0 & 0 & 0 & 0.5 & 0 & 2.6 & 1.6 \\
     & \textbf{cols} & 3014 & 6047 & 7305 & 12971 & 12083 & 14339 & 16497 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
-    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & \underline{3393.9} & 3401.4 & 3426.4 & 3411.4 \\
-    $M=12$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0.6 & 1.1 \\
+    & \textbf{value}  & 3447.9 & 3432 & 3418.9 & \underline{3396.1} & 3403.7 & 3429.6 & 3414.2 \\
+    $M=12$ & \textbf{gap \%}   & 0 & 0 & 0 & 0.5 & 0 & 2.6 & 1.6 \\
     & \textbf{cols} & 3014 & 6047 & 7305 & 12971 & 12083 & 14339 & 16497 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-9}
-    & \textbf{value}  & 3443.6 & 3429.3 & 3417.9 & \underline{3393.9} & 3401.4 & 3426.4 & 3411.4 \\
-    $M=16$ & \textbf{gap \%}   & 0 & 0 & 0 & 0 & 0 & 0.8 & 1.1 \\
+    & \textbf{value}  & 3447.9 & 3432 & 3418.9 & \underline{3396.1} & 3403.7 & 3429.6 & 3414.2 \\
+    $M=16$ & \textbf{gap \%}   & 0 & 0 & 0 & 0.5 & 0 & 2.6 & 1.6 \\
     & \textbf{cols} & 3014 & 6047 & 7305 & 12971 & 12083 & 14339 & 16497 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
@@ -1395,9 +1410,11 @@ As we can see, for the E-VSP the number of base columns $N$ solely determines th
 Here, we again see that including a larger number of secondary columns improves the final solution quality; for $N \geq 16$, the best known crew solution for the given vehicle solution is found regardless of the chosen $M$. When compared to the vehicle experiments, we do now also see significant influence of different values of $M$. This may be explained by the fact that the number of to be covered blocks is generally much lower than the number of trips (usually by a factor of $\sim2$ in our initial testing). This in turn implies that a larger proportion of the underlying graph is blocked, causing more apparent diversity in the secondary columns which are generated. We can again conclude that a reasonably high $N$ is good in general, whereas $M$ may need to be varied depending on the specific instance.
 
 \subsubsection{E-VSP Local search}
-Let us now consider the two local search methods discussed for the E-VSP. 
+Let us now discuss parameters for the two E-VSP local search methods. Both the global solution and the pricing problem variant are initialized with a temperature $T$ of around 50 euros, decreasing exponentially to $T = 0.001$. The rate of decrease is based on the target number of iterations. 
 
-Let us first consider the local search used for finding an initial solution. In this, we hava already fixed the weigths, and have chosen a starting temperature of around 50 euros. We will therefore now consider the effects of differing numbers of solutions, as well as the number of operations that are attempted for each solution. Let $R$ represent the number of solutions, and let $I$ represent the number of operations. As the resulting solution is nondeterministic, we will run each set of parameters a total of 5 times and report the average results. An overview of these results can be found in Table \ref{tab:evsp-ls-global}.
+For the initial solution, we assign the 2-Opt, Range move and Change arc operators weights of 4, 4 and 1 respectively. Change arc is set lower due to the fact that the other two operators also allow for arcs to be changed, and because not all pairs of trip nodes have a detour arc between them. For the pricing problem variant, the Add trip, Remove trip and Change arc operators are given weights of 10, 1 and 5 respectively. Here, weights were chosen in order to bias the search towards vehicle tasks which are as filled as possible, as less vehicle downtime generally results in higher quality solutions. We will also create a total of 5 secondary columns for every primary column generated, using the method described in Section \ref{sec:evsp-methodology}. We now have two main parameters left that can influence the quality of the solution: the number of times a local search is performed, which we shall refer to as $R$, and the number of iterations that is performed per local search, which we shall refer to as $I$. 
+
+Let us first consider their influence on the local search for the initial solution. We are interested in both the final solution (after recombination of different local searches using ILP) and the best result found in a single local search; we shall refer to these as the \textit{ILP value} and the \textit{LS value} respectively. Additionally, we report the ILP optimality gap and the total number of unique columns generated. As the results of these tests are nondeterministic, we will run each tested combination of $R$ and $I$ a total of 5 times and average their results; for each run, a Gurobi timeout of 300 seconds is set for the ILP. An overview of these results can be found in Table \ref{tab:evsp-ls-global}.
 
 \begin{table}[h]
   \centering
@@ -1427,13 +1444,13 @@ Let us first consider the local search used for finding an initial solution. In 
     & \textbf{cols} & 7019 & 5736.6 & 5425.4 & 5082.4 & 4603 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effect of number of rounds and iterations on E-VSP global local search, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number operations attempted per round. LS value is best single LS result, ILP value is result after recombination, all avg. of 5 runs. Best solution per category \underline{underlined}.}
+  \caption{Effect of number of rounds and iterations on E-VSP global local search, tested on \texttt{leiden-1-2}. $R$ is number of attempts, $I$ is number operations per round. LS value is best single LS result, ILP value is result after recombination, all avg. of 5 runs. Best solution per category \underline{underlined}.}
   \label{tab:evsp-ls-global}
 \end{table}
 
-As we can see, both $R$ and $I$ have significant influence on the solution quality. A higher $I$ seems to be the most important factor, as we can see that even with the lowest tested $R$ a solution is found of comparable quality to both the highest $R$ and best quality solution in the labeling tests. We can also see that significantly fewer columns are considered when $I$ is higher; this is most likely due to the fact that the local search converges on a local optimum, resulting in different runs producing similar columns. Next, we see that recombination can significantly improve the solution quality, in line with previous results by \citet{Bosch21}. Lastly, we also note that this approach alone resulted in a better solution than the labeling algorithm; this is most likely due to the fact that the graph does not need to be preprocessed, giving a larger solution space. We can conclude that higher $R$ and $I$ are generally better, however specific numbers will have to be based on the instance.  \\
+As we can see, both $R$ and $I$ have significant influence on the solution quality. A higher $I$ seems to be the most important factor, as we can see that even with the lowest tested $R$ a solution is found of comparable quality to both the highest $R$ and best quality solution in the labeling tests. We can also see that significantly fewer columns are considered when $I$ is higher; this is most likely due to the fact that the local search converges on a local optimum, resulting in different runs producing similar columns. Next, we see that recombination can significantly improve the solution quality, in line with previous results by \citet{Bosch21}. Lastly, we also note that this approach alone resulted in a better solution than the labeling algorithm. This can most likely attributed to a combination of two factors: the underlying graph $G_{vt}$ not being to be preprocessed, and the sets of columns being generated as part of a fully covering integer solution instead of just minimizing the value of the LP relaxation. From the given results we can conclude that higher $R$ and $I$ are generally better, however specific numbers will have to be based on the instance.  \\
 
-Next, let us do the same for the pricing problem local search. We again have fixed weights and a temperature of around 50 euros. In this, $R$ will represent the number of column generation rounds (dual costs being updated). Results are given in Table \ref{tab:evsp-ls-single}.
+Next, let us do the same for the pricing problem local search. In this, $R$ will represent the total number of column generation rounds; that is, between each round, the LP relaxation is solved, and dual costs are updated based on the previously discovered columns. We again use a Gurobi timeout of 300 seconds in for the final ILP. Results are given in Table \ref{tab:evsp-ls-single}.
 
 \begin{table}[h]
   \centering
@@ -1467,46 +1484,66 @@ Next, let us do the same for the pricing problem local search. We again have fix
     & \textbf{cols} & 24672.6 & 29898.6 & 34885.6 & 34818.4 & 33944.0 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effect of number of rounds and iterations on E-VSP singles local search, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number operations attempted per round. Best solution \underline{underlined}.}
+  \caption{Effect of number of rounds and iterations on E-VSP pricing problem LS, tested on \texttt{leiden-1-2}. $R$ is number of rounds, $I$ is number of operations attempted per LS. Best solution \underline{underlined}.}
   \label{tab:evsp-ls-single}
 \end{table}
 
-Here, we see that this approach is able to find a reasonable solution, however not near the quality of that of the other two approaches. For the given instance size, it therefore does not seem to be worth it to apply this method; this may however be different when instances are larger causing the labeling algorithm to become infeasible. 
+As with the global LS, we see that both $R$ and $I$ directly influence the solution quality. We do however seem to see a larger dependence on $R$ than before, most likely caused by the fact that this LS is guided by the dual costs that are updated after every round. We also see the same behavior as in the global LS in the number of columns generated, where a higher $I$ seems to converge to a local optimum thereby reducing the number of distinct columns. 
 
-\subsubsection{Integrated Methods}
-Next, let us consider our integrated methods. In this, let us consider two main things: the number of normal rounds that we perform, and the number of rounds with disrupted lambda that we perform afterwards. 
+Overall however, this method seems a lot less promising. The best solution found using only the pricing problem LS is nearly 12\% higher than the best known solution provided by the previous two methods. Additionally, the optimality gap is significant; while a better solution might be available, the branch-and-bound is not able to find it within the given timelimit. For the given instance size, it therefore does not seem to be worth it to apply this method; this may however be different when instances are larger, causing the labeling algorithm to become infeasible due to time constraints. 
 
-We will first consider the effects of varying the number of normal rounds using LR. In order to do this, we first create a sequential solution by using only our labeling algorithms. In this, we will use $N=16$ and $M=8$ for both the E-VSP and CSP in order to create secondary columns; we note that this selection differs from the one used in Sec this is different when compared to our previous tests, allowing us to also see the effects of a different vehicle solution on the sequential problem.  We shall refer to this solution as being round $R = I$.
+\subsubsection{CSP Local search}
+\todo{gewoon doen makker maatje}
 
-Next, we report different solution values of the integrated ILP for varying numbers of preceding LR rounds $R$; for $R=0$, we only allow the columns of the sequential solution in the integrated ILP. We generally do not expect this to result in a better solution due to the fact that no blocks other than the ones in the sequentially selected vehicle tasks are included in previously generated crew duties. For all other rounds $R \geq 1$, we note that the result is not deterministic due to our construction of $B_{alt}$. A single run was presented here in which previously generated columns were maintained between rounds, however a subsequent run may have given different results. 
+\subsubsection{E-VCSP Improvement rounds}
+Next, let us consider the E-VCSP.  \todo{dsafds} et us consider two main things: the number of normal rounds that we perform, and the number of rounds with disrupted lambda that we perform afterwards. 
+
+We will first consider the effects of varying the number of normal rounds using LR. In order to do this, we first create a sequential solution by using only our labeling algorithms. In this, we will use $N=16$ and $M=8$ for both the E-VSP and CSP in order to create secondary columns; we note that this selection differs from the one used in Section \ref{sec:params-sec-label-columns}, allowing us to also see the effects of a different vehicle solution on the sequential problem.  We shall refer to this sequential solution as round $R = I$.
+
+Using this, we will now report different solution values of the integrated ILP for different numbers of rounds $R$. For $R=0$, we do not perform any additional column generation rounds in the E-VSP or CSP, therefore only allowing the use of the sequential solution columns in the integrated ILP. In general, we do not expect this to result in a better solution as no blocks other than the ones in the sequentially selected vehicle tasks are present in previously generated crew duties. For all other rounds, we note that the result is not deterministic due to our construction of $B_{alt}$. In order to account for this, the results presented are from a single run in which the integrated ILP is solved after each round with the set of columns available at that time. 
 
 \begin{table}[h]
   \centering
   \begin{tabular}{cccrrrccrr}
     \toprule
-       \textbf{R} & $|VT^*|$ & $|CD^*|$ & \textbf{VH cost} & \textbf{CR cost} & \textbf{$\Delta$\%} & $|VT|$ & $|CD|$ & \textbf{gap \%} & CG runtime (s) \\
+       \textbf{R} & $|VT^*|$ & $|CD^*|$ & \textbf{VH cost} & \textbf{CR cost} & \textbf{$\Delta$\%} & $|VT|$ & $|CD|$ & \textbf{gap \%} & CG time (s) \\
        \cmidrule(lr){1-1} \cmidrule(lr){2-6} \cmidrule(lr){7-8} \cmidrule(lr){9-10}
         I   & 10 & 23 & 3403.7 & 12620.3 & -    & 13140 & 2128 & - & -      \\
-        0   & 10 & 23 & 3403.7 & 12620.3 & 0    & 13140 & 2128 & 0 & 0      \\
-        1   & 10 & 22 & 3403.7 & 12400.1 & 1.4  & 28150 & 4947 & 0 & 53.6   \\
-        2   & 11 & 22 & 3651.5 & 12056.7 & 2    & 31730 & 6236 & 0 & 123.7  \\
-        3   & 11 & 21 & 3607.9 & 12009.8 & 2.5  & 33441 & 6748 & 0 & 201.1  \\
+        0   & 10 & 23 & 3403.7 & 12620.3 & -0    & 13140 & 2128 & 0 & 0      \\
+        1   & 10 & 22 & 3403.7 & 12400.1 & -1.4  & 28150 & 4947 & 0 & 53.6   \\
+        2   & 11 & 22 & 3651.5 & 12056.7 & -2.0    & 31730 & 6236 & 0 & 123.7  \\
+        3   & 11 & 21 & 3607.9 & 12009.8 & -2.5  & 33441 & 6748 & 0 & 201.1  \\
             & .. & .. & .. & .. & .. & \\
-        13  & 11 & 21 & 3607.9 & 12005.4 & 2.6  & 38497 & 8995 & 0 & 1009.8 \\
-        14  & 11 & 21 & 3607.9 & 12001.1 & 2.6  & 39923 & 9525 & 0 & 1097.3 \\
-        15  & 10 & 21 & 3421.1 & 12028.2 & 3.6  & 41338 & 9563 & 0 & 1185.1 \\
+        13  & 11 & 21 & 3607.9 & 12005.4 & -2.6  & 38497 & 8995 & 0 & 1009.8 \\
+        14  & 11 & 21 & 3607.9 & 12001.1 & -2.6  & 39923 & 9525 & 0 & 1097.3 \\
+        15  & 10 & 21 & 3421.1 & 12028.2 & -3.6  & 41338 & 9563 & 0 & 1185.1 \\
             & .. & .. & .. & .. & .. & \\
-        20  & 10 & 21 & 3421.1 & 12023.8 & 3.6  & 43240 & 9815 & 0 & 1648.3 \\
+        20  & 10 & 21 & 3421.1 & 12023.8 & -3.6  & 43240 & 9815 & 0 & 1648.3 \\
         \bottomrule
   \end{tabular}
   \caption{Effects of the number of rounds on the E-VCSP. Only rounds with changed objective value reported. $\Delta$\% shows solution value difference when compared to sequential. }
   \label{tab:evcsp-rounds}
 \end{table}
-
+Let us first point out that the solution quality for $R=I$ is substantially better than that found in previous experiments. The selected vehicle solution was only marginally worse than the best one known for this instance, however the crew solution is shows a decrease of almost 1500; this is a clear example of the flaws of the sequential method, as minimizing the vehicle related costs can result in overall solution costs to increase dramatically. 
 
 \section{Discussion}
 \todo{Uitwerken; is nu gewoon een lijstje met dingen die ooit besproken zijn / mij persoonlijk nog interessant lijken.}
 \subsection{Future work}
+The results provided in this work showcase that using a combination of column generation and Lagrangean relaxation can be used in order to quite successfully solve the E-VCSP. There are however a number of improvements to be made, as well as possibilities to expand the problem in order to allow for more complex real world behavior to be included. 
+
+\subparagraph{Charging infrastructure}
+Of primary importance is better modeling of charging infrastructure. In our current problem description, we assume that the charging infrastructure provided does not have limits on either the number of chargers available or the total amount of power used at any given time. In practice, these two elements can often form bottlenecks for feasible charging schedules, thereby making some type of postprocessing to include them in our generated schedules hard or even impossible. 
+
+Limiting the number of chargers available at a location has already been done in previous work on the E-VSP by adding time-discretized charging nodes to the underlying graph, after which constraints can be added on the number of vehicle tasks in a solution that cover a certain node. This can relatively easily be incorporated in our current formulation by replacing charging idles in $A_{vt}$ with node visits, adding additional E-VSP constraints and updating the reduced cost formulas. Experimentation is however needed to see the effect of this on the quality of integer solutions and the convergence of the Lagrangean relaxation. Total power shared between chargers on the other hand is, as far as we know, not a constraint which has been included in an E-VSP formulation before; adding it to the current CG formulation is non-trivial due to the fact that power may be arbitrarily shared, thereby making a local search or large neighborhood search approach seem more interesting. 
+
+\subparagraph{Multiple depots/vehicle types}
+Another area of interest are traditional extensions of the VSP: the inclusion of multiple depots and vehicle types. We believe that the provided framework may be extended in order to incorporate this without much issue, however as before the quality of integer solutions prove hard to maintain. 
+
+\subparagraph{Crew movements}
+
+\subparagraph{Crew duty generation}
+
+
 \begin{itemize}
   \item Multiple depots / vehicle types
   \item Vehicle capacity in charging stations

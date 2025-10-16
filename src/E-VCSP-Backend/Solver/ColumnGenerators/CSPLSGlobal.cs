@@ -2,6 +2,13 @@
 using E_VCSP.Solver.SolutionState;
 
 namespace E_VCSP.Solver.ColumnGenerators {
+    public struct CSPLSCosts {
+        public double BaseCosts;
+        public double PenaltyCosts;
+
+        public readonly double OverallCosts => BaseCosts + PenaltyCosts;
+    }
+
     public class CSPLSNode {
         #region debug
         public int DEBUG_INDEX;
@@ -126,21 +133,9 @@ namespace E_VCSP.Solver.ColumnGenerators {
     }
 
     internal class CSPLSDuty {
-        public required DutyType Type = DutyType.Single;
         // Invariant: Dont include the sign on / off elements at start/end of shift
         public required CSPLSNode? head;
         public CSPLSNode? tail => head?.FindLastAfter(_ => true) ?? head;
-
-        public List<int> CoveredBlocks() {
-            List<int> res = [];
-            CSPLSNode? curr = head;
-            while (curr != null) {
-                if (curr.CDE.Type == CrewDutyElementType.Block)
-                    res.Add(((CDEBlock)curr.CDE).Block.Index);
-                curr = curr.Next;
-            }
-            return res;
-        }
 
         private (int minStartTime, int maxStartTime, int minEndTime, int maxEndTime)[] DutyTypeTimeframes =
         [
@@ -161,18 +156,40 @@ namespace E_VCSP.Solver.ColumnGenerators {
             Constants.CR_MAX_SHIFT_LENGTH, // Broken
         ];
 
-        public bool IsFeasible(DutyType dt, bool final = false) {
-            if (final) {
-                if (!head!.CDE.StartLocation.CrewBase || !tail!.CDE.EndLocation.CrewBase) return false;
+        public (bool feasible, double penaltyCosts) CheckFeasibility(List<double> blockDualCosts, DutyType dt, double penaltyMultiplier = 1) {
+            if (head == null) return (true, 0);
+
+            int paidDuration = PaidDuration(dt);
+
+            double penalty = 0;
+            bool feasible = true;
+            void applyPenalty(double p) {
+                feasible = false;
+                penalty += p * penaltyMultiplier;
             }
+
+            if (!head!.CDE.StartLocation.CrewBase) applyPenalty(Config.CSP_LS_G_CREWHUB_PENALTY);
+            if (!tail!.CDE.EndLocation.CrewBase) applyPenalty(Config.CSP_LS_G_CREWHUB_PENALTY);
 
             // Check start / end times
             var timeframe = DutyTypeTimeframes[(int)dt];
-            if (timeframe.minStartTime > head!.CDE.StartTime || timeframe.maxStartTime < head.CDE.StartTime) return false;
-            if (timeframe.minEndTime > tail!.CDE.EndTime || timeframe.maxEndTime < tail.CDE.EndTime) return false;
+            int startTimeDeviation = 0;
+            if (timeframe.minStartTime > head!.CDE.StartTime)
+                startTimeDeviation = timeframe.minStartTime - head!.CDE.StartTime;
+            if (head!.CDE.StartTime > timeframe.maxStartTime)
+                startTimeDeviation = Math.Max(startTimeDeviation, head!.CDE.StartTime - timeframe.maxStartTime);
+            if (startTimeDeviation > 0) applyPenalty(startTimeDeviation * Config.CSP_LS_G_TIME_PENALTY);
+
+            int endTimeDeviation = 0;
+            if (timeframe.minEndTime > tail!.CDE.EndTime)
+                endTimeDeviation = timeframe.minEndTime - tail!.CDE.EndTime;
+            if (tail!.CDE.EndTime > timeframe.maxEndTime)
+                endTimeDeviation = Math.Max(endTimeDeviation, tail!.CDE.EndTime - timeframe.maxEndTime);
+            if (endTimeDeviation > 0) applyPenalty(endTimeDeviation * Config.CSP_LS_G_TIME_PENALTY);
 
             // Check duration
-            if (PaidDuration > DutyTypeMaxDurations[(int)dt]) return false;
+            int durationDeviation = paidDuration > DutyTypeMaxDurations[(int)dt] ? paidDuration - DutyTypeMaxDurations[(int)dt] : 0;
+            if (durationDeviation > 0) applyPenalty(durationDeviation * Config.CSP_LS_G_TIME_PENALTY);
 
             List<(int startTime, int duration)> breaks = [];
 
@@ -180,7 +197,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
             int lastBreak = head!.CDE.StartTime;
             (int startTime, int duration) longIdle = (-1, 0);
             bool longIdleUsed = false;
-
             if (dt == DutyType.Broken) {
                 var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
                 if (longestIdle != null) longIdle = (longestIdle.CDE.StartTime, longestIdle.CDE.EndTime - longestIdle.CDE.EndTime);
@@ -200,14 +216,15 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime < breakStartTime) {
                     // First check time traveled before big idle, then update last break time accordingly
-                    if (longIdle.startTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
+                    if (longIdle.startTime - lastBreak > Constants.MAX_STEERING_TIME)
+                        applyPenalty((longIdle.startTime - lastBreak - Constants.MAX_STEERING_TIME) * Config.CSP_LS_G_STEER_PENALTY);
                     lastBreak = longIdle.startTime + longIdle.duration;
                     longIdleUsed = true;
                 }
 
                 // Too long between breaks
                 if (cde.StartTime - lastBreak > Constants.MAX_STEERING_TIME) {
-                    return false;
+                    applyPenalty((cde.StartTime - lastBreak - Constants.MAX_STEERING_TIME) * Config.CSP_LS_G_STEER_PENALTY);
                 }
                 lastBreak = cde.EndTime;
 
@@ -216,11 +233,14 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime > lastBreak) {
                 // Check if there is a long idle after the last break
-                if (longIdle.startTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
+                if (longIdle.startTime - lastBreak > Constants.MAX_STEERING_TIME)
+                    applyPenalty((longIdle.startTime - lastBreak - Constants.MAX_STEERING_TIME) * Config.CSP_LS_G_STEER_PENALTY);
                 lastBreak = longIdle.startTime + longIdle.duration;
                 longIdleUsed = true;
             }
-            if (tail.CDE.EndTime - lastBreak > Constants.MAX_STEERING_TIME) return false;
+            if (tail.CDE.EndTime - lastBreak > Constants.MAX_STEERING_TIME)
+                applyPenalty((tail.CDE.EndTime - lastBreak - Constants.MAX_STEERING_TIME) * Config.CSP_LS_G_STEER_PENALTY);
+
 
             if (longIdle.startTime != -1) {
                 // Before / after long idle is handled seperately
@@ -230,23 +250,27 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 var afterBreaks = breaks.Where(x => x.startTime + x.duration > longIdle.startTime + longIdle.duration).ToList();
 
                 if (beforeDuration > 4 * 60 * 60 && beforeDuration <= 5.5 * 60 * 60) {
-                    if (beforeBreaks.Count() == 0) return false;
+                    if (beforeBreaks.Count() == 0) applyPenalty(Config.CSP_LS_G_BREAK_PENALTY);
                 }
                 else if (beforeDuration >= 5.5 * 60 * 60) {
-                    if (beforeBreaks.Sum(x => x.duration) < 40 * 60 || beforeBreaks.FindIndex(x => x.duration >= 20 * 60) == -1) return false;
+                    if (beforeBreaks.Sum(x => x.duration) < 40 * 60 || beforeBreaks.FindIndex(x => x.duration >= 20 * 60) == -1)
+                        applyPenalty(Config.CSP_LS_G_BREAK_PENALTY);
                 }
                 if (afterDuration > 4 * 60 * 60 && afterDuration <= 5.5 * 60 * 60) {
-                    if (afterBreaks.Count() == 0) return false;
+                    if (afterBreaks.Count() == 0) applyPenalty(Config.CSP_LS_G_BREAK_PENALTY);
                 }
                 else if (afterDuration >= 5.5 * 60 * 60) {
-                    if (afterBreaks.Sum(x => x.duration) < 40 * 60 || afterBreaks.FindIndex(x => x.duration >= 20 * 60) == -1) return false;
+                    if (afterBreaks.Sum(x => x.duration) < 40 * 60 || afterBreaks.FindIndex(x => x.duration >= 20 * 60) == -1)
+                        applyPenalty(Config.CSP_LS_G_BREAK_PENALTY);
                 }
             }
             else {
                 // Min 1 break of 15 minutes
-                if (PaidDuration > 4 * 60 * 60 && PaidDuration <= 5.5 * 60 * 60 && breaks.Count == 0) return false;
+                if (paidDuration > 4 * 60 * 60 && paidDuration <= 5.5 * 60 * 60 && breaks.Count == 0)
+                    applyPenalty(Config.CSP_LS_G_BREAK_PENALTY);
                 // Min 40 min break, min 1 of length >= 20min
-                else if (PaidDuration >= 5.5 * 60 * 60 && (breaks.Sum(x => x.duration) < 40 * 60 || !breaks.Any(x => x.duration > 20 * 60))) return false;
+                else if (paidDuration >= 5.5 * 60 * 60 && (breaks.Sum(x => x.duration) < 40 * 60 || !breaks.Any(x => x.duration > 20 * 60)))
+                    applyPenalty(Config.CSP_LS_G_BREAK_PENALTY);
             }
 
             // Additional check for late duties with dinner break
@@ -255,72 +279,76 @@ namespace E_VCSP.Solver.ColumnGenerators {
                     x => x.duration >= 20 * 60
                     && x.startTime >= 16.5 * 60 * 60
                     && x.startTime <= 20.5 * 60 * 60 - x.duration
-                ) == -1) return false;
+                ) == -1) applyPenalty(Config.CSP_LS_G_BREAK_PENALTY);
             }
 
-            return true;
+            if (feasible) {
+                // subtract the block reduced costs from the penalty
+                curr = head;
+                while (curr != null) {
+                    if (curr.CDE.Type == CrewDutyElementType.Block) {
+                        penalty -= blockDualCosts[((CDEBlock)curr.CDE).Block.Index] * Math.Max(1, penaltyMultiplier);
+                    }
+                    curr = curr.Next;
+                }
+            }
+
+            return (feasible, penalty);
         }
 
-        /// <summary>
-        /// Determines which duty types are feasible for this duty.
-        /// </summary>
-        /// <returns></returns>
-        public List<DutyType> FeasibleTypes() {
-            if (head == null) {
-                return [DutyType.Single]; // No elements, no duty    
-            }
+        public (DutyType dt, bool feasible, double cost, double penaltyCost) MinTypeCost(List<double> blockDualCosts, double penaltyMultiplier = 1) {
+            (DutyType, bool, double cost, double penaltyCost) min = (DutyType.Single, false, double.PositiveInfinity, 0);
 
-            List<DutyType> feasibleTypes = [];
             for (int i = 0; i < (int)DutyType.Count; i++) {
                 DutyType type = (DutyType)i;
-                if (IsFeasible(type)) {
-                    feasibleTypes.Add(type);
-                }
+                double cost = Cost(type);
+                var feasibilityRes = CheckFeasibility(blockDualCosts, type, penaltyMultiplier);
+
+                if (cost + feasibilityRes.penaltyCosts < min.cost + min.penaltyCost)
+                    min = (type, feasibilityRes.feasible, cost, feasibilityRes.penaltyCosts);
             }
 
-            //feasibleTypes.Add(DutyType.Single);
-            return feasibleTypes;
+            return min;
         }
 
-        public int PaidDuration {
-            get {
-                if (head == null || tail == null) return 0;
-                int baseDuration = tail.CDE.EndTime - head.CDE.StartTime;
-                if (Type == DutyType.Broken) {
-                    var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
+        public int PaidDuration(DutyType dt) {
+            if (head == null || tail == null) return 0;
+            int baseDuration = tail.CDE.EndTime - head.CDE.StartTime;
 
-                    if (longestIdle == null) return baseDuration;
-                    return baseDuration - (longestIdle.CDE.EndTime - longestIdle.CDE.StartTime);
-                }
+            if (head.CDE.StartLocation.CrewBase) baseDuration += head.CDE.StartLocation.SignOnTime;
+            if (head.CDE.StartLocation.CrewBase) baseDuration += head.CDE.StartLocation.SignOffTime;
 
-                return baseDuration;
+            if (dt == DutyType.Broken) {
+                var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
+
+                if (longestIdle == null) return baseDuration;
+                return baseDuration - (longestIdle.CDE.EndTime - longestIdle.CDE.StartTime);
             }
+
+            return baseDuration;
         }
 
-        public double Cost {
-            get {
-                double cost = BaseCost;
-                cost += PaidDuration / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
-                if (head == null || tail == null) return cost;
+        public double Cost(DutyType dt) {
+            double cost = BaseCost(dt);
+            cost += PaidDuration(dt) / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
+            if (head == null || tail == null) return cost;
 
-                if (!head.CDE.StartLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
-                if (!tail.CDE.EndLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
+            if (!head.CDE.StartLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
+            if (!tail.CDE.EndLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
 
-                return cost;
-            }
+            return cost;
         }
 
-        public double BaseCost {
-            get {
-                double cost = Config.CR_SHIFT_COST;
-                if (Type == DutyType.Single) cost += Config.CR_SINGLE_SHIFT_COST;
-                if (Type == DutyType.Broken) cost += Constants.CR_BROKEN_SHIFT_COST;
-                return cost;
-            }
+        public double BaseCost(DutyType dt) {
+            double cost = Config.CR_SHIFT_COST;
+            if (dt == DutyType.Broken) cost += Constants.CR_BROKEN_SHIFT_COST;
+            return cost;
         }
 
-        public CrewDuty? ToCrewDuty() {
-            if (Type != DutyType.Single && !IsFeasible(Type, true)) return null;
+        public CrewDuty? ToCrewDuty(List<double> blockDualCosts) {
+            // If no type exists which can be feasibly used, return
+            var minType = MinTypeCost(blockDualCosts, 10000);
+            if (!minType.feasible) return null;
 
             List<CrewDutyElement> cdes = [];
             var curr = head;
@@ -328,9 +356,16 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 cdes.Add(curr.CDE);
                 curr = curr.Next;
             }
+            cdes.Insert(0, new CDESignOnOff(cdes[0].StartTime - cdes[0].StartLocation.SignOnTime, cdes[0].StartTime, cdes[0].StartLocation));
+            cdes.Add(new CDESignOnOff(cdes[^1].EndTime, cdes[^1].EndTime + cdes[^1].EndLocation.SignOffTime, cdes[^1].EndLocation));
             return new CrewDuty(cdes) {
-                Type = Type
+                Type = minType.dt
             };
+        }
+
+        public override string ToString() {
+            var min = MinTypeCost(Enumerable.Range(0, 1000).Select(x => 0.0).ToList(), 1);
+            return $"Dur: {PaidDuration(DutyType.Single)}, MinTypeCost: {min.dt}/{min.cost}/{min.feasible}/{min.penaltyCost}";
         }
     }
 
@@ -363,10 +398,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
                 duties.Add(new() {
                     head = head,
-                    Type = DutyType.Single
                 });
-
-                duties[^1].Type = duties[^1].FeasibleTypes()[0];
             }
         }
 
@@ -472,8 +504,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Calculate costs before move
             double costDiff = 0;
-            costDiff -= duty1.Cost;
-            costDiff -= duty2.Cost;
+            var d1OldRes = duty1.MinTypeCost(blockDualCosts, 1 / T);
+            var d2OldRes = duty2.MinTypeCost(blockDualCosts, 1 / T);
+            costDiff -= d1OldRes.cost + d1OldRes.penaltyCost;
+            costDiff -= d2OldRes.cost + d2OldRes.penaltyCost;
 
             // Change links, reevaluate heads
             if (prevIn1 != null) prevIn1.Next = linkPrev1ToRange;
@@ -487,23 +521,22 @@ namespace E_VCSP.Solver.ColumnGenerators {
             duty1.head = rangeStart.FindLastBefore(_ => true) ?? rangeStart;
             duty2.head = prevIn2?.FindLastBefore(_ => true) ?? prevIn2 ?? nextIn2;
 
-            // Determine costs / feasibility
-            var feasibleTypes1 = duty1.FeasibleTypes();
-            var feasibleTypes2 = duty2.FeasibleTypes();
 
             // Check costs
-            costDiff += duty1.Cost;
-            costDiff += duty2.Cost;
+            var d1NewRes = duty1.MinTypeCost(blockDualCosts, 1 / T);
+            var d2NewRes = duty2.MinTypeCost(blockDualCosts, 1 / T);
+            costDiff += d1NewRes.cost + d1NewRes.penaltyCost;
+            costDiff += d2NewRes.cost + d2NewRes.penaltyCost;
 
             // If the second duty is now empty, remove it
             if (duty2.head == null) {
-                costDiff -= duty2.BaseCost;
+                costDiff -= duty2.BaseCost(d2OldRes.dt);
                 if (duties.Count > Config.MAX_DUTIES)
                     costDiff -= Config.CR_OVER_MAX_COST;
             }
 
             // If infeasible or cost change not acceptable, revert  
-            if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
+            if (!accept(costDiff)) {
                 // Revert changes
                 if (prevIn1 != null) prevIn1.Next = prevIn1Next;
                 if (nextIn1 != null) nextIn1.Prev = nextIn1Prev;
@@ -514,7 +547,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
 
-                return (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0) ? LSOpResult.Invalid : LSOpResult.Decline;
+                return LSOpResult.Decline;
             }
 
             if (duty2.head == null) duties.Remove(duty2);
@@ -604,8 +637,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Calculate costs before swap
             double costDiff = 0;
-            costDiff -= duty1.Cost;
-            costDiff -= duty2.Cost;
+            var d1OldRes = duty1.MinTypeCost(blockDualCosts, 1 / T);
+            var d2OldRes = duty2.MinTypeCost(blockDualCosts, 1 / T);
+            costDiff -= d1OldRes.cost + d1OldRes.penaltyCost;
+            costDiff -= d2OldRes.cost + d2OldRes.penaltyCost;
 
             // Check if tail swap is even feasible
             CSPLSNode? lastRemainingBlock1Next = lastRemainingBlock1?.Next;
@@ -628,28 +663,26 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 ?? firstBlockInTail1?.FindLastBefore(_ => true)
                 ?? firstBlockInTail1;
 
-            // Check feasibility
-            var feasibleTypes1 = duty1.FeasibleTypes();
-            var feasibleTypes2 = duty2.FeasibleTypes();
-
             // Check costs
-            costDiff += duty1.Cost;
-            costDiff += duty2.Cost;
+            var d1NewRes = duty1.MinTypeCost(blockDualCosts, 1 / T);
+            var d2NewRes = duty2.MinTypeCost(blockDualCosts, 1 / T);
+            costDiff += d1NewRes.cost + d1NewRes.penaltyCost;
+            costDiff += d2NewRes.cost + d2NewRes.penaltyCost;
 
             // If one of the two duties is empty, we can also additionally remove extra cost
             if (duty1.head == null) {
-                costDiff -= duty1.BaseCost;
+                costDiff -= duty1.BaseCost(d1OldRes.dt);
                 if (duties.Count > Config.MAX_DUTIES)
                     costDiff -= Config.CR_OVER_MAX_COST;
             }
             if (duty2.head == null) {
-                costDiff -= duty2.BaseCost;
+                costDiff -= duty2.BaseCost(d2OldRes.dt);
                 if (duties.Count > Config.MAX_DUTIES)
                     costDiff -= Config.CR_OVER_MAX_COST;
             }
 
             // If either of the changes is not feasible or costs are not accepted, revert
-            if (feasibleTypes1.Count == 0 || feasibleTypes2.Count == 0 || !accept(costDiff)) {
+            if (!accept(costDiff)) {
                 if (lastRemainingBlock1 != null) lastRemainingBlock1.Next = lastRemainingBlock1Next;
                 if (lastRemainingBlock2 != null) lastRemainingBlock2.Next = lastRemainingBlock2Next;
                 if (firstBlockInTail1 != null) firstBlockInTail1.Prev = firstBlockInTail1Prev;
@@ -657,13 +690,10 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 duty1.head = prevHead1;
                 duty2.head = prevHead2;
 
-                return LSOpResult.Invalid;
+                return LSOpResult.Decline;
             }
 
             // Finalize operation 
-            duty1.Type = feasibleTypes1[0];
-            duty2.Type = feasibleTypes2[0];
-
             if (duty1.head == null) duties.Remove(duty1);
             if (duty2.head == null) duties.Remove(duty2);
 
@@ -687,6 +717,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             for (int i = 1; i < operations.Count; i++) sums.Add(sums[i - 1] + operations[i].chance);
 
             int currIts = 0;
+            int prevSum = 0;
 
             List<int> resCounts = Enumerable.Range(0, (int)LSOpResult.Count).Select(x => 0).ToList();
             while (currIts < Config.CSP_LS_G_ITERATIONS) {
@@ -698,11 +729,26 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 int operationIndex = sums.FindIndex(x => r <= x);
                 var res = operations[operationIndex].operation();
                 resCounts[(int)res]++;
+
+                int sum = 0;
+                for (int i = 0; i < duties.Count; i++) {
+                    var head = duties[i].head;
+                    while (head != null) {
+                        if (head.CDE.Type == CrewDutyElementType.Block) {
+                            sum++;
+                        }
+                        head = head.Next;
+                    }
+                }
+                if (currIts != 1 && sum != prevSum) {
+                    Console.WriteLine("oh god oh fuck");
+                }
+                prevSum = sum;
             }
 
             //Console.WriteLine("Op results: " + string.Join('\t', resCounts.Select(x => x.ToString())));
             //Console.WriteLine($"Total duties/css.instance.Blocks covered: {duties.Count} / {duties.Sum(x => x.CoveredBlocks().Count)}");
-            var fs = duties.Select(x => (-1.0, x.ToCrewDuty())).Where(x => x.Item2 != null).ToList();
+            var fs = duties.Select(x => (-1.0, x.ToCrewDuty(blockDualCosts))).Where(x => x.Item2 != null).ToList();
             //Console.WriteLine($"Feasible duties/css.instance.Blocks covered: {fs.Count} / {fs.Sum(x => x.Item2!.Covers.Count)}");
             return fs;
         }
