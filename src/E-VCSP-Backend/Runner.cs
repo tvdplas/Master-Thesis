@@ -437,18 +437,19 @@ namespace E_VCSP_Backend {
         }
 
         void expVCSPMaxCols() {
-            Reload("VCSP Max cols");
+            Reload("VCSP Max cols v2");
 
-            List<int> maxCols = [2500, 5000, 10_000, 25_000, 50_000];
+            int attempts = 5;
+            List<int> maxCols = [500, 2500, 5000, 10_000, 25_000];
 
             Config.VSP_SOLVER_TIMEOUT_SEC = 600;
             Config.CSP_SOLVER_TIMEOUT_SEC = 600;
-            Config.VCSP_SOLVER_TIMEOUT_SEC = 900;
+            Config.VCSP_SOLVER_TIMEOUT_SEC = 600;
             Config.VSP_LB_SEC_COL_ATTEMPTS = 16;
             Config.VSP_LB_SEC_COL_COUNT = 8;
             Config.CSP_LB_SEC_COL_ATTEMPTS = 16;
             Config.CSP_LB_SEC_COL_COUNT = 8;
-            Config.VCSP_ROUNDS = 10;
+            Config.VCSP_ROUNDS = 5;
             Config.LAGRANGE_DISRUPT_ROUNDS = 0; // nondeterministic
             Config.LAGRANGE_N = 50;
             Config.LAGRANGE_PI_END = 0.0001;
@@ -473,18 +474,20 @@ namespace E_VCSP_Backend {
 
             foreach (int maxvhcols in maxCols) {
                 foreach (int maxcrcols in maxCols) {
-                    Config.VCSP_MAX_TASKS_DURING = maxvhcols;
-                    Config.VCSP_MAX_DUTIES_DURING = maxcrcols;
+                    for (int i = 0; i < attempts; i++) {
+                        Config.VCSP_MAX_TASKS_DURING = maxvhcols;
+                        Config.VCSP_MAX_DUTIES_DURING = maxcrcols;
 
-                    IntegratedSolver = new(new(basevss), new(basecss));
-                    Stopwatch sw = Stopwatch.StartNew();
-                    IntegratedSolver.Solve();
-                    sw.Stop();
-                    Console.WriteLine($"{Config.CNSL_OVERRIDE}{maxvhcols};{maxcrcols};" +
-                        $"{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
-                        $"{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
-                        $"{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};" +
-                        $"{IntegratedSolver.model!.MIPGap};{IntegratedSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
+                        IntegratedSolver = new(new(basevss), new(basecss));
+                        Stopwatch sw = Stopwatch.StartNew();
+                        IntegratedSolver.Solve();
+                        sw.Stop();
+                        Console.WriteLine($"{Config.CNSL_OVERRIDE}{maxvhcols};{maxcrcols};" +
+                            $"{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
+                            $"{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
+                            $"{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};" +
+                            $"{IntegratedSolver.model!.MIPGap};{IntegratedSolver.model.Runtime};{sw.Elapsed.TotalSeconds}");
+                    }
                 }
             }
         }
