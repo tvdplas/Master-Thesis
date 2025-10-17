@@ -1570,46 +1570,144 @@ We also see that the number of new generated columns per round decreases over ti
 
 Let us first point out that the base solution is of lower quality than the one found at $R=10$ of the previous test; as mentioned before, this is caused by our construction of $B_{alt}$ introducing nondeterministic behavior. Next, we see that the decrease in the solution value when we do more disruption rounds is not consistent; for $DR=3$ and $DR=7$ results are worse than with fewer disruption rounds. In general however, the trend does seem to indicate that they are having some positive effect, although we know that the base solution could also have been improved without disruption as seen in the previous experiment. We do see a clear effect in the number of unique columns; for both vehicle and crew significantly more columns are present after the disruptions, indicating that we are successfully generating columns that we would likely have not found using only normal rounds. In general, disruption rounds do not seem to have a negative influence on the solution value as Gurobi is still able to prove optimality, however their contribution to a better quality solution is also not entirely clear. \\
 
-Lastly for our integrated methods, let us consider the effects of limiting the number of columns in the solution. We will once again use the same parameters for our column generation methods, setting $VT_{max}$ and $CD_{max}$ to different values. We note that the actual number of columns available to the solution may still be higher, as we do not want to discard columns which are required in order to cover the required trips/blocks. In general however, we expect it to roughly limit. Results are averaged / not \todo{ga ik nog tijd hebben om dit te averagen} and reported in Table \ref{tab:evcsp-max-cols}.
+\noindent Lastly for our integrated methods, let us consider the effects of limiting the number of columns in the solution. We will once again use the same parameters for our column generation methods, setting $VT_{max}$ and $CD_{max}$ to different values. We note that the actual number of columns available to the solution may still be slightly higher, as we do not discard a column if they contain a trips or block which we would otherwise be unable to cover. Results are averaged over 5 runs and are reported in Table \ref{tab:evcsp-max-cols}.
 
 \begin{table}[h]
   \centering
   \begin{tabular}{llrrrrr}
     \toprule
-    && $CD_{max}=500$ & $CD_{max}=2500$ & $CD_{max}=5000$ & $CD_{max}=10000$ & $CD_{max}=25000$  \\
+    && $|CD| \lesssim 5e2$ & $|CD| \lesssim 2.5e3$ & $|CD| \lesssim 5e3$ & $|CD| \lesssim 1e4$ & $|CD| \lesssim 2.5e4$  \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-7}
     \addlinespace[0.4em]
-    \multirow{4}{*}{$VT_{max}=500$} & \textbf{value}  & - & - & -& -& -\\
-    & \textbf{$|VT|$}   & - & - & - & - & - \\
-    & \textbf{$|CD|$} & - & - & - & - & - \\
-    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \multirow{4}{*}{$|VT| \lesssim 5e2$} & \textbf{value}  & 16336.2 & 16088.5 & 15875.0 & 15728.0 & 15917.7 \\
+    & \textbf{VH value} & \underline{3386.4} & \underline{3386.4} & 3387.0 & 3429.6 & \underline{3386.4} \\
+    & \textbf{CR value} & 12949.8 & 12702.1 & 12488.1 & 12298.4 & 12531.4 \\
+    & \textbf{CG time} & 80.9 & 103.3 & 130.5 & 127.0 & 123.8 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-7}
-    \multirow{4}{*}{$VT_{max}=2500$} & \textbf{value}  & - & - & -& -& -\\
-    & \textbf{$|VT|$}   & - & - & - & - & - \\
-    & \textbf{$|CD|$} & - & - & - & - & - \\
-    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \multirow{4}{*}{$|VT| \lesssim 2.5e3$} & \textbf{value}  & 15744.4 & 15695.9 & 15761.0& 15581.5& 15537.6\\
+    & \textbf{VH value} & 3683.9 & 3482.6 & 3515.5 & 3510.5 & 3473.3 \\
+    & \textbf{CR value} & 12060.5 & 12213.3 & 12245.5 & 12071.0 & 12064.3 \\
+    & \textbf{CG time} & 173.6 & 168.0 & 179.6 & 198.2 & 216.6 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-7}
-    \multirow{4}{*}{$VT_{max}=5000$} & \textbf{value}  & - & - & -& -& -\\
-    & \textbf{$|VT|$}   & - & - & - & - & - \\
-    & \textbf{$|CD|$} & - & - & - & - & - \\
-    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \multirow{4}{*}{$|VT| \lesssim 5e3$} & \textbf{value}  & \underline{15615.4} & 15692.2 & 15728.1& 15709.9& 15661.1\\
+    & \textbf{VH value} & 3633.1 & 3474.2 & 3516.4 & 3520.2 & 3390.3 \\
+    & \textbf{CR value} & 11982.3 & 12218.1 & 12211.6 & 12189.8 & 12270.8 \\
+    & \textbf{CG time} & 166.4 & 184.1 & 209.1 & 195.1 & 224.9 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-7}
-    \multirow{4}{*}{$VT_{max}=10000$} & \textbf{value}  & - & - & -& -& -\\
-    & \textbf{$|VT|$}   & - & - & - & - & - \\
-    & \textbf{$|CD|$} & - & - & - & - & - \\
-    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \multirow{4}{*}{$|VT| \lesssim 1e4$} & \textbf{value}  & 15702.3  & 15570.5  & 15696.8 & 15677.5 & 15668.1 \\
+    & \textbf{VH value} & 3558.1 & 3674.1 & 3518.3 & 3514.6 & 3594.7 \\
+    & \textbf{CR value} & 12144.2 & \underline{11896.4} & 12178.4 & 12162.9 & 12073.4 \\
+    & \textbf{CG time} & 195.3 & 203.7 & 234.2 & 265.4 & 265.6 \\
     \arrayrulecolor{black!30}\cmidrule(lr){1-7}
-    \multirow{4}{*}{$VT_{max}=25000$} & \textbf{value}  & - & - & -& -& -\\
-    & \textbf{$|VT|$}   & - & - & - & - & - \\
-    & \textbf{$|CD|$} & - & - & - & - & - \\
-    & \textbf{CG time (s)} & - & - & - & - & - \\
-    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{4}{*}{$|VT| \lesssim 2.5e4$} & \textbf{value}  & 15920.3 & 15887.5 & 15739.1& 15803.5& 15758.1\\
+    & \textbf{VH value} & 3763.5 & 3553.0 & 3634.9 & 3638.0 & 3644.0 \\
+    & \textbf{CR value} & 12156.8 & 12334.6 & 12104.3 & 12165.5 & 12114.1 \\
+    & \textbf{CG time} & 272.7 & 298.6 & 330.4 & 314.9 & 313.3 \\
     \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effect of number of rounds and iterations on E-VSP global local search, tested on \texttt{leiden-1-2}. $R$ is number of attempts, $I$ is number operations per round. LS value is best single LS result, ILP value is result after recombination, all avg. of 5 runs. Best solution per category \underline{underlined}.}
-  \label{tab:evsp-ls-global}
+  \caption{Effect of limited number of columns on E-VCSP, tested on \texttt{leiden-1-2}. Best result per category \underline{underlined}.}
+  \label{tab:evcsp-max-cols}
 \end{table}
 
+\subsection{Comparing sequential and integrated solutions}
+Having seen the effects of different parameters on our methods, we are now ready to compare the sequential and integrated solution quality for our given instances. We could already see during parameter selection that the results of the sequential method can vary quite substantially based on the original E-VSP solution; we will take this into account in our experiments, as we might otherwise provide an overly optimistic view of the performance of our methods. In order to do this, we will consider different sequential solutions which result from reasonable parameter choices. Afterwards, we will take the best sequential solution found and attempt to improve it using our integrated methods. 
+
+\subsubsection{Sequential solution quality}
+For each instance, a number of different sequential scenerios were run based on the parameters discussed before. In particular, tests were run with the following parameters; all different combinations were attempted.
+\begin{itemize}
+  \item Both labeling secondary columns set to $N \in \{ 4, 8, 16 \}$ \todo{tests met 16}, $M \in \{ 4, 8 \}$.
+  \item E-VSP global LS for $R \in \{ 0, 100, 1000 \}$ rounds and 500,000 iterations. 
+\end{itemize}
+On all runs, timeouts of 5 minutes were set for the final ILP solve for both the E-VSP and CSP. The results have been displayed per instance in Figure \ref{fig:seq-solutions}.
+
+\begin{figure}
+  \begin{tikzpicture}
+    \begin{groupplot}[
+        group style={
+          group size=2 by 2,
+          horizontal sep=1.5cm,
+          vertical sep=1.7cm,
+        },
+        width=(\textwidth) / 2,
+        height=5cm, 
+        grid=both,
+        xlabel={Vehicle Cost},
+        ylabel={Overall Cost},
+        title style={yshift=-0.6ex},
+        ticklabel style={/pgf/number format/fixed}
+      ]
+  
+      % --- Plot (1,1)
+      \nextgroupplot[title={\texttt{terschelling}}]
+      \addplot+[only marks, mark=*, mark size=1.6pt]
+        coordinates {
+          (1826.273889, 5744.107222)
+          (1796.563709, 5638.063709)
+          (1795.612319, 5591.028985)
+          (1830.801616, 5791.968282)
+          (1804.078415, 5790.161749)
+          (1791.069477, 5595.736144)
+          (1809.928503, 5757.011836)
+          (1810.193478, 5764.360145)
+          (1790.855055, 5587.938388)
+          (1801.171851, 5639.088518)
+          (1796.956992, 5638.456992)
+          (1796.048452, 5614.215119)
+        };
+  
+      % --- Plot (2,1)
+      \nextgroupplot[title={\texttt{leiden-1-2}}]
+      \addplot+[only marks, mark=square*, mark size=1.6pt]
+        coordinates {
+          (3435.827835, 16440.7445)
+          (3389.500171, 15054.75017)
+          (3364.233268, 14863.73327)
+          (3413.57062, 17167.07062)
+          (3388.918727, 16102.16873)
+          (3367.040049, 15136.62338)
+          (3402.977092, 16106.72709)
+          (3380.194952, 15006.44495)
+          (3363.988524, 14918.73852)
+          (3419.519013, 18309.93568)
+          (3366.001341, 15892.83467)
+          (3363.898077, 14792.64808)
+        };
+  
+      % --- Plot (1,2)
+      \nextgroupplot[title={\texttt{leiden-3-4-14}}]
+      \addplot+[only marks, mark=triangle*, mark size=1.8pt]
+        coordinates {
+          (3766.224348, 16930.30768)
+          (3711.845032, 17100.67837)
+          (3655.395593, 16904.89559)
+          (3781.691366, 17008.44137)
+          (3708.568197, 17246.40153)
+          (3643.75353, 16521.4202)
+          (3766.070871, 17151.4042)
+          (3772.396367, 17269.06303)
+          (3652.916264, 17840.9996)
+          (3734.628466, 17047.29513)
+          (3748.833748, 17376.58375)
+          (3660.790589, 17755.29059)
+        };
+  
+      % --- Plot (2,2)
+      \nextgroupplot[title={\texttt{leiden}}]
+      \addplot+[only marks, mark=diamond*, mark size=1.8pt]
+        coordinates {
+          (6430.078772237068,22438.083333333332)
+          (6370.052879846232,22105.000000000004)
+          (6118.55114164412,21786.500000000007)
+          (6383.714759074799,22067.833333333332)
+          (6348.127006021544,21507.916666666668)
+        };
+    \end{groupplot}
+  \end{tikzpicture}
+  \caption{Sequential solution quality using different E-VSP results}
+  \label{fig:seq-solutions}
+\end{figure}
+
+As we can clearly see, overall solution quality can be greatly influenced by the initial vehicle solution. In the instance \texttt{terschelling} for instance, a 40 euro difference in vehicle costs can result in a 200 euro cost difference overall. In general, we do see that lower vehicle costs tend to imply lower overall costs; this can mostly be attributed to the fact that cheaper vehicle schedules generally also imply less driven hours, which can result in a decrease in the required number of crew working hours. We do however see outliers; in particular in the \texttt{leiden} instance, the largest in our testset. Here, a higher vehicle cost can be incurred in order to reduce overall costs, thereby showing the flaws of the sequential method oncemore. 
 
 \section{Conclusion}
 \subsection{Future work}

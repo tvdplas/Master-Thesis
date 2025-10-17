@@ -329,7 +329,7 @@ namespace E_VCSP_Backend {
 
             Config.VSP_SOLVER_TIMEOUT_SEC = 600;
             Config.CSP_SOLVER_TIMEOUT_SEC = 600;
-            Config.VCSP_SOLVER_TIMEOUT_SEC = 900;
+            Config.VCSP_SOLVER_TIMEOUT_SEC = 600;
             Config.VSP_LB_SEC_COL_ATTEMPTS = 16;
             Config.VSP_LB_SEC_COL_COUNT = 8;
             Config.CSP_LB_SEC_COL_ATTEMPTS = 16;
@@ -496,7 +496,8 @@ namespace E_VCSP_Backend {
 
         void expFindBestSeq() {
             List<string> filepaths = ["../../data/terschelling", "../../data/leiden-1-2", "../../data/leiden-3-4-14", "../../data/leiden"];
-            List<int> Ns = [4, 8];
+            //List<int> Ns = [4, 8];
+            List<int> Ns = [16];
             List<int> Ms = [4, 8];
             Config.VSP_INSTANCES_PER_IT = 20;
             List<int> lsRounds = [0, 100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];

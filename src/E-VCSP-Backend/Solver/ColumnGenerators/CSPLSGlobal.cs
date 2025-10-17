@@ -139,12 +139,19 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
         private (int minStartTime, int maxStartTime, int minEndTime, int maxEndTime)[] DutyTypeTimeframes =
         [
-            (int.MinValue, int.MaxValue, int.MinValue, (int)(16.5 * 60 * 60)), // Early
-            (int.MinValue, int.MaxValue, (int)(16.5 * 60 * 60), (int)(18.25 * 60 * 60)), // Day
-            (13 * 60 * 60, int.MaxValue, int.MinValue, (int)(26.5 * 60 * 60)), // Late
-            (int.MinValue, 24 * 60 * 60, (int)(26.5 * 60 * 60), int.MaxValue), // Night
-            (int.MinValue, 13 * 60 * 60, (int)(18.25 * 60 * 60), int.MaxValue), // Between
-            ((int)(5.5 * 60 * 60), int.MaxValue, int.MinValue, (int)(19.5 * 60 * 60)), // Broken
+            //(int.MinValue, int.MaxValue, int.MinValue, (int)(16.5 * 60 * 60)), // Early
+            //(int.MinValue, int.MaxValue, (int)(16.5 * 60 * 60), (int)(18.25 * 60 * 60)), // Day
+            //(13 * 60 * 60, int.MaxValue, int.MinValue, (int)(26.5 * 60 * 60)), // Late
+            //(int.MinValue, 24 * 60 * 60, (int)(26.5 * 60 * 60), int.MaxValue), // Night
+            //(int.MinValue, 13 * 60 * 60, (int)(18.25 * 60 * 60), int.MaxValue), // Between
+            //((int)(5.5 * 60 * 60), int.MaxValue, int.MinValue, (int)(19.5 * 60 * 60)), // Broken
+
+            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
         ];
 
         private int[] DutyTypeMaxDurations = [
@@ -160,12 +167,19 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (head == null) return (true, 0);
 
             int paidDuration = PaidDuration(dt);
+            int numUncoveredBlocks = 0;
+            CSPLSNode? curr = head;
+            while (curr != null) {
+                if (curr.CDE.Type == CrewDutyElementType.Block && blockDualCosts[((CDEBlock)curr.CDE).Block.Index] > Config.CR_SINGLE_SHIFT_COST) numUncoveredBlocks++;
+                curr = curr.Next;
+            }
 
             double penalty = 0;
             bool feasible = true;
             void applyPenalty(double p) {
+                []
                 feasible = false;
-                penalty += p * penaltyMultiplier;
+                penalty += p * penaltyMultiplier * paidDuration / (10 * numUncoveredBlocks);
             }
 
             if (!head!.CDE.StartLocation.CrewBase) applyPenalty(Config.CSP_LS_G_CREWHUB_PENALTY);
@@ -202,7 +216,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 if (longestIdle != null) longIdle = (longestIdle.CDE.StartTime, longestIdle.CDE.EndTime - longestIdle.CDE.EndTime);
             }
 
-            CSPLSNode? curr = head;
+            curr = head;
             while (curr != null) {
                 CrewDutyElement cde = curr.CDE;
                 if (cde.Type != CrewDutyElementType.Break) {
@@ -282,16 +296,16 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 ) == -1) applyPenalty(Config.CSP_LS_G_BREAK_PENALTY);
             }
 
-            if (feasible) {
-                // subtract the block reduced costs from the penalty
-                curr = head;
-                while (curr != null) {
-                    if (curr.CDE.Type == CrewDutyElementType.Block) {
-                        penalty -= blockDualCosts[((CDEBlock)curr.CDE).Block.Index] * Math.Max(1, penaltyMultiplier);
-                    }
-                    curr = curr.Next;
+            //if (feasible) {
+            // subtract the block reduced costs from the penalty
+            curr = head;
+            while (curr != null) {
+                if (curr.CDE.Type == CrewDutyElementType.Block) {
+                    penalty -= blockDualCosts[((CDEBlock)curr.CDE).Block.Index];
                 }
+                curr = curr.Next;
             }
+            //}
 
             return (feasible, penalty);
         }
