@@ -546,14 +546,14 @@ namespace E_VCSP_Backend {
                             Stopwatch sw = Stopwatch.StartNew();
                             VSPSolver.Solve();
                             sw.Stop();
-                            double elapsedSecsVSP = sw.Elapsed.Seconds;
+                            double elapsedSecsVSP = sw.Elapsed.TotalSeconds;
 
                             css = new(Instance, Block.FromVehicleTasks(vss.SelectedTasks));
                             CSPSolver = new CSPCG(css);
                             sw.Restart();
                             CSPSolver.Solve();
                             sw.Stop();
-                            double elapsedSecsCSP = sw.Elapsed.Seconds;
+                            double elapsedSecsCSP = sw.Elapsed.TotalSeconds;
 
                             Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
                                 $"{filepath};{N};{M};{lsRound};{lsmaxIts};" +
