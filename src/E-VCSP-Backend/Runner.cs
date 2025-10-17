@@ -502,18 +502,20 @@ namespace E_VCSP_Backend {
             List<int> lsRounds = [0, 100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];
             const int lsmaxIts = 5_000_000;
 
-            Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
-                $"instance;sec n;sec m;ls rounds;ls maxIts;" +
-                $"seq vsp value;seq csp value;" +
-                $"seq vsp cols;seq csp cols;" +
-                $"seq vsp selected cols;seq csp selected cols;seq csp selected single;" +
-                $"vsp mipgap;vsp mip runtime;vsp total runtime;" +
-                $"csp mipgap;csp mip runtime;csp total runtime"
-            );
             for (int fpi = 0; fpi < filepaths.Count; fpi++) {
                 string filepath = filepaths[fpi];
                 ActiveFolder = filepath;
-                Reload("filepath", fpi == 0);
+                Reload("FindBestSeq", fpi == 0);
+                if (fpi == 0) {
+                    Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
+                        $"instance;sec n;sec m;ls rounds;ls maxIts;" +
+                        $"seq vsp value;seq csp value;" +
+                        $"seq vsp cols;seq csp cols;" +
+                        $"seq vsp selected cols;seq csp selected cols;seq csp selected single;" +
+                        $"vsp mipgap;vsp mip runtime;vsp total runtime;" +
+                        $"csp mipgap;csp mip runtime;csp total runtime"
+                    );
+                }
 
                 foreach (var N in Ns) {
                     foreach (var M in Ms) {
