@@ -177,7 +177,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
             double penalty = 0;
             bool feasible = true;
             void applyPenalty(double p) {
-                []
+                //[]
                 feasible = false;
                 penalty += p * penaltyMultiplier * paidDuration / (10 * numUncoveredBlocks);
             }
