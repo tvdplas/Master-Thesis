@@ -25,7 +25,7 @@ Abstract
 \section*{Acknowledgements}
 I would first like to thank my academic supervisors Han Hoogeveen, Marcel van Kooten-Niekerk and Philip de Bruin. Their support throughout this process was extremely valuable, providing knowledge of existing techniques in the field, constant feedback on new methods and helping me write a work that I am proud of. All time spent in weekly meetings, reading my work and responding to little messages sharing partial results is appreciated. 
 
-I would also like to thank my internship supervisors Marcel van Kooten-Niekerk and Marc Stikvoort for allowing me to complete this thesis at Qbuzz. Being able to do this work for a major public transport company gave me a lot of additional motivation, especially knowing that these results can actually make a difference for both people working with and using Dutch public transport (although the coffee machine in the Qbuzz office was also a very good motivator). I would in particular like to thank Marcel again, as he further explained the context of my research, gave me tours of locations which normal public transport users never get to see, allowed me to drive a bus at the local depot, and provided instances for me to perform experiments on. Your passion for this subject is contagious, and I would not have been able to complete this project in the same way without your support. 
+I would also like to thank my internship supervisors Marcel van Kooten-Niekerk and Marc Stikvoort for allowing me to complete this thesis at Qbuzz. Being able to do this work for a major public transport company gave me a lot of additional motivation, especially knowing that these results can actually make a difference for both people working with and using Dutch public transport (although the coffee machine in the Qbuzz office was also a very good motivator). Marcel deserves an additional thanks, as he further explained the context of my research, gave me tours of locations which normal public transport users never get to see, allowed me to drive a bus at the local depot, and provided instances for me to perform experiments on. Your passion for this subject is contagious, and I would not have been able to complete this project in the same way without your support. 
 
 Additionally, I would like to thank Jippe, Reinier and Mike for providing me with a good amount of distraction and incredibly fun experience competing in ICPC while working on this project. All those afternoons spent problem-solving helped me stay motivated for this work, and I would personally say the delay in my thesis was worth it to be able to compete in Baku.
 
@@ -1574,23 +1574,42 @@ Lastly for our integrated methods, let us consider the effects of limiting the n
 
 \begin{table}[h]
   \centering
-  \begin{tabular}{crrrrrrrrr}
+  \begin{tabular}{llrrrrr}
     \toprule
-       \textbf{DR} & $|VT^*|$ & $|CD^*|$ & \textbf{VH cost} & \textbf{CR cost} & \textbf{$\Delta$\%} & \multicolumn{1}{c}{$|VT|$} & \multicolumn{1}{c}{$|CD|$} & \textbf{gap \%} & CG time (s) \\
-       \cmidrule(lr){1-1} \cmidrule(lr){2-6} \cmidrule(lr){7-8} \cmidrule(lr){9-10}
-        0   & 11   & 21   & 3615.3 & 12178.2 & -    & 39146   & 11480 & 0 & -    \\
-        1   & 11.0 & 21.0 & 3613.0 & 12178.2 & -0.01 & 45291.9 & 11823.3 & 0 & 106.2  \\
-        2   & 11.0 & 21.0 & 3610.8 & 12151.2 & -0.20 & 49226.7 & 12055.8 & 0 & 206.0  \\
-        3   & 11.0 & 21.0 & 3610.7 & 12178.2 & -0.02 & 51452.2 & 12208.2 & 0 & 306.5  \\
-        4   & 11.1 & 20.9 & 3631.4 & 12125.1 & -0.23 & 52800.0 & 12500.9 & 0 & 408.3  \\
-        5   & 11.0 & 21.0 & 3609.3 & 12134.2 & -0.32 & 55169.1 & 12910.9 & 0 & 526.2  \\
-        6   & 11.0 & 21.0 & 3607.9 & 12133.1 & -0.34 & 56853.5 & 13265.1 & 0 & 638.3  \\
-        7   & 11.0 & 21.1 & 3606.5 & 12144.4 & -0.26 & 58324.4 & 13978.1 & 0 & 764.6  \\
-        \bottomrule
+    && $CD_{max}=500$ & $CD_{max}=2500$ & $CD_{max}=5000$ & $CD_{max}=10000$ & $CD_{max}=25000$  \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \addlinespace[0.4em]
+    \multirow{4}{*}{$VT_{max}=500$} & \textbf{value}  & - & - & -& -& -\\
+    & \textbf{$|VT|$}   & - & - & - & - & - \\
+    & \textbf{$|CD|$} & - & - & - & - & - \\
+    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{4}{*}{$VT_{max}=2500$} & \textbf{value}  & - & - & -& -& -\\
+    & \textbf{$|VT|$}   & - & - & - & - & - \\
+    & \textbf{$|CD|$} & - & - & - & - & - \\
+    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{4}{*}{$VT_{max}=5000$} & \textbf{value}  & - & - & -& -& -\\
+    & \textbf{$|VT|$}   & - & - & - & - & - \\
+    & \textbf{$|CD|$} & - & - & - & - & - \\
+    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{4}{*}{$VT_{max}=10000$} & \textbf{value}  & - & - & -& -& -\\
+    & \textbf{$|VT|$}   & - & - & - & - & - \\
+    & \textbf{$|CD|$} & - & - & - & - & - \\
+    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \multirow{4}{*}{$VT_{max}=25000$} & \textbf{value}  & - & - & -& -& -\\
+    & \textbf{$|VT|$}   & - & - & - & - & - \\
+    & \textbf{$|CD|$} & - & - & - & - & - \\
+    & \textbf{CG time (s)} & - & - & - & - & - \\
+    \arrayrulecolor{black!30}\cmidrule(lr){1-7}
+    \arrayrulecolor{black}\bottomrule
   \end{tabular}
-  \caption{Effects of the maximum number of columns. $\Delta$\% shows solution value difference when compared to the base $DR=0$. Values averaged over 10 runs. }
-  \label{tab:evcsp-max-cols}
+  \caption{Effect of number of rounds and iterations on E-VSP global local search, tested on \texttt{leiden-1-2}. $R$ is number of attempts, $I$ is number operations per round. LS value is best single LS result, ILP value is result after recombination, all avg. of 5 runs. Best solution per category \underline{underlined}.}
+  \label{tab:evsp-ls-global}
 \end{table}
+
 
 \section{Conclusion}
 \subsection{Future work}

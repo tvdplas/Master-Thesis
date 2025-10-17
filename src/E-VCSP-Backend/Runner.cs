@@ -500,7 +500,7 @@ namespace E_VCSP_Backend {
             List<int> Ms = [4, 8];
             Config.VSP_INSTANCES_PER_IT = 20;
             List<int> lsRounds = [0, 100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];
-            const int lsmaxIts = 5_000_000;
+            const int lsmaxIts = 500_000;
 
             for (int fpi = 0; fpi < filepaths.Count; fpi++) {
                 string filepath = filepaths[fpi];
