@@ -36,7 +36,7 @@ namespace E_VCSP_Backend {
             }
         }
 
-        public void Reload(string runDescription = "No Description", bool noNewFolder = false) {
+        public void Reload(string runDescription = "No Description", bool createNewFolder = true) {
             if (ActiveFolder == "No folder selected") return;
 
             Instance = new(ActiveFolder);
@@ -47,7 +47,7 @@ namespace E_VCSP_Backend {
             CSPSolver = new(css);
             IntegratedSolver = new EVCSPCGLagrange(vss, css);
 
-            if (noNewFolder) {
+            if (createNewFolder) {
                 string timestamp = DateTime.Now.ToString("yy-MM-dd-HH.mm.ss");
                 Constants.RUN_LOG_FOLDER = $"./runs/{timestamp} {runDescription}/";
                 Directory.CreateDirectory(Constants.RUN_LOG_FOLDER);
@@ -513,7 +513,7 @@ namespace E_VCSP_Backend {
             for (int fpi = 0; fpi < filepaths.Count; fpi++) {
                 string filepath = filepaths[fpi];
                 ActiveFolder = filepath;
-                Reload("filepath", fpi > 0);
+                Reload("filepath", fpi == 0);
 
                 foreach (var N in Ns) {
                     foreach (var M in Ms) {
