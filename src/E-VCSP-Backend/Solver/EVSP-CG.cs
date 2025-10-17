@@ -121,7 +121,7 @@ namespace E_VCSP.Solver {
 
             // Finalize max vehicle constraint with slack
             // Note: added after trips so trips have easier indexing. 
-            GRBVar vehicleCountSlack = model.AddVar(0, vss.Instance.Trips.Count - Config.MAX_VEHICLES, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
+            GRBVar vehicleCountSlack = model.AddVar(0, GRB.INFINITY, Config.VH_OVER_MAX_COST, GRB.CONTINUOUS, "vehicle_count_slack");
             model.AddConstr(maxVehicles <= Config.MAX_VEHICLES + vehicleCountSlack, Constants.CSTR_MAX_VEHICLES);
 
             this.model = model;
