@@ -567,9 +567,100 @@ namespace E_VCSP_Backend {
                     }
                 }
             }
-
-            void expNothing() { }
-            #endregion
         }
+
+        void expFindBestIntegrated() {
+            const int attempts = 5;
+            Config.VSP_INSTANCES_PER_IT = 20;
+            List<string> filepaths = ["../../data/terschelling", "../../data/leiden-3-4-14", "../../data/leiden-1-2", "../../data/leiden"];
+            //List<int> Ns = [4, 8];
+            List<int> Ns = [16, 4, 16, 16];
+            List<int> Ms = [4, 8, 4, 4];
+            List<int> lsRounds = [100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT, 100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];
+            const int lsmaxIts = 500_000;
+
+            for (int fpi = 0; fpi < filepaths.Count; fpi++) {
+                string filepath = filepaths[fpi];
+                ActiveFolder = filepath;
+                Reload("FindBestInt", fpi == 0);
+                if (fpi == 0) {
+                    Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
+                        $"instance;sec n;sec m;ls rounds;ls maxIts;" +
+                        $"seq vsp value;seq csp value;" +
+                        $"seq vsp cols;seq csp cols;" +
+                        $"seq vsp selected cols;seq csp selected cols;seq csp selected single;" +
+                        $"int vsp value;int csp value;" +
+                        $"int vsp cols;int csp cols;" +
+                        $"int vsp selected cols;int csp selected cols;int csp selected single;" +
+                        $"final mip runtime;total runtime"
+                    );
+                }
+
+                int N = Ns[fpi];
+                int M = Ms[fpi];
+                int lsRound = lsRounds[fpi];
+
+                for (int attempt = 0; attempt < attempts; attempt++) {
+                    Config.VSP_SOLVER_TIMEOUT_SEC = 300;
+                    Config.CSP_SOLVER_TIMEOUT_SEC = 300;
+                    Config.VCSP_SOLVER_TIMEOUT_SEC = 1800;
+                    Config.VSP_LB_SEC_COL_ATTEMPTS = N;
+                    Config.VSP_LB_SEC_COL_COUNT = M;
+                    Config.CSP_LB_SEC_COL_ATTEMPTS = N;
+                    Config.CSP_LB_SEC_COL_COUNT = M;
+                    Config.VSP_LS_G_ITERATIONS = lsmaxIts;
+                    Config.VSP_OPT_IT_THRESHOLD = Math.Max(10, lsRound + 10);
+                    Config.VSP_OPERATION_SEQUENCE = String.Join("", Enumerable.Range(0, lsRound).Select(x => "2"));
+                    Config.VSP_MAX_COL_GEN_ITS = Math.Max(200, lsRound * 2);
+                    Config.CR_SINGLE_SHIFT_COST = 1000;
+                    Config.VCSP_ROUNDS = 15;
+                    Config.LAGRANGE_DISRUPT_ROUNDS = 5;
+                    Config.VCSP_MAX_TASKS_DURING = 100_000;
+                    Config.VCSP_MAX_DUTIES_DURING = 100_000;
+
+                    if (fpi < 3) {
+                        Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
+                        Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
+                    }
+                    else {
+                        Config.CR_MAX_SHORT_IDLE_TIME = 30 * 60;
+                        Config.CR_MAX_BREAK_TIME = 60 * 60;
+                    }
+
+                    vss = new(Instance, Instance.VehicleTypes[0]);
+                    css = new(Instance, []);
+                    IntegratedSolver = new(vss, css);
+                    Stopwatch sw = Stopwatch.StartNew();
+                    IntegratedSolver.Initialize();
+                    sw.Stop();
+                    double seqVSPValue = vss.Costs();
+                    int seqVSPCols = vss.Tasks.Count;
+                    int seqVSPSelectedCols = vss.SelectedTasks.Count;
+                    double seqCSPValue = css.Costs();
+                    int seqCSPCols = css.Duties.Count;
+                    int seqCSPSelectedCols = css.SelectedDuties.Count;
+                    int seqCSPSelectedSingleCols = css.SelectedDuties.Count(x => x.duty.Type == DutyType.Single);
+                    double seqTime = sw.Elapsed.TotalSeconds;
+                    sw.Restart();
+                    IntegratedSolver.Solve();
+                    sw.Stop();
+
+                    Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
+                        $"{filepath};{N};{M};{lsRound};{lsmaxIts};" +
+                        $"{seqVSPValue};{seqCSPValue};" +
+                        $"{seqVSPCols};{seqCSPCols};" +
+                        $"{seqVSPSelectedCols};{seqCSPSelectedCols};{seqCSPSelectedSingleCols};" +
+                        $"{vss.Costs()};{css.Costs()};" +
+                        $"{vss.Tasks.Count};{css.Duties.Count};" +
+                        $"{vss.SelectedTasks.Count};{css.SelectedDuties.Count};{css.SelectedDuties.Count(x => x.duty.Type == DutyType.Single)};" +
+                        $"{IntegratedSolver.model.Runtime};{IntegratedSolver.model.MIPGap};{seqTime};{sw.Elapsed.TotalSeconds}"
+                    );
+                }
+            }
+        }
+
+        void expNothing() { }
+        #endregion
+
     }
 }

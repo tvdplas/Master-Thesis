@@ -9,6 +9,7 @@ using System.Collections;
 
 namespace E_VCSP.Solver {
     public class EVCSPCGLagrange : Solver {
+        public bool Initialized = false;
         public readonly VehicleSolutionState vss;
         public readonly CrewSolutionState css;
         public double initialSolutionQuality = double.PositiveInfinity;
@@ -58,8 +59,10 @@ namespace E_VCSP.Solver {
 
         #region Init
         public void Initialize() {
+            if (Initialized) return;
             initializeCover();
             initializeLagrangeModel();
+            Initialized = true;
         }
 
         public (VehicleSolutionState vss, CrewSolutionState css) initializeCover() {
