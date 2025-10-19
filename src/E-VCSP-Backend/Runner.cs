@@ -635,6 +635,7 @@ namespace E_VCSP_Backend {
                     IntegratedSolver = new(vss, css);
                     IntegratedSolver.Initialize();
                     sw.Stop();
+                    Console.WriteLine(Config.CNSL_OVERRIDE + "retry");
                 } while (vss.Costs() + css.Costs() > targetSeqValues[fpi] + 40);
                 var basevss = vss;
                 var basecss = css;
