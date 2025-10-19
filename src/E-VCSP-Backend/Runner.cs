@@ -580,10 +580,10 @@ namespace E_VCSP_Backend {
             List<double> targetSeqValues = [5561.990504, 16521.4202, 14735.12511, 27831.54337];
             const int lsmaxIts = 500_000;
 
-            for (int fpi = 0; fpi < filepaths.Count; fpi++) {
+            for (int fpi = 3; fpi < filepaths.Count; fpi++) {
                 string filepath = filepaths[fpi];
                 ActiveFolder = filepath;
-                Reload("FindBestInt", fpi == 0);
+                Reload("FindBestInt", fpi == 3);
                 if (fpi == 0) {
                     Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
                         $"instance;sec n;sec m;ls rounds;ls maxIts;" +
@@ -601,8 +601,8 @@ namespace E_VCSP_Backend {
                 int M = Ms[fpi];
                 int lsRound = lsRounds[fpi];
 
-                Config.VSP_SOLVER_TIMEOUT_SEC = 150;
-                Config.CSP_SOLVER_TIMEOUT_SEC = 150;
+                Config.VSP_SOLVER_TIMEOUT_SEC = 300;
+                Config.CSP_SOLVER_TIMEOUT_SEC = 300;
                 Config.VCSP_SOLVER_TIMEOUT_SEC = 1800;
                 Config.VSP_LB_SEC_COL_ATTEMPTS = N;
                 Config.VSP_LB_SEC_COL_COUNT = M;
@@ -626,7 +626,7 @@ namespace E_VCSP_Backend {
                     IntegratedSolver = new(vss, css);
                     IntegratedSolver.Initialize();
                     sw.Stop();
-                } while (vss.Costs() + css.Costs() > targetSeqValues[fpi] + 10);
+                } while (vss.Costs() + css.Costs() > targetSeqValues[fpi] + 50);
                 var basevss = vss;
                 var basecss = css;
                 double seqVSPValue = basevss.Costs();
