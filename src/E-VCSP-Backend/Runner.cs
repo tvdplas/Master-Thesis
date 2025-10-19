@@ -635,7 +635,7 @@ namespace E_VCSP_Backend {
                     IntegratedSolver = new(vss, css);
                     IntegratedSolver.Initialize();
                     sw.Stop();
-                } while (vss.Costs() + css.Costs() > targetSeqValues[fpi] + 25);
+                } while (vss.Costs() + css.Costs() > targetSeqValues[fpi] + 40);
                 var basevss = vss;
                 var basecss = css;
                 double seqVSPValue = basevss.Costs();
@@ -647,7 +647,7 @@ namespace E_VCSP_Backend {
                 int seqCSPSelectedSingleCols = basecss.SelectedDuties.Count(x => x.duty.Type == DutyType.Single);
                 double seqTime = sw.Elapsed.TotalSeconds;
 
-
+                Console.WriteLine(Config.CNSL_OVERRIDE + "Starting attempts");
                 for (int attempt = 0; attempt < attempts; attempt++) {
                     IntegratedSolver = new(new(basevss), new(basecss));
                     sw.Restart();
