@@ -580,11 +580,12 @@ namespace E_VCSP_Backend {
             List<double> targetSeqValues = [5561.990504, 16521.4202, 14735.12511, 27831.54337];
             const int lsmaxIts = 500_000;
 
-            for (int fpi = 3; fpi < filepaths.Count; fpi++) {
+            const int start = 3;
+            for (int fpi = start; fpi < filepaths.Count; fpi++) {
                 string filepath = filepaths[fpi];
                 ActiveFolder = filepath;
                 Reload("FindBestInt", fpi == 3);
-                if (fpi == 0) {
+                if (fpi == start) {
                     Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
                         $"instance;sec n;sec m;ls rounds;ls maxIts;" +
                         $"seq vsp value;seq csp value;" +
@@ -595,6 +596,14 @@ namespace E_VCSP_Backend {
                         $"int vsp selected cols;int csp selected cols;int csp selected single;" +
                         $"final mip runtime;total runtime"
                     );
+                }
+                if (fpi < 3) {
+                    Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
+                    Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
+                }
+                else {
+                    Config.CR_MAX_SHORT_IDLE_TIME = 30 * 60;
+                    Config.CR_MAX_BREAK_TIME = 60 * 60;
                 }
 
                 int N = Ns[fpi];
@@ -626,7 +635,7 @@ namespace E_VCSP_Backend {
                     IntegratedSolver = new(vss, css);
                     IntegratedSolver.Initialize();
                     sw.Stop();
-                } while (vss.Costs() + css.Costs() > targetSeqValues[fpi] + 50);
+                } while (vss.Costs() + css.Costs() > targetSeqValues[fpi] + 25);
                 var basevss = vss;
                 var basecss = css;
                 double seqVSPValue = basevss.Costs();
@@ -640,20 +649,16 @@ namespace E_VCSP_Backend {
 
 
                 for (int attempt = 0; attempt < attempts; attempt++) {
-                    if (fpi < 3) {
-                        Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
-                        Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
-                    }
-                    else {
-                        Config.CR_MAX_SHORT_IDLE_TIME = 30 * 60;
-                        Config.CR_MAX_BREAK_TIME = 60 * 60;
-                    }
-
                     IntegratedSolver = new(new(basevss), new(basecss));
                     sw.Restart();
                     IntegratedSolver.Solve();
                     sw.Stop();
 
+
+                    var basevsscf = basevss.CostFactors();
+                    var basecsscf = basecss.CostFactors();
+                    var vsscf = vss.CostFactors();
+                    var csscf = css.CostFactors();
                     Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
                         $"{filepath};{N};{M};{lsRound};{lsmaxIts};" +
                         $"{seqVSPValue};{seqCSPValue};" +
@@ -662,7 +667,11 @@ namespace E_VCSP_Backend {
                         $"{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
                         $"{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
                         $"{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};{IntegratedSolver.css.SelectedDuties.Count(x => x.duty.Type == DutyType.Single)};" +
-                        $"{IntegratedSolver.model.Runtime};{IntegratedSolver.model.MIPGap};{seqTime};{sw.Elapsed.TotalSeconds}"
+                        $"{IntegratedSolver.model.Runtime};{IntegratedSolver.model.MIPGap};{seqTime};{sw.Elapsed.TotalSeconds};" +
+                        $"{basevsscf.overall};{basevsscf.pullout};{basevsscf.tripdriving};{basevsscf.tripkwh};{basevsscf.dhdriving};{basevsscf.dhkwh};{basevsscf.idlekwh};{basevsscf.batterydeg};" +
+                        $"{vsscf.overall};{vsscf.pullout};{vsscf.tripdriving};{vsscf.tripkwh};{vsscf.dhdriving};{vsscf.dhkwh};{vsscf.idlekwh};{vsscf.batterydeg};" +
+                        $"{basecsscf.countPenalty};{basecsscf.avgPenalty};{basecsscf.longPenalty};{basecsscf.maxBrokenPenalty};{basecsscf.maxBetweenPenalty};{basecsscf.totalPenalty};{basecsscf.workingHours};{basecsscf.blockHours};{basecsscf.blockDrivingHours};{basecsscf.breakHours};" +
+                        $"{csscf.countPenalty};{csscf.avgPenalty};{csscf.longPenalty};{csscf.maxBrokenPenalty};{csscf.maxBetweenPenalty};{csscf.totalPenalty};{csscf.workingHours};{csscf.blockHours};{csscf.blockDrivingHours};{csscf.breakHours};"
                     );
                 }
             }

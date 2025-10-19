@@ -293,7 +293,7 @@ namespace E_VCSP.Solver.SolutionState {
             return SelectedDuties.Sum(x => x.count * x.duty.Cost);
         }
 
-        public void PrintCostBreakdown(
+        public (double countPenalty, double avgPenalty, double longPenalty, double maxBrokenPenalty, double maxBetweenPenalty, double totalPenalty, double workingHours, double blockHours, double blockDrivingHours, double breakHours) CostFactors(
             int countSlack = 0,
             double avgDutySlack = 0,
             double longDutySlack = 0,
@@ -323,6 +323,19 @@ namespace E_VCSP.Solver.SolutionState {
                 if (y is CDEBreak) return y.EndTime - y.StartTime;
                 else return 0;
             })) / 60.0 / 60.0;
+
+            return (countPenalty, avgPenalty, longPenalty, maxBrokenPenalty, maxBetweenPenalty, totalPenalty, workingHours, blockHours, blockDrivingHours, breakHours);
+        }
+
+        public void PrintCostBreakdown(
+            int countSlack = 0,
+            double avgDutySlack = 0,
+            double longDutySlack = 0,
+            double brokenDutySlack = 0,
+            double betweenDutySlack = 0
+        ) {
+            var (countPenalty, avgPenalty, longPenalty, maxBrokenPenalty, maxBetweenPenalty, totalPenalty, workingHours, blockHours, blockDrivingHours, breakHours)
+                = CostFactors(countSlack, avgDutySlack, longDutySlack, brokenDutySlack, betweenDutySlack);
 
             string breakdown =
             $"""

@@ -490,7 +490,7 @@ namespace E_VCSP.Solver.SolutionState {
             return SelectedTasks.Sum(x => x.Cost);
         }
 
-        public void PrintCostBreakdown(int slack = 0) {
+        public (double overall, double pullout, double tripdriving, double tripkwh, double dhdriving, double dhkwh, double idlekwh, double batterydeg) CostFactors() {
             double overallCost = SelectedTasks.Sum(x => x.Cost);
             double pulloutCost = SelectedTasks.Count * Config.VH_PULLOUT_COST;
             double tripDrivingCost = SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Trip ? y.Cost : 0));
@@ -499,6 +499,12 @@ namespace E_VCSP.Solver.SolutionState {
             double dhKWHCost = SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Deadhead ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0));
             double idleKWHCost = SelectedTasks.Sum(x => x.Elements.Sum(y => y.Type == VEType.Idle ? Math.Max(0, y.StartSoCInTask - y.EndSoCInTask) / 100 * VehicleType.Capacity * Constants.KWH_COST : 0)); ;
             double batteryDegCost = overallCost - pulloutCost - tripDrivingCost - tripKWHCost - dhDrivingCost - dhKWHCost - idleKWHCost;
+
+            return (overallCost, pulloutCost, tripDrivingCost, tripKWHCost, dhDrivingCost, dhKWHCost, idleKWHCost, batteryDegCost);
+        }
+
+        public void PrintCostBreakdown(int slack = 0) {
+            var (overallCost, pulloutCost, tripDrivingCost, tripKWHCost, dhDrivingCost, dhKWHCost, idleKWHCost, batteryDegCost) = CostFactors();
 
             string breakdown =
             $"""

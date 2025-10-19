@@ -59,6 +59,7 @@ namespace E_VCSP_Backend {
                 }
 
                 foreach ((string name, Action action) in actions) {
+                    runner.ActiveFolder = args[1];
                     Console.WriteLine(Config.CNSL_OVERRIDE + "Running experiment " + name);
                     Config.GLOBAL_CONSOLE_KILL = true;
                     action();
