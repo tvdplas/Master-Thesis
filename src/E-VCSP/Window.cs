@@ -3,6 +3,7 @@ using E_VCSP.Formatting;
 using E_VCSP.Objects;
 using E_VCSP.Solver.SolutionState;
 using E_VCSP_Backend;
+using E_VCSP_Backend.Formatting;
 using System.Reflection;
 using System.Text.Json;
 
@@ -57,8 +58,8 @@ namespace E_VCSP {
             Panel scrollablePanel = new() {
                 AutoScroll = true,
                 BorderStyle = BorderStyle.FixedSingle,
-                Location = new System.Drawing.Point(10, 135),
-                Size = new System.Drawing.Size(280, 405),
+                Location = new System.Drawing.Point(10, 165),
+                Size = new System.Drawing.Size(280, 375),
                 Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom,
                 Padding = new Padding(0, 0, 0, 100),
             };
@@ -159,9 +160,13 @@ namespace E_VCSP {
             bool success = await Task.Run(runner.VSPFromInstance);
             if (success) {
                 view = 0;
-                rd.UpdateRosterNodes(
-                    SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks)
-                );
+                Roster r = new() {
+                    RosterNodes = SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks),
+                    Type = 0,
+                    Comment = runner.vss.CostFactors().ToString()
+                };
+
+                rd.ChangeRoster(r);
                 solveCSPButton.Enabled = true;
             }
 
@@ -177,7 +182,12 @@ namespace E_VCSP {
 
             if (success) {
                 view = 2;
-                rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(runner.css!.SelectedDuties));
+                Roster r = new() {
+                    RosterNodes = SolutionGraph.GenerateCrewDutyGraph(runner.css!.SelectedDuties),
+                    Type = 2,
+                    Comment = runner.css.CostFactors().ToString()
+                };
+                rd.ChangeRoster(r);
             }
 
             solveVSPButton.Enabled = true;
@@ -193,7 +203,11 @@ namespace E_VCSP {
             bool success = await Task.Run(runner.VCSPFromInstance);
             if (success) {
                 view = 0;
-                rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks));
+                Roster r = new() {
+                    RosterNodes = SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks),
+                    Type = 0,
+                    Comment = runner.vss.CostFactors().ToString()
+                };
             }
 
             solveVSPButton.Enabled = true;
@@ -214,7 +228,12 @@ namespace E_VCSP {
             else if (view == 2 && runner.css != null && runner.css.SelectedDuties.Count > 0)
                 newNodes = SolutionGraph.GenerateCrewDutyGraph(runner.css.SelectedDuties);
 
-            rd.UpdateRosterNodes(newNodes);
+            Roster r = new() {
+                RosterNodes = newNodes,
+                Type = view,
+                Comment = "Cycled",
+            };
+            rd.ChangeRoster(r);
         }
 
         private void loadEVSPResultClick(object sender, EventArgs e) {
@@ -230,7 +249,11 @@ namespace E_VCSP {
                 runner.vss = new(runner.Instance!, runner.Instance!.VehicleTypes[0]);
                 runner.vss.LoadFromDump(dump);
                 view = 0;
-                rd.UpdateRosterNodes(SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks));
+                Roster r = new() {
+                    RosterNodes = SolutionGraph.GenerateVehicleTaskGraph(runner.vss!.SelectedTasks),
+                    Type = 0,
+                    Comment = runner.vss.CostFactors().ToString()
+                };
                 viewToggleButton.Enabled = true;
                 solveCSPButton.Enabled = true;
                 Console.WriteLine("Loaded " + loadResultDialog.FileName);
@@ -250,10 +273,37 @@ namespace E_VCSP {
                 runner.css = new(runner.Instance!, []);
                 runner.css.LoadFromDump(dump);
                 view = 2;
-                rd.UpdateRosterNodes(SolutionGraph.GenerateCrewDutyGraph(runner.css!.SelectedDuties));
+                Roster r = new() {
+                    RosterNodes = SolutionGraph.GenerateCrewDutyGraph(runner.css!.SelectedDuties),
+                    Type = 2,
+                    Comment = runner.css.CostFactors().ToString()
+                };
                 viewToggleButton.Enabled = true;
                 solveCSPButton.Enabled = true;
                 Console.WriteLine("Loaded " + loadResultDialog.FileName);
+            }
+        }
+
+        private void loadRosterButtonClick(object sender, EventArgs e) {
+            var res = loadResultDialog.ShowDialog();
+            if (res == DialogResult.OK) {
+                Console.WriteLine("Starting loading roster " + loadResultDialog.FileName);
+                var dump = JsonSerializer.Deserialize<Roster>(File.ReadAllText(loadResultDialog.FileName), new JsonSerializerOptions());
+                if (dump == null) throw new InvalidDataException("Dump not valid");
+                rd.ChangeRoster(dump);
+            }
+        }
+
+        private void dumpRosterButtonClick(object sender, EventArgs e) {
+            if (Constants.RUN_LOG_FOLDER == "") {
+                Console.WriteLine("Could not be dumped; no run log folder set");
+                return;
+            }
+
+            for (int i = 0; i < 3; i++) {
+                rd.Roster.Dump(Constants.RUN_LOG_FOLDER + "roster-dump");
+                Console.WriteLine("Dumped view " + view);
+                toggleGraphView(null, null);
             }
         }
     }

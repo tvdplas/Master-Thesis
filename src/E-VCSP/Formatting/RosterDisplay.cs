@@ -1,17 +1,6 @@
 ﻿using E_VCSP.Formatting;
+using E_VCSP_Backend.Formatting;
 using System.Drawing.Drawing2D;
-public class RosterNode {
-    public required int StartTime;
-    public required int EndTime;
-    public required string Content;
-    public required Color Color;
-
-    public string DisplayContent {
-        get {
-            return $"{Content}\n{Time.HHMMSS(StartTime)}-{Time.HHMMSS(EndTime)}";
-        }
-    }
-}
 
 public class RosterDisplay : Control {
     private float _zoom = 1.0f;
@@ -41,20 +30,20 @@ public class RosterDisplay : Control {
     private PointF _mouseDownPoint;
     private PointF _panStart;
 
-    private List<List<RosterNode>> rosterNodes = [];
+    public Roster Roster = new();
 
     private float rx(float x) => x * _horizontalZoom;
 
     public void ResetView(bool resetPan = true) {
-        if (rosterNodes.Any() && resetPan)
-            _panOffset = new PointF(-rosterNodes.Min(x => x.Min(y => y.StartTime * _zoom * _horizontalZoom)), 0);
+        if (Roster.RosterNodes.Any() && resetPan)
+            _panOffset = new PointF(-Roster.RosterNodes.Min(x => x.Min(y => y.StartTime * _zoom * _horizontalZoom)), 0);
 
         this.Invalidate();
     }
 
-    public void UpdateRosterNodes(List<List<RosterNode>> rosterNodes) {
-        bool resetPan = !this.rosterNodes.Any() && rosterNodes.Any();
-        this.rosterNodes = rosterNodes;
+    public void ChangeRoster(Roster roster) {
+        bool resetPan = !this.Roster.RosterNodes.Any() && roster.RosterNodes.Any();
+        this.Roster = roster;
 
         ResetView(resetPan);
     }
@@ -77,33 +66,33 @@ public class RosterDisplay : Control {
         g.TranslateTransform(_panOffset.X, _panOffset.Y);
         g.ScaleTransform(_zoom, _zoom);
 
-        if (!rosterNodes.Any()) {
+        if (!Roster.RosterNodes.Any()) {
             g.DrawString("No data available", clockFont, Brushes.Black, new PointF(10, 10));
             return;
         }
 
         // Draw time lines at top
-        int minTime = rosterNodes.Min(x => x.Min(y => y.StartTime));
-        int maxTime = rosterNodes.Max(x => x.Max(y => y.EndTime));
+        int minTime = Roster.RosterNodes.Min(x => x.Min(y => y.StartTime));
+        int maxTime = Roster.RosterNodes.Max(x => x.Max(y => y.EndTime));
 
         int startHour = minTime / 3600;
         int endHour = maxTime / 3600 + 1; // Klopt niet helemaal maar goed
 
         for (int i = startHour; i <= endHour; i++) {
             int x = i * 3600;
-            g.DrawLine(new Pen(Color.DarkGray, 4), rx(x), -100, rx(x), rosterNodes.Count * (RowHeight + RowMargin));
-            g.DrawLine(new Pen(Color.LightGray, 4), rx(x + 900), -100, rx(x + 900), rosterNodes.Count * (RowHeight + RowMargin));
-            g.DrawLine(new Pen(Color.LightGray, 4), rx(x + 1800), -100, rx(x + 1800), rosterNodes.Count * (RowHeight + RowMargin));
-            g.DrawLine(new Pen(Color.LightGray, 4), rx(x + 2700), -100, rx(x + 2700), rosterNodes.Count * (RowHeight + RowMargin));
+            g.DrawLine(new Pen(Color.DarkGray, 4), rx(x), -100, rx(x), Roster.RosterNodes.Count * (RowHeight + RowMargin));
+            g.DrawLine(new Pen(Color.LightGray, 4), rx(x + 900), -100, rx(x + 900), Roster.RosterNodes.Count * (RowHeight + RowMargin));
+            g.DrawLine(new Pen(Color.LightGray, 4), rx(x + 1800), -100, rx(x + 1800), Roster.RosterNodes.Count * (RowHeight + RowMargin));
+            g.DrawLine(new Pen(Color.LightGray, 4), rx(x + 2700), -100, rx(x + 2700), Roster.RosterNodes.Count * (RowHeight + RowMargin));
             g.DrawString(Time.HHMMSS(x), clockFont, Brushes.Black, new PointF(rx(x + 10), -90));
         }
 
         // Sort nodes by color, draw all rectangles in single call, add text afterwards
-        Dictionary<Color, List<RectangleF>> bufferedRectangles = new();
+        Dictionary<string, List<RectangleF>> bufferedRectangles = new();
         List<(PointF p, string s, Font f)> bufferedText = new();
 
-        for (int row = 0; row < rosterNodes.Count; row++) {
-            foreach (var node in rosterNodes[row]) {
+        for (int row = 0; row < Roster.RosterNodes.Count; row++) {
+            foreach (var node in Roster.RosterNodes[row]) {
                 float width = rx(node.EndTime - node.StartTime);
                 if (width <= 1) continue;
 
@@ -112,8 +101,8 @@ public class RosterDisplay : Control {
                 RectangleF rf = new RectangleF(left, top, width, RowHeight);
                 if (!g.IsVisible(rf)) continue;
 
-                if (bufferedRectangles.ContainsKey(node.Color)) bufferedRectangles[node.Color].Add(rf);
-                else bufferedRectangles[node.Color] = [rf];
+                if (bufferedRectangles.ContainsKey(node.ColorHex)) bufferedRectangles[node.ColorHex].Add(rf);
+                else bufferedRectangles[node.ColorHex] = [rf];
 
                 if (_zoom < 0.5f) continue; // Don't draw text if zoomed out too far
                 for (int i = fontOptions.Count - 1; i >= 0; i--) {
@@ -132,7 +121,7 @@ public class RosterDisplay : Control {
             }
 
             foreach (var kvp in bufferedRectangles) {
-                g.FillRectangles(new SolidBrush(kvp.Key), kvp.Value.ToArray());
+                g.FillRectangles(new SolidBrush(System.Drawing.ColorTranslator.FromHtml(kvp.Key)), kvp.Value.ToArray());
                 g.DrawRectangles(new Pen(Color.Black, borderWidth), kvp.Value.ToArray());
             }
             foreach (var (p, s, f) in bufferedText) {

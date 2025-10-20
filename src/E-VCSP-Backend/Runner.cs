@@ -1,8 +1,10 @@
 ﻿using E_VCSP;
+using E_VCSP.Formatting;
 using E_VCSP.Objects;
 using E_VCSP.Objects.ParsedData;
 using E_VCSP.Solver;
 using E_VCSP.Solver.SolutionState;
+using E_VCSP_Backend.Formatting;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -36,6 +38,14 @@ namespace E_VCSP_Backend {
             }
         }
 
+        public void CreateLogFolder(string description) {
+            string timestamp = DateTime.Now.ToString("yy-MM-dd-HH.mm.ss");
+            Constants.RUN_LOG_FOLDER = $"./runs/{timestamp} {description}/";
+            Directory.CreateDirectory(Constants.RUN_LOG_FOLDER);
+            Config.Dump();
+            Console.WriteLine($"Instance reloaded. Current config state dumped to {Constants.RUN_LOG_FOLDER + "config.txt"}");
+        }
+
         public void Reload(string runDescription = "No Description", bool createNewFolder = true) {
             if (ActiveFolder == "No folder selected") return;
 
@@ -47,13 +57,7 @@ namespace E_VCSP_Backend {
             CSPSolver = new(css);
             IntegratedSolver = new EVCSPCGLagrange(vss, css);
 
-            if (createNewFolder) {
-                string timestamp = DateTime.Now.ToString("yy-MM-dd-HH.mm.ss");
-                Constants.RUN_LOG_FOLDER = $"./runs/{timestamp} {runDescription}/";
-                Directory.CreateDirectory(Constants.RUN_LOG_FOLDER);
-                Config.Dump();
-                Console.WriteLine($"Instance reloaded. Current config state dumped to {Constants.RUN_LOG_FOLDER + "config.txt"}");
-            }
+            if (createNewFolder) CreateLogFolder(runDescription);
         }
 
         public bool VSPFromInstance() {
@@ -496,11 +500,10 @@ namespace E_VCSP_Backend {
 
         void expFindBestSeq() {
             List<string> filepaths = ["../../data/terschelling", "../../data/leiden-1-2", "../../data/leiden-3-4-14", "../../data/leiden"];
-            //List<int> Ns = [4, 8];
-            List<int> Ns = [16];
+            List<int> Ns = [4, 8, 16];
             List<int> Ms = [4, 8];
             Config.VSP_INSTANCES_PER_IT = 20;
-            List<int> lsRounds = [0, 100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];
+            List<int> lsRounds = [100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];
             const int lsmaxIts = 500_000;
 
             for (int fpi = 0; fpi < filepaths.Count; fpi++) {
@@ -570,33 +573,53 @@ namespace E_VCSP_Backend {
         }
 
         void expFindBestIntegrated() {
-            const int attempts = 5;
-            Config.VSP_INSTANCES_PER_IT = 20;
+            CreateLogFolder("Best seq-int");
+            Directory.CreateDirectory(Constants.RUN_LOG_FOLDER + "rosters/seq");
+            Directory.CreateDirectory(Constants.RUN_LOG_FOLDER + "rosters/int");
+            string seqFile = Constants.RUN_LOG_FOLDER + "seq-raw-data.csv";
+            string intFile = Constants.RUN_LOG_FOLDER + "int-raw-data.csv";
+            void writeToSeq(string s) => File.AppendAllText(seqFile, s + "\n");
+            void writeToInt(string s) => File.AppendAllText(intFile, s + "\n");
+            writeToSeq("instance;sec n;sec m;ls rounds;ls maxIts;" +
+                $"seq vsp cols;seq csp cols;" +
+                $"seq vsp selected cols;seq csp selected cols;seq csp selected single;" +
+                $"seq vsp value;seq csp value;" +
+                $"seq vsp pullout;seq vsp tripdriving;seq vsp tripkwh;seq vsp dhdriving;seq vsp dhkwh;seq vsp idlekwh;seq vsp batterydeg;" +
+                $"seq csp blockhours;seq csp blockdrivinghours;seq csp breakhours;" +
+                $"seq vsp mip runtime;seq vsp mip gap;seq vsp runtime;" +
+                $"seq csp mip runtime;seq csp mip gap;seq csp runtime"
+            );
+            writeToInt("instance;sec n;sec m;ls rounds;ls maxIts;" +
+                $"int vsp cols;int csp cols;" +
+                $"int vsp selected cols;int csp selected cols;int csp selected single;" +
+                $"int vsp value;int csp value;" +
+                $"int vsp pullout;int vsp tripdriving;int vsp tripkwh;int vsp dhdriving;int vsp dhkwh;int vsp idlekwh;int vsp batterydeg;" +
+                $"int csp blockhours;int csp blockdrivinghours;int csp breakhours;" +
+                $"int mip runtime;int mip gap;int total runtime"
+            );
+            Stopwatch sw = new();
+
+            Console.WriteLine(Config.CNSL_OVERRIDE + "Starting best seq-int experiment; writing results to " + seqFile + " and " + intFile);
+            Console.WriteLine(Config.CNSL_OVERRIDE + "Experiment updates are written to this file.");
+
             List<string> filepaths = ["../../data/terschelling", "../../data/leiden-3-4-14", "../../data/leiden-1-2", "../../data/leiden"];
-            //List<int> Ns = [4, 8];
-            List<int> Ns = [16, 4, 16, 16];
-            List<int> Ms = [4, 8, 4, 4];
-            List<int> lsRounds = [100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT, 100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];
-            List<double> targetSeqValues = [5561.990504, 16521.4202, 14735.12511, 27831.54337];
+
+            // Param sets 
+            List<int> Ns = [4, 8, 16];
+            List<int> Ms = [4, 8];
+            Config.VSP_INSTANCES_PER_IT = 20;
+            List<int> lsRounds = [0, 100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];
             const int lsmaxIts = 500_000;
 
-            const int start = 3;
-            for (int fpi = start; fpi < filepaths.Count; fpi++) {
+            // Total number times integrated is attempted using seq solution
+            const int integratedAttempts = 5;
+
+            List<(VehicleSolutionState vss, CrewSolutionState css, int N, int M, int lsRounds)> bestSequentialSolutions = [];
+
+            for (int fpi = 0; fpi < filepaths.Count; fpi++) {
                 string filepath = filepaths[fpi];
                 ActiveFolder = filepath;
-                Reload("FindBestInt", fpi == 3);
-                if (fpi == start) {
-                    Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
-                        $"instance;sec n;sec m;ls rounds;ls maxIts;" +
-                        $"seq vsp value;seq csp value;" +
-                        $"seq vsp cols;seq csp cols;" +
-                        $"seq vsp selected cols;seq csp selected cols;seq csp selected single;" +
-                        $"int vsp value;int csp value;" +
-                        $"int vsp cols;int csp cols;" +
-                        $"int vsp selected cols;int csp selected cols;int csp selected single;" +
-                        $"final mip runtime;total runtime"
-                    );
-                }
+
                 if (fpi < 3) {
                     Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
                     Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
@@ -605,75 +628,150 @@ namespace E_VCSP_Backend {
                     Config.CR_MAX_SHORT_IDLE_TIME = 30 * 60;
                     Config.CR_MAX_BREAK_TIME = 60 * 60;
                 }
+                Reload("FindBestInt" + filepath, false);
+                Console.WriteLine(Config.CNSL_OVERRIDE + "Starting sequential rounds for " + filepath);
+                foreach (var N in Ns) {
+                    foreach (var M in Ms) {
+                        foreach (var lsRound in lsRounds) {
+                            Config.VSP_SOLVER_TIMEOUT_SEC = 300;
+                            Config.CSP_SOLVER_TIMEOUT_SEC = 300;
+                            Config.VSP_LB_SEC_COL_ATTEMPTS = N;
+                            Config.VSP_LB_SEC_COL_COUNT = M;
+                            Config.CSP_LB_SEC_COL_ATTEMPTS = N;
+                            Config.CSP_LB_SEC_COL_COUNT = M;
+                            Config.VSP_LS_G_ITERATIONS = lsmaxIts;
+                            Config.VSP_OPT_IT_THRESHOLD = Math.Max(10, lsRound + 10);
+                            Config.VSP_OPERATION_SEQUENCE = String.Join("", Enumerable.Range(0, lsRound).Select(x => "2"));
+                            Config.VSP_MAX_COL_GEN_ITS = Math.Max(1000, lsRound * 2);
+                            Config.CSP_MAX_COL_GEN_ITS = 1000;
+                            Config.CR_SINGLE_SHIFT_COST = 1000;
 
-                int N = Ns[fpi];
-                int M = Ms[fpi];
-                int lsRound = lsRounds[fpi];
+                            vss = new(Instance!, Instance!.VehicleTypes[0]);
+                            VSPSolver = new EVSPCG(vss);
+                            sw.Restart();
+                            VSPSolver.Solve();
+                            sw.Stop();
+                            double elapsedSecsVSP = sw.Elapsed.TotalSeconds;
 
-                Config.VSP_SOLVER_TIMEOUT_SEC = 300;
-                Config.CSP_SOLVER_TIMEOUT_SEC = 300;
-                Config.VCSP_SOLVER_TIMEOUT_SEC = 1800;
-                Config.VSP_LB_SEC_COL_ATTEMPTS = N;
-                Config.VSP_LB_SEC_COL_COUNT = M;
-                Config.CSP_LB_SEC_COL_ATTEMPTS = N;
-                Config.CSP_LB_SEC_COL_COUNT = M;
-                Config.VSP_LS_G_ITERATIONS = lsmaxIts;
-                Config.VSP_OPT_IT_THRESHOLD = Math.Max(10, lsRound + 10);
-                Config.VSP_OPERATION_SEQUENCE = String.Join("", Enumerable.Range(0, lsRound).Select(x => "2"));
-                Config.VSP_MAX_COL_GEN_ITS = Math.Max(200, lsRound * 2);
-                Config.CR_SINGLE_SHIFT_COST = 1000;
-                Config.VCSP_ROUNDS = 15;
-                Config.LAGRANGE_DISRUPT_ROUNDS = 5;
-                Config.VCSP_MAX_TASKS_DURING = 100_000;
-                Config.VCSP_MAX_DUTIES_DURING = 100_000;
+                            css = new(Instance, Block.FromVehicleTasks(vss.SelectedTasks));
+                            CSPSolver = new CSPCG(css);
+                            sw.Restart();
+                            CSPSolver.Solve();
+                            sw.Stop();
+                            double elapsedSecsCSP = sw.Elapsed.TotalSeconds;
+                            Console.WriteLine(Config.CNSL_OVERRIDE + $"Finished seq round {filepath};{N};{M};{lsRound};{lsmaxIts}: {vss.Costs()} + {css.Costs()} = {vss.Costs() + css.Costs()}");
 
-                Stopwatch sw = Stopwatch.StartNew();
-                do {
-                    sw.Restart();
-                    vss = new(Instance, Instance.VehicleTypes[0]);
-                    css = new(Instance, []);
-                    IntegratedSolver = new(vss, css);
-                    IntegratedSolver.Initialize();
-                    sw.Stop();
-                    Console.WriteLine(Config.CNSL_OVERRIDE + "retry");
-                } while (vss.Costs() + css.Costs() > targetSeqValues[fpi] + 40);
-                var basevss = vss;
-                var basecss = css;
-                double seqVSPValue = basevss.Costs();
-                int seqVSPCols = basevss.Tasks.Count;
-                int seqVSPSelectedCols = basevss.SelectedTasks.Count;
-                double seqCSPValue = basecss.Costs();
-                int seqCSPCols = basecss.Duties.Count;
-                int seqCSPSelectedCols = basecss.SelectedDuties.Count;
-                int seqCSPSelectedSingleCols = basecss.SelectedDuties.Count(x => x.duty.Type == DutyType.Single);
-                double seqTime = sw.Elapsed.TotalSeconds;
+                            // Write sequential result to disk
+                            var vsscf = vss.CostFactors();
+                            var csscf = css.CostFactors();
+                            writeToSeq($"{filepath};{N};{M};{lsRound};{lsmaxIts};" +
+                                $"{vss.Tasks.Count};{css.Duties.Count};" +
+                                $"{vss.SelectedTasks.Count};{css.SelectedDuties.Count};{css.SelectedDuties.Count(x => x.duty.Type == DutyType.Single)};" +
+                                $"{vss.Costs()};{css.Costs()};" +
+                                $"{vsscf.pullout};{vsscf.tripdriving};{vsscf.tripkwh};{vsscf.dhdriving};{vsscf.dhkwh};{vsscf.idlekwh};{vsscf.batterydeg};" +
+                                $"{csscf.blockHours};{csscf.blockDrivingHours};{csscf.breakHours};" +
+                                $"{VSPSolver.model.Runtime};{VSPSolver.model.MIPGap};{elapsedSecsVSP};" +
+                                $"{CSPSolver.model.Runtime};{CSPSolver.model.MIPGap};{elapsedSecsCSP}"
+                            );
 
-                Console.WriteLine(Config.CNSL_OVERRIDE + "Starting attempts");
-                for (int attempt = 0; attempt < attempts; attempt++) {
-                    IntegratedSolver = new(new(basevss), new(basecss));
+                            // Save best vss/css for integrated runs in memory; Only dump rosternode views to files
+                            if (bestSequentialSolutions.Count == fpi) {
+                                bestSequentialSolutions.Add((new(vss), new(css), N, M, lsRound));
+                            }
+                            else if (vss.Costs() + css.Costs() < bestSequentialSolutions[fpi].vss.Costs() + bestSequentialSolutions[fpi].css.Costs()) {
+                                bestSequentialSolutions[fpi] = (new(vss), new(css), N, M, lsRound);
+                            }
+
+                            Roster vhRoster = new() {
+                                Comment = vss.CostFactors().ToString(),
+                                RosterNodes = SolutionGraph.GenerateVehicleTaskGraph(vss.SelectedTasks),
+                                Type = 0
+                            };
+                            Roster blockRoster = new() {
+                                Comment = "Blocks based on vehicle tasks; " + vss.CostFactors().ToString(),
+                                RosterNodes = SolutionGraph.GenerateBlockGraph(vss.SelectedTasks.Select(Block.FromVehicleTask).ToList()),
+                                Type = 1
+                            };
+                            Roster crRoster = new() {
+                                Comment = css.CostFactors().ToString(),
+                                RosterNodes = SolutionGraph.GenerateCrewDutyGraph(css.SelectedDuties),
+                                Type = 2
+                            };
+
+                            string instanceName = $"{filepath.Split("/")[^1]}-n{N}-m{M}-lsr{lsRound}";
+                            vhRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/seq/{instanceName}");
+                            blockRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/seq/{instanceName}");
+                            crRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/seq/{instanceName}");
+                        }
+                    }
+                }
+
+                var bestSeqSol = bestSequentialSolutions[fpi];
+
+                Console.WriteLine(Config.CNSL_OVERRIDE + "Starting integrated attempts");
+                Console.WriteLine(Config.CNSL_OVERRIDE + $"Loading sequential solution with value {bestSeqSol.vss.Costs()} + {bestSeqSol.css.Costs()} = {bestSeqSol.vss.Costs() + bestSeqSol.css.Costs()}");
+                for (int attempt = 0; attempt < integratedAttempts; attempt++) {
+                    Config.VSP_SOLVER_TIMEOUT_SEC = 300;
+                    Config.CSP_SOLVER_TIMEOUT_SEC = 300;
+                    Config.VSP_LB_SEC_COL_ATTEMPTS = bestSeqSol.N;
+                    Config.VSP_LB_SEC_COL_COUNT = bestSeqSol.M;
+                    Config.CSP_LB_SEC_COL_ATTEMPTS = bestSeqSol.N;
+                    Config.CSP_LB_SEC_COL_COUNT = bestSeqSol.M;
+                    Config.VSP_LS_G_ITERATIONS = lsmaxIts;
+                    Config.VSP_OPT_IT_THRESHOLD = Math.Max(10, bestSeqSol.lsRounds + 10);
+                    Config.VSP_OPERATION_SEQUENCE = String.Join("", Enumerable.Range(0, bestSeqSol.lsRounds).Select(x => "2"));
+                    Config.VSP_MAX_COL_GEN_ITS = Math.Max(1000, bestSeqSol.lsRounds * 2);
+                    Config.CSP_MAX_COL_GEN_ITS = 1000;
+                    Config.CR_SINGLE_SHIFT_COST = 1000;
+                    Config.VCSP_SOLVER_TIMEOUT_SEC = 1800;
+                    Config.VCSP_MAX_TASKS_DURING = 100_000;
+                    Config.VCSP_MAX_DUTIES_DURING = 100_000;
+                    Config.VCSP_ROUNDS = 15;
+                    Config.LAGRANGE_DISRUPT_ROUNDS = 5;
+
+                    VehicleSolutionState intvss = new(bestSeqSol.vss);
+                    CrewSolutionState intcss = new(bestSeqSol.css);
+
+                    IntegratedSolver = new(intvss, intcss);
                     sw.Restart();
                     IntegratedSolver.Solve();
                     sw.Stop();
 
+                    Console.WriteLine(Config.CNSL_OVERRIDE + $"Finished int round {filepath};{bestSeqSol.N};{bestSeqSol.M};{bestSeqSol.lsRounds};{lsmaxIts}: {IntegratedSolver.vss.Costs()} + {IntegratedSolver.css.Costs()} = {IntegratedSolver.vss.Costs() + IntegratedSolver.css.Costs()}");
 
-                    var basevsscf = basevss.CostFactors();
-                    var basecsscf = basecss.CostFactors();
-                    var vsscf = vss.CostFactors();
-                    var csscf = css.CostFactors();
-                    Console.WriteLine($"{Config.CNSL_OVERRIDE}" +
-                        $"{filepath};{N};{M};{lsRound};{lsmaxIts};" +
-                        $"{seqVSPValue};{seqCSPValue};" +
-                        $"{seqVSPCols};{seqCSPCols};" +
-                        $"{seqVSPSelectedCols};{seqCSPSelectedCols};{seqCSPSelectedSingleCols};" +
-                        $"{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
+
+                    var vsscf = IntegratedSolver.vss.CostFactors();
+                    var csscf = IntegratedSolver.css.CostFactors();
+                    writeToInt($"{filepath};{bestSeqSol.N};{bestSeqSol.M};{bestSeqSol.lsRounds};{lsmaxIts};" +
                         $"{IntegratedSolver.vss.Tasks.Count};{IntegratedSolver.css.Duties.Count};" +
                         $"{IntegratedSolver.vss.SelectedTasks.Count};{IntegratedSolver.css.SelectedDuties.Count};{IntegratedSolver.css.SelectedDuties.Count(x => x.duty.Type == DutyType.Single)};" +
-                        $"{IntegratedSolver.model.Runtime};{IntegratedSolver.model.MIPGap};{seqTime};{sw.Elapsed.TotalSeconds};" +
-                        $"{basevsscf.overall};{basevsscf.pullout};{basevsscf.tripdriving};{basevsscf.tripkwh};{basevsscf.dhdriving};{basevsscf.dhkwh};{basevsscf.idlekwh};{basevsscf.batterydeg};" +
-                        $"{vsscf.overall};{vsscf.pullout};{vsscf.tripdriving};{vsscf.tripkwh};{vsscf.dhdriving};{vsscf.dhkwh};{vsscf.idlekwh};{vsscf.batterydeg};" +
-                        $"{basecsscf.countPenalty};{basecsscf.avgPenalty};{basecsscf.longPenalty};{basecsscf.maxBrokenPenalty};{basecsscf.maxBetweenPenalty};{basecsscf.totalPenalty};{basecsscf.workingHours};{basecsscf.blockHours};{basecsscf.blockDrivingHours};{basecsscf.breakHours};" +
-                        $"{csscf.countPenalty};{csscf.avgPenalty};{csscf.longPenalty};{csscf.maxBrokenPenalty};{csscf.maxBetweenPenalty};{csscf.totalPenalty};{csscf.workingHours};{csscf.blockHours};{csscf.blockDrivingHours};{csscf.breakHours};"
+                        $"{IntegratedSolver.vss.Costs()};{IntegratedSolver.css.Costs()};" +
+                        $"{vsscf.pullout};{vsscf.tripdriving};{vsscf.tripkwh};{vsscf.dhdriving};{vsscf.dhkwh};{vsscf.idlekwh};{vsscf.batterydeg};" +
+                        $"{csscf.blockHours};{csscf.blockDrivingHours};{csscf.breakHours};" +
+                        $"{IntegratedSolver.model.Runtime};{IntegratedSolver.model.MIPGap};{sw.Elapsed.TotalSeconds}"
                     );
+
+                    Roster vhRoster = new() {
+                        Comment = intvss.CostFactors().ToString(),
+                        RosterNodes = SolutionGraph.GenerateVehicleTaskGraph(intvss.SelectedTasks),
+                        Type = 0
+                    };
+                    Roster blockRoster = new() {
+                        Comment = "Blocks based on vehicle tasks; " + intvss.CostFactors().ToString(),
+                        RosterNodes = SolutionGraph.GenerateBlockGraph(intvss.SelectedTasks.Select(Block.FromVehicleTask).ToList()),
+                        Type = 1
+                    };
+                    Roster crRoster = new() {
+                        Comment = intcss.CostFactors().ToString(),
+                        RosterNodes = SolutionGraph.GenerateCrewDutyGraph(intcss.SelectedDuties),
+                        Type = 2
+                    };
+
+                    string instanceName = $"{filepath.Split("/")[^1]}-n{bestSeqSol.N}-m{bestSeqSol.M}-lsr{bestSeqSol.lsRounds}-a{attempt}";
+                    vhRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/int/{instanceName}");
+                    blockRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/int/{instanceName}");
+                    crRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/int/{instanceName}");
+
                 }
             }
         }

@@ -191,12 +191,12 @@ namespace E_VCSP.Solver {
                 if (selectedMethod.Count > 1) {
                     Parallel.For(0, selectedMethod.Count, (i) => {
                         selectedMethod[i].UpdateDualCosts(tripDualCosts, [], []);
-                        generatedTasks.Add(selectedMethod[i].GenerateVehicleTasks());
+                        generatedTasks.Add(selectedMethod[i].GenerateVehicleTasks() ?? []);
                     });
                 }
                 else {
                     selectedMethod[0].UpdateDualCosts(tripDualCosts, [], []);
-                    generatedTasks.Add(selectedMethod[0].GenerateVehicleTasks());
+                    generatedTasks.Add(selectedMethod[0].GenerateVehicleTasks() ?? []);
                 }
 
                 totalGenerated += generatedTasks.Count;

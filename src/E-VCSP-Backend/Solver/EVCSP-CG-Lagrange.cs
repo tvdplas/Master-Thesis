@@ -142,6 +142,8 @@ namespace E_VCSP.Solver {
                 throw new InvalidOperationException("Cannot initialize from nonexistent cover");
 
             Console.WriteLine("Using existing cover");
+            foreach (VehicleTask vt in vss.Tasks) Block.FromVehicleTask(vt); // ensure that block descriptors are calculated for vt;
+
             costUpperBound = 0;
             foreach (var vt in vss.SelectedTasks) costUpperBound += vt.Cost;
             costUpperBound += Math.Max(0, vss.SelectedTasks.Count - Config.MAX_VEHICLES) * Config.VH_OVER_MAX_COST;

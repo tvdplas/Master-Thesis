@@ -23,6 +23,8 @@ namespace E_VCSP
             activeFolderLabel = new Label();
             consoleView = new TextBox();
             configPanel = new Panel();
+            dumpRosterButton = new Button();
+            loadRosterButton = new Button();
             comboBox1 = new ComboBox();
             runExperiment = new Button();
             solveEVCSPButton = new Button();
@@ -79,6 +81,8 @@ namespace E_VCSP
             // 
             // configPanel
             // 
+            configPanel.Controls.Add(dumpRosterButton);
+            configPanel.Controls.Add(loadRosterButton);
             configPanel.Controls.Add(comboBox1);
             configPanel.Controls.Add(runExperiment);
             configPanel.Controls.Add(solveEVCSPButton);
@@ -94,6 +98,26 @@ namespace E_VCSP
             configPanel.Name = "configPanel";
             configPanel.Size = new Size(304, 558);
             configPanel.TabIndex = 1;
+            // 
+            // dumpRosterButton
+            // 
+            dumpRosterButton.Location = new Point(146, 134);
+            dumpRosterButton.Name = "dumpRosterButton";
+            dumpRosterButton.Size = new Size(152, 23);
+            dumpRosterButton.TabIndex = 12;
+            dumpRosterButton.Text = "Dump Raw Roster";
+            dumpRosterButton.UseVisualStyleBackColor = true;
+            dumpRosterButton.Click += dumpRosterButtonClick;
+            // 
+            // loadRosterButton
+            // 
+            loadRosterButton.Location = new Point(4, 134);
+            loadRosterButton.Name = "loadRosterButton";
+            loadRosterButton.Size = new Size(136, 23);
+            loadRosterButton.TabIndex = 11;
+            loadRosterButton.Text = "Load Raw Roster";
+            loadRosterButton.UseVisualStyleBackColor = true;
+            loadRosterButton.Click += loadRosterButtonClick;
             // 
             // comboBox1
             // 
@@ -275,5 +299,7 @@ namespace E_VCSP
         private Button solveEVCSPButton;
         private ComboBox comboBox1;
         private Button runExperiment;
+        private Button dumpRosterButton;
+        private Button loadRosterButton;
     }
 }

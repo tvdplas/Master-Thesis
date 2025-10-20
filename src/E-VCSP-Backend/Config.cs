@@ -90,9 +90,9 @@ namespace E_VCSP {
         public static int CSP_OPT_IT_THRESHOLD = 2; // Amount of columns sequentially generated without rc before cg is stopped
         public static bool CSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static int CSP_INSTANCES_PER_IT = 1;
-        public static int CSP_MAX_COL_GEN_ITS = 150;
+        public static int CSP_MAX_COL_GEN_ITS = 1000;
         public static int CR_MIN_BREAK_TIME = 15 * 60; // Min break length
-        public static int CR_MAX_BREAK_TIME = 4 * 60 * 60; // Max break length
+        public static int CR_MAX_BREAK_TIME = 60 * 60; // Max break length
         public static int CR_MIN_SHORT_IDLE_TIME = 0; // Min idle time which is not part of a split shift
         public static int CR_MAX_SHORT_IDLE_TIME = 30 * 60; // Max idle time which is not part of a split shift
         public static int CR_MIN_LONG_IDLE_TIME = (int)(1.5 * 60 * 60); // Min idle time which is part of a split shift
