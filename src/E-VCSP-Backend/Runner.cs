@@ -713,9 +713,9 @@ namespace E_VCSP_Backend {
                 for (int attempt = 0; attempt < integratedAttempts; attempt++) {
                     Config.VSP_SOLVER_TIMEOUT_SEC = 300;
                     Config.CSP_SOLVER_TIMEOUT_SEC = 300;
-                    Config.VSP_LB_SEC_COL_ATTEMPTS = bestSeqSol.N;
+                    Config.VSP_LB_SEC_COL_ATTEMPTS = 16;
                     Config.VSP_LB_SEC_COL_COUNT = bestSeqSol.M;
-                    Config.CSP_LB_SEC_COL_ATTEMPTS = bestSeqSol.N;
+                    Config.CSP_LB_SEC_COL_ATTEMPTS = 16;
                     Config.CSP_LB_SEC_COL_COUNT = bestSeqSol.M;
                     Config.VSP_LS_G_ITERATIONS = lsmaxIts;
                     Config.VSP_OPT_IT_THRESHOLD = Math.Max(10, bestSeqSol.lsRounds + 10);
