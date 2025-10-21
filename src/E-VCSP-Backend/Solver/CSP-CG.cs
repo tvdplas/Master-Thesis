@@ -76,11 +76,11 @@ namespace E_VCSP.Solver {
             GRBLinExpr maxBroken = new(); // max 30% broken
             GRBLinExpr maxBetween = new(); // max 10% between
 
-            GRBVar maxDutySlack = model.AddVar(0, GRB.INFINITY, Config.CR_OVER_MAX_COST, GRB.CONTINUOUS, "maxDutySlack");
-            GRBVar noExcessiveLengthSlack = model.AddVar(0, GRB.INFINITY, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "noExcessiveLengthSlack");
-            GRBVar limitedAverageLengthSlack = model.AddVar(0, GRB.INFINITY, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "limitedAverageLengthSlack");
-            GRBVar maxBrokenSlack = model.AddVar(0, GRB.INFINITY, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "maxBrokenSlack");
-            GRBVar maxBetweenSlack = model.AddVar(0, GRB.INFINITY, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "maxBetweenSlack");
+            GRBVar maxDutySlack = model.AddVar(0, 0, Config.CR_OVER_MAX_COST, GRB.CONTINUOUS, "maxDutySlack");
+            GRBVar noExcessiveLengthSlack = model.AddVar(0, 0, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "noExcessiveLengthSlack");
+            GRBVar limitedAverageLengthSlack = model.AddVar(0, 0, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "limitedAverageLengthSlack");
+            GRBVar maxBrokenSlack = model.AddVar(0, 0, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "maxBrokenSlack");
+            GRBVar maxBetweenSlack = model.AddVar(0, 0, Constants.CR_HARD_CONSTR_PENALTY, GRB.CONTINUOUS, "maxBetweenSlack");
 
             for (int i = 0; i < dutyVars.Count; i++) {
                 GRBVar v = dutyVars[i];
@@ -302,6 +302,12 @@ namespace E_VCSP.Solver {
                 if (var.VarName.StartsWith("cd_"))
                     var.Set(GRB.CharAttr.VType, GRB.BINARY);
             }
+            model.GetVarByName("maxDutySlack").UB = 0;
+            model.GetVarByName("noExcessiveLengthSlack").UB = 0;
+            model.GetVarByName("limitedAverageLengthSlack").UB = 0;
+            model.GetVarByName("maxBrokenSlack").UB = 0;
+            model.GetVarByName("maxBetweenSlack").UB = 0;
+
             model.Update();
 
             bool configState = Config.CONSOLE_GUROBI;

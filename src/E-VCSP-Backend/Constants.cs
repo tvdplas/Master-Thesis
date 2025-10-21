@@ -17,7 +17,7 @@
         public static string CSTR_CR_BETWEEN_DUTIES = "cr_overall_max_between";
 
         // "Hard" constraint slack penalties
-        public static double CR_HARD_CONSTR_PENALTY = 10000;
+        public static double CR_HARD_CONSTR_PENALTY = 100000;
 
         // Driving/Charging
         public static double KWH_COST = 0.32; // based on national average price
