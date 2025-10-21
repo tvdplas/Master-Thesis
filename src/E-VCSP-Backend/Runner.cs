@@ -602,7 +602,7 @@ namespace E_VCSP_Backend {
             Console.WriteLine(Config.CNSL_OVERRIDE + "Starting best seq-int experiment; writing results to " + seqFile + " and " + intFile);
             Console.WriteLine(Config.CNSL_OVERRIDE + "Experiment updates are written to this file.");
 
-            List<string> filepaths = ["../../data/terschelling", "../../data/leiden-3-4-14", "../../data/leiden-1-2", "../../data/leiden"];
+            List<string> filepaths = ["../../data/leiden-1-2", "../../data/leiden-3-4-14", "../../data/leiden", "../../data/terschelling"];
 
             // Param sets 
             List<int> Ns = [4, 8, 16];
@@ -620,7 +620,7 @@ namespace E_VCSP_Backend {
                 string filepath = filepaths[fpi];
                 ActiveFolder = filepath;
 
-                if (fpi < 3) {
+                if (fpi != 2) {
                     Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
                     Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
                 }
