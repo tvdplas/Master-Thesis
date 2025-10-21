@@ -646,6 +646,7 @@ namespace E_VCSP_Backend {
                             Config.CSP_MAX_COL_GEN_ITS = 1000;
                             Config.CR_SINGLE_SHIFT_COST = 1000;
 
+
                             vss = new(Instance!, Instance!.VehicleTypes[0]);
                             VSPSolver = new EVSPCG(vss);
                             sw.Restart();
@@ -728,6 +729,8 @@ namespace E_VCSP_Backend {
                     Config.VCSP_MAX_DUTIES_DURING = 100_000;
                     Config.VCSP_ROUNDS = 15;
                     Config.LAGRANGE_DISRUPT_ROUNDS = 5;
+                    Config.LAGRANGE_N = 50;
+                    Config.LAGRANGE_PI_END = 0.0001;
 
                     VehicleSolutionState intvss = new(bestSeqSol.vss);
                     CrewSolutionState intcss = new(bestSeqSol.css);

@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿
+using System.Reflection;
 using System.Text;
 
 namespace E_VCSP {
@@ -145,7 +146,7 @@ namespace E_VCSP {
         public static double LAGRANGE_N = 30;
         public static int LAGRANGE_DISRUPT_ROUNDS = 2;
         public static double LAGRANGE_DISRUPT_LWR = 0.8;
-        public static double LAGRANGE_DISRUPT_UPR = 1.25;
+        public static double LAGRANGE_DISRUPT_UPR = 1.20;
 
         public static void Dump() {
             Type configType = typeof(Config);

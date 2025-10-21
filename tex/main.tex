@@ -23,9 +23,9 @@ Abstract
 \newpage
 
 \section*{Acknowledgements}
-I would first like to thank my academic supervisors Han Hoogeveen, Marcel van Kooten-Niekerk and Philip de Bruin. Their support throughout this process was extremely valuable, providing knowledge of existing techniques in the field, constant feedback on new methods and helping me write a work that I am proud of. All time spent in weekly meetings, reading my work and responding to little messages sharing partial results is appreciated. 
+First, I would first like to thank my academic supervisors Han Hoogeveen, Marcel van Kooten-Niekerk and Philip de Bruin. Their support throughout this process was extremely valuable, providing knowledge of existing techniques in the field, constant feedback on new methods and helping me write a work that I am proud of. All time spent in weekly meetings, reading my work and responding to little messages sharing partial results is appreciated. 
 
-I would also like to thank my internship supervisors Marcel van Kooten-Niekerk and Marc Stikvoort for allowing me to complete this thesis at Qbuzz. Being able to do this work for a major public transport company gave me a lot of additional motivation, especially knowing that these results can actually make a difference for both people working with and using Dutch public transport (although the coffee machine in the Qbuzz office was also a very good motivator). Marcel deserves an additional thanks, as he further explained the context of my research, gave me tours of locations which normal public transport users never get to see, allowed me to drive a bus at the local depot, and provided instances for me to perform experiments on. Your passion for this subject is contagious, and I would not have been able to complete this project in the same way without your support. 
+Next, I would like to thank my internship supervisors Marcel van Kooten-Niekerk and Marc Stikvoort for allowing me to complete this thesis at Qbuzz. Knowing that these results could actually make a difference for both people working with and using Dutch public transport gave me additional motivation throughout the process (although the coffee machine in the Qbuzz office was also a very good motivator). Marcel deserves an additional thanks, as he further explained the context of my research, gave me tours of locations which normal public transport users never get to see, allowed me to drive a bus at the local depot, and provided instances for me to perform experiments on. Your passion for this subject is contagious, and I would not have been able to complete this project in the same way without your support. 
 
 Additionally, I would like to thank Jippe, Reinier and Mike for providing me with a good amount of distraction and incredibly fun experience competing in ICPC while working on this project. All those afternoons spent problem-solving helped me stay motivated for this work, and I would personally say the delay in my thesis was worth it to be able to compete in Baku.
 
@@ -1619,7 +1619,7 @@ For each instance, a number of different sequential scenerios were run based on 
   \item E-VSP global LS for $R \in \{ 0, 100, 1000 \}$ rounds and 500,000 iterations. 
 \end{itemize}
 On all runs, timeouts of 5 minutes were set for the final ILP solve for both the E-VSP and CSP. The results have been displayed per instance in Figure \ref{fig:seq-solutions}.
-
+\todo{aanpassing}
 \begin{figure}
   \begin{tikzpicture}
     \begin{groupplot}[
@@ -1653,53 +1653,86 @@ On all runs, timeouts of 5 minutes were set for the final ILP solve for both the
           (1801.171851, 5639.088518)
           (1796.956992, 5638.456992)
           (1796.048452, 5614.215119)
+          (1821.743484, 5633.326817)
+          (1793.073837, 5561.990504)
+          (1794.000623, 5589.41729)
+          (1817.238788, 5850.238788)
+          (1813.905562, 5648.572228)
+          (1792.918127, 5586.168127)
+
         };
   
       % --- Plot (2,1)
       \nextgroupplot[title={\texttt{leiden-1-2}}]
       \addplot+[only marks, mark=square*, mark size=1.6pt]
         coordinates {
-          (3435.827835, 16440.7445)
-          (3389.500171, 15054.75017)
-          (3364.233268, 14863.73327)
-          (3413.57062, 17167.07062)
-          (3388.918727, 16102.16873)
-          (3367.040049, 15136.62338)
-          (3402.977092, 16106.72709)
-          (3380.194952, 15006.44495)
-          (3363.988524, 14918.73852)
-          (3419.519013, 18309.93568)
-          (3366.001341, 15892.83467)
-          (3363.898077, 14792.64808)
+            (3435.827835,16440.7445)
+            (3389.500171,15054.75017)
+            (3364.233268,14863.73327)
+            (3413.57062,17167.07062)
+            (3388.918727,16102.16873)
+            (3367.040049,15136.62338)
+            (3402.977092,16106.72709)
+            (3380.194952,15006.44495)
+            (3363.988524,14918.73852)
+            (3419.519013,18309.93568)
+            (3366.001341,15892.83467)
+            (3363.898077,14792.64808)
+            (3425.64724,15920.64724)
+            (3376.458447,14735.12511)
+            (3369.083516,14918.41685)
+            (3386.699159,15444.28249)
+            (3377.730108,15289.39678)
+            (3363.629882,14928.12988)
         };
   
       % --- Plot (1,2)
       \nextgroupplot[title={\texttt{leiden-3-4-14}}]
       \addplot+[only marks, mark=triangle*, mark size=1.8pt]
         coordinates {
-          (3766.224348, 16930.30768)
-          (3711.845032, 17100.67837)
-          (3655.395593, 16904.89559)
-          (3781.691366, 17008.44137)
-          (3708.568197, 17246.40153)
-          (3643.75353, 16521.4202)
-          (3766.070871, 17151.4042)
-          (3772.396367, 17269.06303)
-          (3652.916264, 17840.9996)
-          (3734.628466, 17047.29513)
-          (3748.833748, 17376.58375)
-          (3660.790589, 17755.29059)
+          (3766.224348,16930.30768)
+          (3711.845032,17100.67837)
+          (3655.395593,16904.89559)
+          (3781.691366,17008.44137)
+          (3708.568197,17246.40153)
+          (3643.75353,16521.4202)
+          (3766.070871,17151.4042)
+          (3772.396367,17269.06303)
+          (3652.916264,17840.9996)
+          (3734.628466,17047.29513)
+          (3748.833748,17376.58375)
+          (3660.790589,17755.29059)
+          (3731.557995,16976.89133)
+          (3742.651491,17225.56816)
+          (3649.309036,16645.64237)
+          (3758.194582,16813.94458)
+          (3715.696603,16993.52994)
+          (3644.615358,16549.94869)
+
         };
   
       % --- Plot (2,2)
       \nextgroupplot[title={\texttt{leiden}}]
       \addplot+[only marks, mark=diamond*, mark size=1.8pt]
         coordinates {
-          (6430.078772237068,22438.083333333332)
-          (6370.052879846232,22105.000000000004)
-          (6118.55114164412,21786.500000000007)
-          (6383.714759074799,22067.833333333332)
-          (6348.127006021544,21507.916666666668)
+          (6430.078772,28868.16211)
+          (6370.05288,28475.05288)
+          (6118.551142,27905.05114)
+          (6383.714759,28451.54809)
+          (6348.127006,27856.04367)
+          (6323.612275,28052.02894)
+          (6355.214323,28828.54766)
+          (6357.329489,28592.16282)
+          (6331.356482,28089.93982)
+          (6343.884362,28099.55103)
+          (6375.641961,28668.05863)
+          (6346.78854,28083.53854)
+          (6338.143935,28034.89393)
+          (6326.708123,27938.95812)
+          (6152.293374,27831.54337)
+          (6329.345523,27995.42886)
+          (6368.345493,28312.67883)
+          (6128.862953,27836.44629)
         };
     \end{groupplot}
   \end{tikzpicture}
@@ -1707,8 +1740,24 @@ On all runs, timeouts of 5 minutes were set for the final ILP solve for both the
   \label{fig:seq-solutions}
 \end{figure}
 
-As we can clearly see, overall solution quality can be greatly influenced by the initial vehicle solution. In the instance \texttt{terschelling} for instance, a 40 euro difference in vehicle costs can result in a 200 euro cost difference overall. In general, we do see that lower vehicle costs tend to imply lower overall costs; this can mostly be attributed to the fact that cheaper vehicle schedules generally also imply less driven hours, which can result in a decrease in the required number of crew working hours. We do however see outliers; in particular in the \texttt{leiden} instance, the largest in our testset. Here, a higher vehicle cost can be incurred in order to reduce overall costs, thereby showing the flaws of the sequential method oncemore. 
+As we can clearly see, overall solution quality can be greatly influenced by the initial vehicle solution. \todo{uitbreiden met nieuwe data}
 
+\begin{table}[h]
+  \centering
+  \begin{tabular}{lrrrrrrrr}
+    \toprule
+       & \multicolumn{3}{c}{\textit{Sequential}} & \multicolumn{3}{c}{\textit{Integrated}} & \\
+       \textbf{Instance} & \textbf{VH cost} & \textbf{CR cost} & \textbf{Total} & \textbf{VH cost} & \textbf{CR cost} & \textbf{Total} & $\Delta\%$ \\
+       \cmidrule(lr){1-1} \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-8}
+        \texttt{terschelling}   & 1799.2 & 3706.5 & 5505.7 & 1822.5 & 3627.4 & 5449.9 & -1.0 \\
+        \texttt{leiden-1-2}   & 3646.6 & 12812.2 & 16458.8 & 3647.4 & 11291.7 & 14687.9 & -0.4 \\
+        \texttt{leiden-3-4}   & 3373.3 & 11370.6 & 14743.9 & 3396.3 & 12733.7 & 16381.1 & -0.5 \\
+        \texttt{leiden}   & 6124.2 & 21577.7 & 27701.9 & 6150.1 & 21497.3 & 27647.5 & -0.2   \\
+        \bottomrule
+  \end{tabular}
+  \caption{Comparison of sequential and integrated solution quality}
+  \label{tab:seq-vs-int}
+\end{table}
 \section{Conclusion}
 \subsection{Future work}
 The results provided in this work showcase that using a combination of column generation and Lagrangean relaxation can be used in order to quite successfully solve the E-VCSP. There are however a number of improvements to be made, as well as possibilities to expand the problem in order to allow for more complex real world behavior to be included. 
