@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Gurobi.Optimizer" Version="12.0.3" />
+    <PackageReference Include="Gurobi.Optimizer" Version="13.0.0-beta1" />
   </ItemGroup>
 
 </Project>

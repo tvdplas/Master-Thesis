@@ -23,15 +23,15 @@ namespace E_VCSP {
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double CR_SHIFT_COST = 100; // Minimum price to pay a crew member
         public static double CR_SINGLE_SHIFT_COST = 50_000; // penalty for use of initial shifts
-        public static int MAX_VEHICLES = 99; // Maximum number of vehicles that can be used in the solution.
+        public static int MAX_VEHICLES = 9999; // Maximum number of vehicles that can be used in the solution.
         public static double VH_OVER_MAX_COST = 0; // Cost per vehicle of going over. only used as penalty
-        public static int MAX_DUTIES = 99; // Maximum number of vehicles that can be used in the solution.
+        public static int MAX_DUTIES = 9999; // Maximum number of vehicles that can be used in the solution.
         public static double CR_OVER_MAX_COST = 0; // Cost per vehicle of going over. only used as penalty
 
         public static Header VSP = new();
         public static bool VSP_DETERMINE_IIS = false;
         public static bool VSP_POSTPROCESS = false;
-        public static int VSP_SOLVER_TIMEOUT_SEC = 450;
+        public static int VSP_SOLVER_TIMEOUT_SEC = 300;
         public static double VSP_SOLVER_HEURISTIC_FRAC = 0.25;
         public static bool VSP_ALLOW_OVERCOVER = true; // determines >= in constraint
         public static bool VSP_ALLOW_SLACK_FINAL_SOLVE = true; // Allows more vehicles to be used than available during final solve
@@ -79,7 +79,7 @@ namespace E_VCSP {
         public static double VSP_LS_G_STARTING_T = 50;
         public static double VSP_LS_G_ENDING_T = 0.01;
         public static double VSP_LS_G_COOLING_RATE = 0.98;
-        public static double VSP_LS_G_ITERATIONS = 10_000_000;
+        public static double VSP_LS_G_ITERATIONS = 500_000;
         public static double VSP_LS_G_2OPT = 20;
         public static double VSP_LS_G_MOVE_RANGE = 20;
         public static double VSP_LS_G_ADD_CHARGE = 5;
@@ -101,7 +101,7 @@ namespace E_VCSP {
 
         public static Header CSP_LABELING = new();
         public static double CSP_LABELING_WEIGHT = 0;
-        public static int CSP_LB_MAX_LABELS_IN_END = 100_000;
+        public static int CSP_LB_MAX_LABELS_IN_END = 500_000;
         public static int CSP_LB_MAX_COLS = 50;
         public static int CSP_LB_SEC_COL_COUNT = 9; // Number of primary columns to generate secondary columns for 
         public static double CSP_LB_SEC_COL_ATTEMPTS = 10; // Number of attempts per secondary column
@@ -129,8 +129,8 @@ namespace E_VCSP {
         public static int VCSP_VH_ITS_ROUND = 10;
         public static int VCSP_CR_ITS_INIT = 10;
         public static int VCSP_CR_ITS_ROUND = 10;
-        public static int VCSP_MAX_TASKS_DURING = 40000;
-        public static int VCSP_MAX_DUTIES_DURING = 40000;
+        public static int VCSP_MAX_TASKS_DURING = 100000;
+        public static int VCSP_MAX_DUTIES_DURING = 100000;
         public static bool VCSP_VH_CSTR_SLACK = true;
         public static bool VCSP_CR_MAX_CSTR_SLACK = true;
         public static bool VCSP_CR_OTH_CSTR_SLACK = false;
@@ -141,9 +141,9 @@ namespace E_VCSP {
 
         public static Header LAGRANGE = new();
         public static double LAGRANGE_PI_START = 2;
-        public static double LAGRANGE_PI_END = 0.001; // (0, 2]
+        public static double LAGRANGE_PI_END = 0.0001; // (0, 2]
         public static double LAGRANGE_PI_COOLING = 0.5; // [0, 1)
-        public static double LAGRANGE_N = 30;
+        public static double LAGRANGE_N = 50;
         public static int LAGRANGE_DISRUPT_ROUNDS = 2;
         public static double LAGRANGE_DISRUPT_LWR = 0.8;
         public static double LAGRANGE_DISRUPT_UPR = 1.20;

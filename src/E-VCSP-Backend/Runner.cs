@@ -57,6 +57,7 @@ namespace E_VCSP_Backend {
             CSPSolver = new(css);
             IntegratedSolver = new EVCSPCGLagrange(vss, css);
 
+            expFindBestIntegrated();
             if (createNewFolder) CreateLogFolder(runDescription);
         }
 
@@ -602,7 +603,7 @@ namespace E_VCSP_Backend {
             Console.WriteLine(Config.CNSL_OVERRIDE + "Starting best seq-int experiment; writing results to " + seqFile + " and " + intFile);
             Console.WriteLine(Config.CNSL_OVERRIDE + "Experiment updates are written to this file.");
 
-            List<string> filepaths = ["../../data/leiden-1-2", "../../data/leiden-3-4-14", "../../data/leiden", "../../data/terschelling"];
+            List<string> filepaths = ["../../data/terschelling", "../../data/leiden-1-2", "../../data/leiden-3-4-14", "../../data/leiden"];
 
             // Param sets 
             List<int> Ns = [4, 8, 16];
@@ -620,7 +621,7 @@ namespace E_VCSP_Backend {
                 string filepath = filepaths[fpi];
                 ActiveFolder = filepath;
 
-                if (fpi != 2) {
+                if (fpi != 3) {
                     Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
                     Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
                 }
@@ -755,18 +756,18 @@ namespace E_VCSP_Backend {
                     );
 
                     Roster vhRoster = new() {
-                        Comment = intvss.CostFactors().ToString(),
-                        RosterNodes = SolutionGraph.GenerateVehicleTaskGraph(intvss.SelectedTasks),
+                        Comment = IntegratedSolver.vss.CostFactors().ToString(),
+                        RosterNodes = SolutionGraph.GenerateVehicleTaskGraph(IntegratedSolver.vss.SelectedTasks),
                         Type = 0
                     };
                     Roster blockRoster = new() {
-                        Comment = "Blocks based on vehicle tasks; " + intvss.CostFactors().ToString(),
-                        RosterNodes = SolutionGraph.GenerateBlockGraph(intvss.SelectedTasks.Select(Block.FromVehicleTask).ToList()),
+                        Comment = "Blocks based on vehicle tasks; " + IntegratedSolver.vss.CostFactors().ToString(),
+                        RosterNodes = SolutionGraph.GenerateBlockGraph(IntegratedSolver.vss.SelectedTasks.Select(Block.FromVehicleTask).ToList()),
                         Type = 1
                     };
                     Roster crRoster = new() {
-                        Comment = intcss.CostFactors().ToString(),
-                        RosterNodes = SolutionGraph.GenerateCrewDutyGraph(intcss.SelectedDuties),
+                        Comment = IntegratedSolver.css.CostFactors().ToString(),
+                        RosterNodes = SolutionGraph.GenerateCrewDutyGraph(IntegratedSolver.css.SelectedDuties),
                         Type = 2
                     };
 
