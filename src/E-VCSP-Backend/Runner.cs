@@ -57,7 +57,6 @@ namespace E_VCSP_Backend {
             CSPSolver = new(css);
             IntegratedSolver = new EVCSPCGLagrange(vss, css);
 
-            expFindBestIntegrated();
             if (createNewFolder) CreateLogFolder(runDescription);
         }
 
