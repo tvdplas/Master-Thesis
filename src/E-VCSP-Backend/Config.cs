@@ -22,7 +22,7 @@ namespace E_VCSP {
         public static Header SOLVER_HINTS = new();
         public static double VH_PULLOUT_COST = 200; // Costs to deploy a vehicle at the beginning of the day. verified at qbuzz
         public static double CR_SHIFT_COST = 100; // Minimum price to pay a crew member
-        public static double CR_SINGLE_SHIFT_COST = 50_000; // penalty for use of initial shifts
+        public static double CR_SINGLE_SHIFT_COST = 1_000; // penalty for use of initial shifts
         public static int MAX_VEHICLES = 9999; // Maximum number of vehicles that can be used in the solution.
         public static double VH_OVER_MAX_COST = 0; // Cost per vehicle of going over. only used as penalty
         public static int MAX_DUTIES = 9999; // Maximum number of vehicles that can be used in the solution.
