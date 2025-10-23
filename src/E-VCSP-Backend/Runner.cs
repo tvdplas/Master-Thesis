@@ -610,13 +610,15 @@ namespace E_VCSP_Backend {
             Config.VSP_INSTANCES_PER_IT = 20;
             List<int> lsRounds = [0, 100 / Config.VSP_INSTANCES_PER_IT, 1000 / Config.VSP_INSTANCES_PER_IT];
             const int lsmaxIts = 500_000;
+            Config.CR_SINGLE_SHIFT_COST = 10_000;
+
 
             // Total number times integrated is attempted using seq solution
             const int integratedAttempts = 5;
 
-            List<(VehicleSolutionState vss, CrewSolutionState css, int N, int M, int lsRounds)> bestSequentialSolutions = [];
 
-            for (int fpi = 0; fpi < filepaths.Count; fpi++) {
+            for (int fpi = 1; fpi < filepaths.Count; fpi++) {
+                (VehicleSolutionState vss, CrewSolutionState css, int N, int M, int lsRounds)? bestSequentialSolution = null;
                 string filepath = filepaths[fpi];
                 ActiveFolder = filepath;
 
@@ -644,7 +646,6 @@ namespace E_VCSP_Backend {
                             Config.VSP_OPERATION_SEQUENCE = String.Join("", Enumerable.Range(0, lsRound).Select(x => "2"));
                             Config.VSP_MAX_COL_GEN_ITS = Math.Max(1000, lsRound * 2);
                             Config.CSP_MAX_COL_GEN_ITS = 1000;
-                            Config.CR_SINGLE_SHIFT_COST = 1000;
 
 
                             vss = new(Instance!, Instance!.VehicleTypes[0]);
@@ -676,11 +677,11 @@ namespace E_VCSP_Backend {
                             );
 
                             // Save best vss/css for integrated runs in memory; Only dump rosternode views to files
-                            if (bestSequentialSolutions.Count == fpi) {
-                                bestSequentialSolutions.Add((new(vss), new(css), N, M, lsRound));
+                            if (!bestSequentialSolution.HasValue) {
+                                bestSequentialSolution = (new(vss), new(css), N, M, lsRound);
                             }
-                            else if (vss.Costs() + css.Costs() < bestSequentialSolutions[fpi].vss.Costs() + bestSequentialSolutions[fpi].css.Costs()) {
-                                bestSequentialSolutions[fpi] = (new(vss), new(css), N, M, lsRound);
+                            else if (vss.Costs() + css.Costs() < bestSequentialSolution.Value.vss.Costs() + bestSequentialSolution.Value.css.Costs()) {
+                                bestSequentialSolution = (new(vss), new(css), N, M, lsRound);
                             }
 
                             Roster vhRoster = new() {
@@ -707,7 +708,7 @@ namespace E_VCSP_Backend {
                     }
                 }
 
-                var bestSeqSol = bestSequentialSolutions[fpi];
+                var bestSeqSol = bestSequentialSolution!.Value;
 
                 Console.WriteLine(Config.CNSL_OVERRIDE + "Starting integrated attempts");
                 Console.WriteLine(Config.CNSL_OVERRIDE + $"Loading sequential solution with value {bestSeqSol.vss.Costs()} + {bestSeqSol.css.Costs()} = {bestSeqSol.vss.Costs() + bestSeqSol.css.Costs()}");
