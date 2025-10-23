@@ -142,7 +142,6 @@ namespace E_VCSP.Solver {
                 throw new InvalidOperationException("Cannot initialize from nonexistent cover");
 
             Console.WriteLine("Using existing cover");
-            foreach (VehicleTask vt in vss.Tasks) Block.FromVehicleTask(vt); // ensure that block descriptors are calculated for vt;
 
             costUpperBound = 0;
             foreach (var vt in vss.SelectedTasks) costUpperBound += vt.Cost;
@@ -151,12 +150,19 @@ namespace E_VCSP.Solver {
             costUpperBound += Math.Max(0, css.SelectedDuties.Sum(x => x.count) - Config.MAX_DUTIES) * Config.CR_OVER_MAX_COST;
             initialSolutionQuality = costUpperBound;
 
-            for (int bi = 0; bi < css.Blocks.Count; bi++) {
-                knownBlocks[css.Blocks[bi].Descriptor] = bi;
+            List<(Block b, int c)> allBlocks = Block.FromVehicleTasks(vss.Tasks);
+            css.ResetBlocks();
+            for (int bi = 0; bi < allBlocks.Count; bi++) {
+                css.AddBlock(allBlocks[bi].b, 1);
+                knownBlocks[allBlocks[bi].b.Descriptor] = bi;
             }
 
             for (int i = 0; i < vss.Tasks.Count; i++) {
                 VehicleTask task = vss.Tasks[i];
+                task.BlockIndexCover = [];
+                foreach (Descriptor desc in task.BlockDescriptorCover) {
+                    task.BlockIndexCover.Add(knownBlocks[desc]);
+                }
                 BitArray tripCover = task.ToTripBitArray(vss.Instance.Trips.Count);
                 BitArray blockCover = task.ToBlockBitArray(css.Blocks.Count);
                 if (knownVTs.ContainsKey((tripCover, blockCover))) {
@@ -167,12 +173,23 @@ namespace E_VCSP.Solver {
 
             for (int i = 0; i < css.Duties.Count; i++) {
                 CrewDuty duty = css.Duties[i];
+                duty.BlockIndexCover = [];
+                foreach (Descriptor desc in duty.BlockDescriptorCover) {
+                    duty.BlockIndexCover.Add(knownBlocks[desc]);
+                }
                 BitArray blockCover = duty.ToBlockBitArray(css.Blocks.Count);
                 int dutyType = (int)duty.Type;
                 if (knownCDs.ContainsKey((blockCover, dutyType))) {
                     Console.WriteLine("Duplicate columns present in initial cr solution");
                 }
                 knownCDs.Add((blockCover, dutyType), i);
+            }
+
+            foreach (var task in vss.SelectedTasks) {
+                task.IsUnit = true;
+            }
+            foreach ((var duty, _) in css.SelectedDuties) {
+                duty.IsUnit = true;
             }
         }
 
