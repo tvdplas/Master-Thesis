@@ -299,8 +299,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                                 // Initialize new range
                                 blockDescriptorStart = new DescriptorHalf(idleLocation, idleEndTime);
                                 List<double> blockDuals = blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart, noDualCost);
-                                minBlockSavings = blockDuals.Min();
-                                maxBlockSavings = blockDuals.Max();
+                                minBlockSavings = Math.Min(blockDuals.Min(), 0);
+                                maxBlockSavings = Math.Max(0, blockDuals.Max());
                             }
 
                             // Charging during idle
@@ -326,8 +326,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                         if (depotStart && !depotEnd) {
                             blockDescriptorStart = new DescriptorHalf(depot, arc.StartTime);
                             List<double> blockDuals = blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart, noDualCost);
-                            minBlockSavings = blockDuals.Min();
-                            maxBlockSavings = blockDuals.Max();
+                            minBlockSavings = Math.Min(blockDuals.Min(), 0);
+                            maxBlockSavings = Math.Max(0, blockDuals.Max());
                         }
 
                         // Perform actual deadhead
@@ -366,8 +366,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                                 // Initialize new range
                                 blockDescriptorStart = new DescriptorHalf(targetTrip.StartLocation, idleEndTime);
                                 List<double> blockDuals = blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart, noDualCost);
-                                minBlockSavings = blockDuals.Min();
-                                maxBlockSavings = blockDuals.Max();
+                                minBlockSavings = Math.Min(blockDuals.Min(), 0);
+                                maxBlockSavings = Math.Max(0, blockDuals.Max());
                             }
                             else {
                                 steeringTime += idleTime;
@@ -464,8 +464,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
                             // Initialize new range
                             blockDescriptorStart = new DescriptorHalf(candidateLocation, idleEndTime);
                             List<double> blockDuals = blockDualCostsByStart.GetValueOrDefault(blockDescriptorStart, noDualCost);
-                            minBlockSavings = blockDuals.Min();
-                            maxBlockSavings = blockDuals.Max();
+                            minBlockSavings = Math.Min(blockDuals.Min(), 0);
+                            maxBlockSavings = Math.Max(0, blockDuals.Max());
                         }
 
                         // Perform charge at charging location  
