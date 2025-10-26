@@ -1126,11 +1126,78 @@ In order to improve our solution quality beyond the initial sequential solution,
 
 \subparagraph{E-VSP Labeling} Let us recall the reduced cost formula for a vehicle task in the integrated problem: 
 \begin{equation}
-cost(vt_0) - \sum_{t \in T}k_{0,t} \lambda_t - \sum_{b \in B}l_{0,b}\lambda_b \nonumber
+cost(vt_0) - \sum_{t \in T}k_{0,t} \pi_t - \sum_{b \in B}l_{0,b}\pi_b \nonumber
 \end{equation}
-We note that these reduced costs are equivalent to the $cost_\lambda(vt_0)$ which is used to determine whether we include a column in the solution to our LR. The main difference between this formulation and the reduced cost formula that we used in the sequential problem is the inclusion of a term for the dual costs of the blocks which are contained within the vehicle task: $-\sum_{b \in B}l_{0,b}\lambda_b$.
+We note that these reduced costs are equivalent to the $cost_\lambda(vt_0)$ which is used to determine whether we include a column in the solution to our LR. The main difference between this and the reduced cost formula that we used in the sequential problem is the inclusion of a term for the dual costs of the blocks which are contained within the vehicle task: $-\sum_{b \in B}l_{0,b}\lambda_b$.
 
-In order to incorporate these costs in our previously defined labeling algorithm, let us first visualize known blocks within our graph $G_{vt}$ by outlining them; see Figure \ref{fig:evsp-graph-blocks} for an example. As before, we represent the ends of trips as nodes and the connecting arcs incorporate both movements and (charging) idles. As blocks may start and end whenever a sufficiently long idle period is present at a relief point, the borders of blocks will always fall somewhere within an edge; for a more detailed example, we refer back to Figure \ref{fig:evsp-graph-edge-contents}. Here, assuming all idle locations are relief points and the minimum handover time is met, the starts of Charge $d(t_1)$, Charge $l_c$ and Idle $o(t_4)$ all correspond with a block end border, and their ends all correspond with block start borders.
+In order to incorporate these costs in our previously defined labeling algorithm, let us consider how blocks interact with our graph $G_{vt}$. Let us first do this by looking at individual arcs. As blocks may start and end whenever a sufficiently long idle period is present at a relief point, the starts and ends of blocks will always fall within an arc. If the visited idle location is however not a relief point or the idle time is not sufficient for a handover, no block border can exist within that specific arc. Examples of this have been visualized in Figure \ref{fig:evsp-graph-block-borders}.
+
+\begin{figure}[h]
+  \centering
+  \resizebox{\textwidth}{!}{
+    \begin{tikzpicture}[
+      node distance=25mm and 18mm,
+    ]
+    % % T1 => T2
+    % \node[lsnode, minimum height=18mm] (t1) {Trip 1 end};
+    % % Base arc
+    % \node[lsnode, text width=4cm, right=
+    % 4mm of t1, minimum height=14mm] (ch1) { Idle $d(t_1)$};
+    % \node[lsnode, text width=4cm, right=
+    % 4mm of ch1, minimum height=14mm] (dh1) {$d(t_1)\xrightarrow[dh]{} o(t_2)$};
+    % \node[lsnode, right=
+    % 1mm of dh1, text width=16mm, minimum height=14mm] (at1) { Drive $t_2$ };
+    % \node[lsnode, right=115mm of t1, minimum height=18mm] (t2) {Trip 2 end};
+    % \draw[dashed, thick, rounded corners=2pt]
+    %   ($(t1.north west)+(-5mm,2mm)$) -- ($(ch1.north west)+(-2mm,4mm)$) -- ($(ch1.south west)+(-2mm,-4mm)$) -- ($(t1.south west)+(-5mm,-2mm)$);
+    % \draw[dashed, thick, rounded corners=2pt]
+    %   ($(t2.north east)+(5mm,2mm)$) -- ($(ch1.north east)+(2mm,4mm)$) -- ($(ch1.south east)+(2mm,-4mm)$) -- ($(t2.south east)+(5mm,-2mm)$);
+    % \path ($(t1.north west)+(-5mm,2mm)$) -- ($(ch1.north west)+(-2mm,4mm)$) coordinate[midway] (b1mid);
+    % \node[above=1mm of b1mid] {Block end 1};
+    % \path ($(t2.north east)+(5mm,2mm)$) -- ($(ch1.north east)+(2mm,4mm)$) coordinate[midway] (b2mid);
+    % \node[above=1mm of b2mid] {Block start 1};
+
+    % T3 => T4
+    \node[lsnode, below=15mm of t1, minimum height=18mm] (t3) {Trip 1 end};
+    % Base arc
+    \node[lsnode, text width=4cm, right=
+    1mm of t3, minimum height=14mm] (dh3) {$d(t_1)\xrightarrow[dh]{} o(t_2)$};
+    \node[lsnode, text width=4cm, right=
+    4mm of dh3, minimum height=14mm] (id3) { Idle $o(t_2)$};
+    \node[lsnode, right=
+    4mm of id3, text width=16mm, minimum height=14mm] (at3) { Drive $t_2$ };
+    \node[lsnode, right=115mm of t3, minimum height=18mm] (t4) {Trip 2 end};
+    \draw[dashed, thick, rounded corners=2pt]
+      ($(t3.north west)+(-5mm,2mm)$) -- ($(id3.north west)+(-2mm,4mm)$) -- ($(id3.south west)+(-2mm,-4mm)$) -- ($(t3.south west)+(-5mm,-2mm)$);
+    \draw[dashed, thick, rounded corners=2pt]
+      ($(t4.north east)+(5mm,2mm)$) -- ($(id3.north east)+(2mm,4mm)$) -- ($(id3.south east)+(2mm,-4mm)$) -- ($(t4.south east)+(5mm,-2mm)$);
+    \path ($(t3.north west)+(-5mm,2mm)$) -- ($(id3.north west)+(-2mm,4mm)$) coordinate[midway] (b3mid);
+    \node[above=1mm of b3mid] {Block end};
+    \path ($(t4.north east)+(5mm,2mm)$) -- ($(id3.north east)+(2mm,4mm)$) coordinate[midway] (b4mid);
+    \node[above=1mm of b4mid] {Block start};
+
+    % T5 => T6
+    \node[lsnode, below=15mm of t3, minimum height=18mm] (t5) {Trip 3 end};
+    % Base arc
+    \node[lsnode, text width=22mm, right=
+    1mm of t5, minimum height=14mm] (id5) { Idle $d(t_3)$};
+    \node[lsnode, text width=4cm, right=
+    1mm of id5, minimum height=14mm] (dh5) {$d(t_3)\xrightarrow[dh]{} o(t_4)$};
+    \node[lsnode, right=
+    1mm of dh5, text width=41mm, minimum height=14mm] (at5) { Drive $t_4$ };
+    \node[lsnode, right=115mm of t5, minimum height=18mm] (t6) {Trip 6 end};
+    \draw[dashed, thick, rounded corners=2pt] ($(t5.north west)+(-5mm,2mm)$) -- ($(t6.north east)+(5mm,2mm)$);
+    \draw[dashed, thick, rounded corners=2pt] ($(t5.south west)+(-5mm,-2mm)$) -- ($(t6.south east)+(5mm,-2mm)$);
+    \path ($(t5.north west)+(-5mm,2mm)$) -- ($(t6.north east)+(5mm,2mm)$) coordinate[midway] (b5mid);
+    \node[above=1mm of b5mid] {Block part};
+
+    \end{tikzpicture}
+  }
+  \caption{Visualization of two arcs in $G_{vt}$ with associated block borders. Both $o(t_2)$ and $d(t_3)$ are relief points, however only the idle at $o(t_2)$ allows for enough time for a handover.}
+  \label{fig:evsp-graph-block-borders}
+\end{figure}
+
+As we can see, an arc uniquely defines the block parts that it contains. A sequence of arcs therefore also uniquely defines the blocks that it contains. We can therefore overlay the blocks that can occur within a vehicle task on our graph $G_{vt}$; an example of this has been given in Figure \ref{fig:evsp-graph-blocks}, in which we only show known blocks. 
 
 \begin{figure}[h]
   \centering
@@ -1163,16 +1230,13 @@ In order to incorporate these costs in our previously defined labeling algorithm
   \label{fig:evsp-graph-blocks}
 \end{figure}
 
-Suppose that in this graph, we have two labels in Trip 2 with $l_1 = (SoC = 80\%, Cost = 120)$ and $l_2 = (SoC = 90\%, Cost = 100)$. By our domination rule as defined previously, $l_1$ dominates $l_2$, as the SoC is greater and incurred costs are lower. This would imply that we may safely discard $l_2$, as there is no way to expand labels such that an expansion of $l_2$ gives a better result than an expansion of $l_1$.
+Suppose that in the graph shown in Figure \ref{fig:evsp-graph-blocks}, we have two labels in Trip 2 with $l_1 = (SoC = 80\%, Cost = 120)$ and $l_2 = (SoC = 90\%, Cost = 100)$. By our domination rule as defined previously, $l_1$ dominates $l_2$, as the SoC is greater and incurred costs are lower. This would imply that we may safely discard $l_2$, as there is no way to expand labels such that an expansion of $l_2$ gives a better result than an expansion of $l_1$.
 
-Let us now consider the known blocks within the graph. In order to more easily do this, assume that for each label we know its origin: for now, let us simply say that $l_1$ originates from Trip 1 and $l_2$ originates elsewhere. As we can see, if $l_1$ were to be expanded towards Trip 4 into a new label $l_1'$, it would cover Block 2; our cost in $l_1'$ would therefore consist of the costs of the arc to Trip 4 minus $\pi_{b_2}$. If we on the other hand expand $l_2$ towards Trip 4, it would not contain Block 2 and therefore not include $\pi_{b_2}$ in its eventual reduced cost. This implies that if $\pi_{b_2} > 20$, $l_1'$ would be cheaper in Trip 4 than $l_2'$. This breaks our domination rule, as keeping $l_1$ would have resulted in a non-dominated cost in $l_1'$.
+Let us now consider the blocks within the graph. In order to more easily do this, assume that for each label we know its origin: for now, let us simply say that $l_1$ originates from Trip 1 and $l_2$ originates elsewhere. As we can see, if $l_1$ were to be expanded towards Trip 4 into a new label $l_1'$, it would cover Block 2. Our cost in $l_1'$ would therefore consist of the costs of the arc to Trip 4 minus $\pi_{b_2}$. If we on the other hand expand $l_2$ towards Trip 4, it would contain some block $b$ other than $b_2$; it would therefore include $\pi_b$ instead of $\pi_{b_2}$ in its reduced cost. This implies that if $\pi_{b_2} > 20 + \pi_b$, $l_1'$ would be cheaper in Trip 4 than $l_2'$. This breaks our domination rule, as keeping $l_1$ could have resulted in a non-dominated cost in $l_1'$ depending on the dual costs of other blocks in our graph.
 
-Note that the problem can also be seen in reverse, where the covering of a block causes a penalty. If $\pi_{b_1} < 0$ and we expand to Trip 3 instead, $l_2'$ gains additional cost due to covering Block 1, while $l_1'$ does not incur any additional cost due to covering a known block. If $\pi_{b_1} < -20$, $l_1'$ would again be better than $l_2'$, resulting in a broken domination rule.  
+In order to account for this, we will keep track of the possible effect of any currently unfinished block in a label. In doing this, we will assume that every unknown block $b$ has a dual cost $\pi_b = 0$. Using this, let us now redefine our label. Let $c$ be the base cost of the label, representing all costs which have already been incurred. Next, let us include a cost upper bound $c_{max}$ and lower bound $c_{min}$, where $c_{min} \leq c \leq c_{max}$ at all times. We will use these to represent the dual costs associated with a block which has not yet been finished. 
 
-\todo{ik wil hier nog een keertje doorheen lezen}
-In order to account for this, we need to keep track of the possible effects of finishing a block. In doing this, we will assume that any unknown blocks have a dual cost of 0. Using this, we will redefine our label. Let $c$ be the base cost of the label, representing all costs which have already been incurred. Next, let us include a cost upper bound $c_{max}$ and lower bound $c_{min}$, where $c_{min} \leq c \leq c_{max}$ at all times. We will use these to represent the dual costs associated with a block which has not yet been finished. 
-
-During propagation throughout the graph we update $c, c_{min}$ and $c_{max}$ as defined for the sequential approach, adding both arc costs and trip dual costs. When we encounter the start of a block during propagation, let us consider all known blocks $B'$ that start at this combination of location and time. Then, find $\pi_{max} = \max \{ \pi_{b} \:|\: b \in B' \} \cup \{ 0 \}$ and $\pi_{min} = \min \{ \pi_{b} \:|\: b \in B' \} \cup \{ 0 \}$.  Using these, we update our bounds to $c_{min} \gets c - \pi_{max}$ and $c_{max} \gets c - \pi_{min}$, thereby modeling the fact that the started block must either end in a known block or a unknown block. When the end of a block $b$ is reached, set $c \gets c - \pi_b$ and reset $c_{min}$ and $c_{max}$ to $c$; if $b$ is unknown, we again assume $\pi_b = 0$. Note that as multiple blocks may end at the same point, the starting time and location of $b$ must be tracked within the label during propagation. 
+During propagation throughout the graph we update $c, c_{min}$ and $c_{max}$ as defined for the sequential approach, accumulating both traversed arc costs and trip dual costs. When we encounter the start of a block during propagation, let us consider the set of known blocks $B'$ that start at this combination of location and time. Then, we find $\pi_{max} = \max \{ \pi_{b} \:|\: b \in B' \} \cup \{ 0 \}$ and $\pi_{min} = \min \{ \pi_{b} \:|\: b \in B' \} \cup \{ 0 \}$.  Using these, we update our bounds to $c_{min} \gets c - \pi_{max}$ and $c_{max} \gets c - \pi_{min}$, thereby modeling the fact that the started block must at some point either end in a known or unknown block. When the end of a block $b$ is reached during propagation, set $c \gets c - \pi_b$ and reset $c_{min}$ and $c_{max}$ to $c$; if $b$ is unknown, we again assume $\pi_b = 0$. Note that as multiple blocks may end at the same point, the starting time and location of $b$ must be tracked within the label during propagation. 
 
 Using this, we can now redefine our domination rule such that for $l$ to dominate $l'$ both $SoC_l \geq SoC_l'$ and $c_{max,l} \leq c_{min,l'}$ must hold. If this is the case, we now know with certainty that the costs of the expansion will not be compensated for by the dual costs of a not yet completed block, thereby making $l$ better than $l'$.
 
@@ -1186,7 +1250,9 @@ In order to more quickly allow blocks to be found which are good for the crew so
 
 Let us consider our set of to be covered blocks $B'$ when entering a crew column generation round. For an individual block $b \in B'$, performing a deadhead or trip directly before or after $b$ may result in a different feasible block $b_{alt}$. More formally, $b_{alt}$ is feasible if the idle time between the $b$ and the added element is less than the minimum handover time, the start and end location of $b_{alt}$ are relief points and the total duration of $b_{alt}$ is less than or equal to the maximum continuous driving time.
 
-Let us now arbitrarily select some subset $B'' \subseteq B'$; we will use $10\%$ the blocks in $B'$, selected at random. Now, for each $b \in B''$, let $B_{alt,b}$ be the feasible alternative blocks which can be created, and let $B_{alt} = \bigcup_{b \in B''} B_{alt,b}$. From $B_{alt}$, let us select a number of blocks which are currently not in $B'$, prioritizing ones which are currently unknown. We will now include these blocks in $B'$ before starting our column generation process; if an alternative block is useful for the crew solution, it will be used in the newly generated duties. If this occurs, all previously unknown blocks become known, and dual costs can be determined for use in a future column  generation step. We have therefore now created a way for blocks which are good for crew solution quality to be created without relying on an unknown path in vehicle task generation.
+Let us therefore arbitrarily select some subset $B'' \subseteq B'$; in testing, we randomly selected $10\%$ the blocks in $B'$. Now, for each $b \in B''$, let $B_{alt,b}$ be the feasible alternative blocks which can be created from $b$, and let $B_{alt} = \bigcup_{b \in B''} B_{alt,b}$. From $B_{alt}$, let us select a number of blocks which are currently not in $B'$, prioritizing ones which are currently unknown. We will now include these blocks in $B'$ before starting our column generation process.
+
+If an alternative block is useful for the crew solution, it will then be used in the newly generated duties. If this occurs, all previously unknown blocks become known, and dual costs can be determined for use in a future column generation step. We have therefore now created a way for blocks which are good for crew solution quality to be created without relying on an unknown path in vehicle task generation.
 
 \paragraph{Additional heuristics}
 A number of other heuristics were included, both in an attempt to improve the solution quality and to make sure that the problem remains computationally feasible.
@@ -1201,7 +1267,7 @@ In addition to this, duplicate columns are filtered out. Primarily during the cr
 
 Firstly, in the non-simplified version of the labor regulations we implemented, there is an additional constraint on the minimum length of each (partial) duty; inspired by this, labels which could only feasibly result in a short duty are discarded. During propagation, this can only be done for broken shifts: if a broken shift label did not yet use a long idle arc and taking any long idle arc would leave less than 1 hour of available work, discard the label.
 
-Secondly, an upper bound $N_{max,lb}$ was set on the number of labels which were allowed in $cb_e$; as soon as a total of $N_{max,lb}$ labels reach $cb_e$, propagation is considered complete and extraction of columns is started. Depending on the method of selecting which label will be propagated next, this can result in significant bias: in order to minimize this effect, we randomly select a label from the list of active labels to propagate. This does still result in a bias for duties with fewer blocks as these require fewer propagations to reach $cb_e$, however this can be negated by setting $N_{max,lb}$ reasonably high. $N_{max,lb}$ was selected such that it was roughly equal to the number of labels required when solving the problem sequentially, thereby preventing a bad subgradient optimization round from grinding the algorithm to a halt.
+Secondly, an upper bound $N_{max,lb}$ was set on the number of labels which were allowed in $cb_e$; as soon as a total of $N_{max,lb}$ labels reach $cb_e$, propagation is considered complete and extraction of columns is started. Depending on the method of selecting which label will be propagated next, this can result in significant bias: in order to minimize this effect, we randomly select a label from the list of active labels to propagate. This does still result in a bias for duties with fewer blocks as these require fewer propagations to reach $cb_e$, however this can be negated by setting $N_{max,lb}$ reasonably high. The parameter $N_{max,lb}$ was therefore selected such that it was roughly equal to the number of labels required when solving the problem sequentially, thereby preventing a bad subgradient optimization round from grinding the algorithm to a halt.
 
 \subparagraph{Multiplier disruption} After performing all vehicle and crew rounds, another set of column generation rounds is done in which $\lambda$ is slightly disrupted. This is done to have an alternative way of forming secondary columns, as the disrupted $\lambda$ will hopefully cause the pricing problems to produce columns which are close but not identical to the ones which are generated with the normal $\lambda$. Disruption is done for each individual multiplier $\lambda_\chi \in \lambda$ by setting $\lambda_\chi \gets \lambda_\chi \cdot \textit{uniform}(0.8,1.2)$. During these additional disrupted rounds, the maximum number of columns is removed as discarding based on disrupted multipliers may lead to a significantly worse quality final solution. 
 
