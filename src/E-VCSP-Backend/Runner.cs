@@ -256,6 +256,51 @@ namespace E_VCSP_Backend {
             }
         }
 
+        void expCSPGlobalLS() {
+            Reload("CSP Secondary Columns");
+            Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;mip runtime;total runtime");
+
+            // Get vsp solution
+            Config.VSP_SOLVER_TIMEOUT_SEC = 150;
+            Config.VSP_LB_SEC_COL_ATTEMPTS = 4;
+            Config.VSP_LB_SEC_COL_COUNT = 4;
+
+            // Unfair testing for CSP
+            Config.CR_SINGLE_SHIFT_COST = 10_000;
+            Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
+            Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
+
+            vss = new(Instance!, Instance!.VehicleTypes[0]);
+            VSPSolver = new EVSPCG(vss);
+            bool success = VSPSolver.Solve();
+
+            int attempts = 5;
+            Config.CSP_INSTANCES_PER_IT = 20;
+            Config.CSP_LS_GLOBAL_WEIGHT = 1;
+            List<int> rounds = [100 / Config.CSP_INSTANCES_PER_IT, 200 / Config.CSP_INSTANCES_PER_IT, 500 / Config.CSP_INSTANCES_PER_IT, 1000 / Config.CSP_INSTANCES_PER_IT];
+            List<int> maxIts = [10_000, 50_000, 100_000, 500_000, 1_000_000, 5_000_000];
+
+
+            foreach (var r in rounds) {
+                foreach (var i in maxIts) {
+                    for (int x = 0; x < attempts; x++) {
+                        Config.CSP_MAX_COL_GEN_ITS = r;
+                        Config.CSP_OPT_IT_THRESHOLD = r;
+                        Config.CSP_LS_G_ITERATIONS = i;
+
+                        css = new(Instance, Block.FromVehicleTasks(vss.SelectedTasks));
+                        CSPSolver = new CSPCG(css);
+                        Stopwatch sw = Stopwatch.StartNew();
+                        success = CSPSolver.Solve();
+                        sw.Stop();
+                        Console.WriteLine($"{Config.CNSL_OVERRIDE}{r};{i};" +
+                            $"{css.Costs()};{css.CostFactors()};{css.Duties.Count};{css.SelectedDuties.Count};{css.SelectedDuties.Count(x => x.duty.Type == DutyType.Single)};" +
+                            $"{css.SelectedDuties.Where(x => x.duty.Type == DutyType.Single).Sum(x => x.duty.PaidDuration / 3600.0 * Constants.CR_HOURLY_COST)};{CSPSolver.model!.MIPGap};{CSPSolver.model.Runtime};{sw.Elapsed.TotalSeconds};");
+                    }
+                }
+            }
+        }
+
         void expVCSPRounds() {
             Reload("VCSP Rounds");
 

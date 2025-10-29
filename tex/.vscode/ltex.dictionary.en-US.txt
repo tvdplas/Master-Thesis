@@ -29,3 +29,10 @@ Gurobi
 bitmask
 overcovered
 Kooten-Niekerk
+subrounds
+presolving
+Qbuzz
+Jippe
+ICPC
+Reinier
+leiden

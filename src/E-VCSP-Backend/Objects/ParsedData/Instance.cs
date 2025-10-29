@@ -152,7 +152,7 @@ namespace E_VCSP.Objects.ParsedData {
             double totalVehicleCost = max * Config.VH_PULLOUT_COST + drivingCost + energyCost + totalDegradationCost;
 
             double totalWorkingHours = Trips.Sum(x => x.Duration) / 60.0 / 60.0;
-            double totalCrewCost = totalWorkingHours * 84.54;
+            double totalCrewCost = totalWorkingHours * 83.18;
 
             Console.WriteLine($"Min costs: {totalVehicleCost} + {totalCrewCost} = {totalVehicleCost + totalCrewCost}");
         }

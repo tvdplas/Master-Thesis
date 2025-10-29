@@ -108,14 +108,14 @@ namespace E_VCSP {
 
         public static Header CSP_LS_GLOBAL = new();
         public static double CSP_LS_GLOBAL_WEIGHT = 0;
-        public static double CSP_LS_G_STARTING_T = 50;
+        public static double CSP_LS_G_STARTING_T = 100;
         public static double CSP_LS_G_ENDING_T = 0.01;
         public static double CSP_LS_G_COOLING_RATE = 0.98;
         public static double CSP_LS_G_ITERATIONS = 10_000_000;
         public static double CSP_LS_G_SWAP_TAILS = 5;
         public static double CSP_LS_G_MOVE_RANGE = 2;
         public static double CSP_LS_G_MOVE_SINGLE = 5;
-        public static double CSP_LS_G_CREWHUB_PENALTY = 100;
+        public static double CSP_LS_G_CREWHUB_PENALTY = 1000;
         public static double CSP_LS_G_TIME_PENALTY = 1;
         public static double CSP_LS_G_STEER_PENALTY = 1;
         public static double CSP_LS_G_BREAK_PENALTY = 10;

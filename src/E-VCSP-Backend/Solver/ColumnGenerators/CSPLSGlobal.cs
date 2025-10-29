@@ -18,6 +18,8 @@ namespace E_VCSP.Solver.ColumnGenerators {
         /// Crew duty elementrepresented in node
         /// </summary>
         public required CrewDutyElement CDE;
+        public (double cost, int duration, Block? block, BlockArc? arc) altStart;
+        public (double cost, int duration, Block? block, BlockArc? arc) altEnd;
 
         /// <summary>
         /// Previous crew duty node
@@ -139,19 +141,19 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
         private (int minStartTime, int maxStartTime, int minEndTime, int maxEndTime)[] DutyTypeTimeframes =
         [
-            //(int.MinValue, int.MaxValue, int.MinValue, (int)(16.5 * 60 * 60)), // Early
-            //(int.MinValue, int.MaxValue, (int)(16.5 * 60 * 60), (int)(18.25 * 60 * 60)), // Day
-            //(13 * 60 * 60, int.MaxValue, int.MinValue, (int)(26.5 * 60 * 60)), // Late
-            //(int.MinValue, 24 * 60 * 60, (int)(26.5 * 60 * 60), int.MaxValue), // Night
-            //(int.MinValue, 13 * 60 * 60, (int)(18.25 * 60 * 60), int.MaxValue), // Between
-            //((int)(5.5 * 60 * 60), int.MaxValue, int.MinValue, (int)(19.5 * 60 * 60)), // Broken
+            (int.MinValue, int.MaxValue, int.MinValue, (int)(16.5 * 60 * 60)), // Early
+            (int.MinValue, int.MaxValue, (int)(16.5 * 60 * 60), (int)(18.25 * 60 * 60)), // Day
+            (13 * 60 * 60, int.MaxValue, int.MinValue, (int)(26.5 * 60 * 60)), // Late
+            (int.MinValue, 24 * 60 * 60, (int)(26.5 * 60 * 60), int.MaxValue), // Night
+            (int.MinValue, 13 * 60 * 60, (int)(18.25 * 60 * 60), int.MaxValue), // Between
+            ((int)(5.5 * 60 * 60), int.MaxValue, int.MinValue, (int)(19.5 * 60 * 60)), // Broken
 
-            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
-            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
-            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
-            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
-            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
-            (int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            //(int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            //(int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            //(int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            //(int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            //(int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
+            //(int.MinValue, int.MaxValue, int.MinValue, int.MaxValue), // Early
         ];
 
         private int[] DutyTypeMaxDurations = [
@@ -177,43 +179,77 @@ namespace E_VCSP.Solver.ColumnGenerators {
             double penalty = 0;
             bool feasible = true;
             void applyPenalty(double p) {
-                //[]
                 feasible = false;
-                penalty += p * penaltyMultiplier * paidDuration / (10 * numUncoveredBlocks);
+                penalty += p * penaltyMultiplier * paidDuration;
             }
 
-            if (!head!.CDE.StartLocation.CrewBase) applyPenalty(Config.CSP_LS_G_CREWHUB_PENALTY);
-            if (!tail!.CDE.EndLocation.CrewBase) applyPenalty(Config.CSP_LS_G_CREWHUB_PENALTY);
+            if (!head!.CDE.StartLocation.CrewBase && head.altStart.block == null)
+                applyPenalty(Config.CSP_LS_G_CREWHUB_PENALTY);
+            if (!tail!.CDE.EndLocation.CrewBase && tail.altEnd.block == null)
+                applyPenalty(Config.CSP_LS_G_CREWHUB_PENALTY);
+
+            bool useAltStart = !head.CDE.StartLocation.CrewBase && head.altStart.block != null;
+            bool useAltEnd = !tail!.CDE.EndLocation.CrewBase && tail.altEnd.block != null;
 
             // Check start / end times
+            int startTime = useAltStart
+                ? head.altStart.block!.StartTime
+                : head.CDE.StartTime;
+            int endTime = useAltEnd
+                ? tail.altEnd.block!.EndTime
+                : tail.CDE.EndTime;
+
             var timeframe = DutyTypeTimeframes[(int)dt];
             int startTimeDeviation = 0;
-            if (timeframe.minStartTime > head!.CDE.StartTime)
-                startTimeDeviation = timeframe.minStartTime - head!.CDE.StartTime;
-            if (head!.CDE.StartTime > timeframe.maxStartTime)
-                startTimeDeviation = Math.Max(startTimeDeviation, head!.CDE.StartTime - timeframe.maxStartTime);
+            if (timeframe.minStartTime > startTime)
+                startTimeDeviation = timeframe.minStartTime - startTime;
+            if (startTime > timeframe.maxStartTime)
+                startTimeDeviation = Math.Max(startTimeDeviation, startTime - timeframe.maxStartTime);
             if (startTimeDeviation > 0) applyPenalty(startTimeDeviation * Config.CSP_LS_G_TIME_PENALTY);
 
             int endTimeDeviation = 0;
-            if (timeframe.minEndTime > tail!.CDE.EndTime)
-                endTimeDeviation = timeframe.minEndTime - tail!.CDE.EndTime;
-            if (tail!.CDE.EndTime > timeframe.maxEndTime)
-                endTimeDeviation = Math.Max(endTimeDeviation, tail!.CDE.EndTime - timeframe.maxEndTime);
+            if (timeframe.minEndTime > endTime)
+                endTimeDeviation = timeframe.minEndTime - endTime;
+            if (endTime > timeframe.maxEndTime)
+                endTimeDeviation = Math.Max(endTimeDeviation, endTime - timeframe.maxEndTime);
             if (endTimeDeviation > 0) applyPenalty(endTimeDeviation * Config.CSP_LS_G_TIME_PENALTY);
 
             // Check duration
-            int durationDeviation = paidDuration > DutyTypeMaxDurations[(int)dt] ? paidDuration - DutyTypeMaxDurations[(int)dt] : 0;
+            int durationDeviation = Math.Max(paidDuration - DutyTypeMaxDurations[(int)dt], 0);
             if (durationDeviation > 0) applyPenalty(durationDeviation * Config.CSP_LS_G_TIME_PENALTY);
 
             List<(int startTime, int duration)> breaks = [];
 
             // Check total break time + max driving duration
-            int lastBreak = head!.CDE.StartTime;
+            int lastBreak = startTime;
             (int startTime, int duration) longIdle = (-1, 0);
             bool longIdleUsed = false;
             if (dt == DutyType.Broken) {
-                var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
-                if (longestIdle != null) longIdle = (longestIdle.CDE.StartTime, longestIdle.CDE.EndTime - longestIdle.CDE.EndTime);
+                (int startTime, int duration) longestIdle = (-1, -1);
+
+                if (useAltStart && head.altStart.arc!.Type == BlockArcType.LongIdle && head.altStart.arc.TotalTime > longestIdle.duration) {
+                    longestIdle = (head.altStart.block!.EndTime, head.altStart.arc.TotalTime);
+                }
+                if (useAltEnd && tail!.altEnd.arc!.Type == BlockArcType.LongIdle && tail.altEnd.arc.TotalTime > longestIdle.duration) {
+                    longestIdle = (tail.altEnd.block!.StartTime - tail.altEnd.arc.TotalTime, tail.altEnd.arc.TotalTime);
+                }
+
+                var longestIdleInDuty = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
+                if (longestIdleInDuty != null && longestIdleInDuty.CDE.EndTime - longestIdleInDuty.CDE.StartTime > longestIdle.duration) {
+                    longIdle = (longestIdleInDuty.CDE.StartTime, longestIdleInDuty.CDE.EndTime - longestIdleInDuty.CDE.StartTime);
+                }
+            }
+
+
+            if (useAltStart && head.altStart.arc!.Type == BlockArcType.Break) {
+                int breakStartTime = head.altStart.block!.EndTime;
+                int breakDuration = head.altStart.arc.TotalTime - head.altStart.duration - head.altStart.block.EndLocation.BrutoNetto;
+                breaks.Add((breakStartTime, breakDuration));
+                // Too long between breaks
+                if (breakStartTime - lastBreak > Constants.MAX_STEERING_TIME) {
+                    applyPenalty((breakStartTime - lastBreak - Constants.MAX_STEERING_TIME) * Config.CSP_LS_G_STEER_PENALTY);
+                }
+                lastBreak = breakStartTime + breakDuration;
             }
 
             curr = head;
@@ -243,6 +279,24 @@ namespace E_VCSP.Solver.ColumnGenerators {
                 lastBreak = cde.EndTime;
 
                 curr = curr.Next;
+            }
+
+            if (useAltEnd && tail!.altEnd.arc!.Type == BlockArcType.Break) {
+                int breakStartTime = tail.CDE.EndTime;
+                int breakDuration = tail.altEnd.arc.TotalTime - tail.CDE.EndLocation.BrutoNetto;
+                breaks.Add((breakStartTime, breakDuration));
+                if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime < breakStartTime) {
+                    // First check time traveled before big idle, then update last break time accordingly
+                    if (longIdle.startTime - lastBreak > Constants.MAX_STEERING_TIME)
+                        applyPenalty((longIdle.startTime - lastBreak - Constants.MAX_STEERING_TIME) * Config.CSP_LS_G_STEER_PENALTY);
+                    lastBreak = longIdle.startTime + longIdle.duration;
+                    longIdleUsed = true;
+                }
+                // Too long between breaks
+                if (breakStartTime - lastBreak > Constants.MAX_STEERING_TIME) {
+                    applyPenalty((breakStartTime - lastBreak - Constants.MAX_STEERING_TIME) * Config.CSP_LS_G_STEER_PENALTY);
+                }
+                lastBreak = breakStartTime + breakDuration;
             }
 
             if (!longIdleUsed && longIdle.startTime != -1 && longIdle.startTime > lastBreak) {
@@ -298,13 +352,13 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             //if (feasible) {
             // subtract the block reduced costs from the penalty
-            curr = head;
-            while (curr != null) {
-                if (curr.CDE.Type == CrewDutyElementType.Block) {
-                    penalty -= blockDualCosts[((CDEBlock)curr.CDE).Block.Index];
-                }
-                curr = curr.Next;
-            }
+            //curr = head;
+            //while (curr != null) {
+            //    if (curr.CDE.Type == CrewDutyElementType.Block) {
+            //        penalty -= blockDualCosts[((CDEBlock)curr.CDE).Block.Index];
+            //    }
+            //    curr = curr.Next;
+            //}
             //}
 
             return (feasible, penalty);
@@ -329,8 +383,15 @@ namespace E_VCSP.Solver.ColumnGenerators {
             if (head == null || tail == null) return 0;
             int baseDuration = tail.CDE.EndTime - head.CDE.StartTime;
 
-            if (head.CDE.StartLocation.CrewBase) baseDuration += head.CDE.StartLocation.SignOnTime;
-            if (head.CDE.StartLocation.CrewBase) baseDuration += head.CDE.StartLocation.SignOffTime;
+            if (head.CDE.StartLocation.CrewBase)
+                baseDuration += head.CDE.StartLocation.SignOnTime;
+            else if (head.altStart.block != null)
+                baseDuration += head.altStart.duration + head.altStart.block.StartLocation.SignOnTime;
+
+            if (tail.CDE.EndLocation.CrewBase)
+                baseDuration += tail.CDE.EndLocation.SignOffTime;
+            else if (tail.altEnd.block != null)
+                baseDuration += tail.altEnd.duration + tail.altEnd.block.EndLocation.SignOffTime;
 
             if (dt == DutyType.Broken) {
                 var longestIdle = head.FindFirstAfter(x => x.CDE.Type == CrewDutyElementType.Idle && x.CDE.EndTime - x.CDE.StartTime > Config.CR_MIN_LONG_IDLE_TIME);
@@ -345,11 +406,6 @@ namespace E_VCSP.Solver.ColumnGenerators {
         public double Cost(DutyType dt) {
             double cost = BaseCost(dt);
             cost += PaidDuration(dt) / (60.0 * 60.0) * Constants.CR_HOURLY_COST;
-            if (head == null || tail == null) return cost;
-
-            if (!head.CDE.StartLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
-            if (!tail.CDE.EndLocation.CrewBase) cost += Config.CSP_LS_G_CREWHUB_PENALTY;
-
             return cost;
         }
 
@@ -359,22 +415,106 @@ namespace E_VCSP.Solver.ColumnGenerators {
             return cost;
         }
 
-        public CrewDuty? ToCrewDuty(List<double> blockDualCosts) {
+        public List<CrewDuty> ToCrewDuty(List<double> blockDualCosts) {
             // If no type exists which can be feasibly used, return
             var minType = MinTypeCost(blockDualCosts, 10000);
-            if (!minType.feasible) return null;
+            if (!minType.feasible) {
+                // attempt to cover every block in the best way possible
+                List<CSPLSNode> blocks = [];
+                var c = head;
+                while (c != null) {
+                    if (c.CDE.Type == CrewDutyElementType.Block) blocks.Add(c);
+                    c = c.Next;
+                }
 
-            List<CrewDutyElement> cdes = [];
+                List<CrewDuty> cds = [];
+                foreach (var b in blocks) {
+                    if ((!b.CDE.StartLocation.CrewBase && b!.altStart.block == null)
+                        || (!b.CDE.EndLocation.CrewBase && b!.altEnd.block == null)) continue;
+
+                    List<CrewDutyElement> elements = [];
+
+                    // create crew duty from alt start / end
+                    if (b.CDE.StartLocation.CrewBase) {
+                        elements.Add(new CDESignOnOff(b.CDE.StartTime - b.CDE.StartLocation.SignOnTime, b.CDE.StartTime, b.CDE.StartLocation));
+                    }
+                    else {
+                        elements.Add(new CDESignOnOff(b.altStart.block.StartTime - b.altStart.block.StartLocation.SignOnTime, b.altStart.block.StartTime, b.altStart.block.StartLocation));
+                        elements.Add(new CDEBlock(b.altStart.block));
+                        if (b.altStart.block.EndLocation.BreakAllowed) {
+                            elements.Add(new CDEBreak(b.altStart.block.EndTime, b.CDE.StartTime, b.altStart.block.EndLocation, b.CDE.StartLocation));
+                        }
+                        else {
+                            elements.Add(new CDEIdle(b.altStart.block.EndTime, b.CDE.StartTime, b.altStart.block.EndLocation, b.CDE.StartLocation));
+                        }
+                    }
+                    elements.Add(b.CDE);
+                    if (b.CDE.EndLocation.CrewBase) {
+                        elements.Add(new CDESignOnOff(b.CDE.EndTime, b.CDE.EndTime + b.CDE.EndLocation.SignOnTime, b.CDE.EndLocation));
+                    }
+                    else {
+                        if (b.altEnd.block.StartLocation.BreakAllowed) {
+                            elements.Add(new CDEBreak(b.CDE.EndTime, b.altEnd.block.StartTime, b.CDE.EndLocation, b.altEnd.block.StartLocation));
+                        }
+                        else {
+                            elements.Add(new CDEIdle(b.CDE.EndTime, b.altEnd.block.StartTime, b.CDE.EndLocation, b.altEnd.block.StartLocation));
+                        }
+                        elements.Add(new CDEBlock(b.altEnd.block));
+                        elements.Add(new CDESignOnOff(b.altEnd.block.EndTime, b.altEnd.block.EndTime + b.altEnd.block.EndLocation.SignOffTime, b.altEnd.block.EndLocation));
+                    }
+
+                    CrewDuty cd = new CrewDuty(elements) {
+                        Type = DutyType.Single,
+                    };
+
+                    for (int i = 0; i < (int)DutyType.Count; i++) {
+                        if (cd.Elements[0].StartTime >= DutyTypeTimeframes[i].minStartTime &&
+                            cd.Elements[0].StartTime <= DutyTypeTimeframes[i].maxStartTime &&
+                            cd.Elements[^1].EndTime >= DutyTypeTimeframes[i].minEndTime &&
+                            cd.Elements[^1].EndTime <= DutyTypeTimeframes[i].maxEndTime &&
+                            cd.Elements[^1].EndTime - cd.Elements[0].StartTime <= DutyTypeMaxDurations[i]) {
+                            cd.Type = (DutyType)i;
+                        }
+                    }
+                    cds.Add(cd);
+                }
+                return cds;
+            }
+
+            // TODO: alternatieve arcs toevoegen
+
             var curr = head;
+            List<CrewDutyElement> cdes = [];
+            if (!curr.CDE.StartLocation.CrewBase) {
+                cdes.Add(new CDEBlock(curr.altStart.block));
+                if (curr.altStart.block.EndLocation.BreakAllowed) {
+                    cdes.Add(new CDEBreak(curr.altStart.block.EndTime, curr.CDE.StartTime, curr.altStart.block.StartLocation, curr.CDE.StartLocation));
+                }
+                else {
+                    cdes.Add(new CDEIdle(curr.altStart.block.EndTime, curr.CDE.StartTime, curr.altStart.block.StartLocation, curr.CDE.StartLocation));
+                }
+            }
             while (curr != null) {
                 cdes.Add(curr.CDE);
                 curr = curr.Next;
             }
+            curr = head.FindLastAfter(_ => true) ?? head;
+            if (!curr.CDE.EndLocation.CrewBase) {
+                if (curr.altEnd.block.StartLocation.BreakAllowed) {
+                    cdes.Add(new CDEBreak(curr.CDE.EndTime, curr.altEnd.block.StartTime, curr.CDE.EndLocation, curr.altEnd.block.StartLocation));
+                }
+                else {
+                    cdes.Add(new CDEIdle(curr.CDE.EndTime, curr.altEnd.block.StartTime, curr.CDE.EndLocation, curr.altEnd.block.StartLocation));
+                }
+                cdes.Add(new CDEBlock(curr.altEnd.block));
+            }
+
             cdes.Insert(0, new CDESignOnOff(cdes[0].StartTime - cdes[0].StartLocation.SignOnTime, cdes[0].StartTime, cdes[0].StartLocation));
             cdes.Add(new CDESignOnOff(cdes[^1].EndTime, cdes[^1].EndTime + cdes[^1].EndLocation.SignOffTime, cdes[^1].EndLocation));
-            return new CrewDuty(cdes) {
+
+            return [new CrewDuty(cdes) {
                 Type = minType.dt
-            };
+            }];
         }
 
         public override string ToString() {
@@ -405,10 +545,44 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             // Reset duties to unit
             for (int i = 0; i < css.Blocks.Count; i++) {
+                if (css.BlockCount[i] == 0) continue;
+
                 Block b = css.Blocks[i];
 
+                // Add alternative costs in the event that a duty requires overcoverage 
+                (double costs, int duration, Block? block, BlockArc? arc) altStart = (b.StartLocation.CrewBase ? 0 : double.PositiveInfinity, -1, null, null);
+                (double costs, int duration, Block? block, BlockArc? arc) altEnd = (b.EndLocation.CrewBase ? 0 : double.PositiveInfinity, -1, null, null);
+
+                for (int j = 0; j < css.Blocks.Count; j++) {
+                    if (css.BlockCount[j] == 0) continue;
+
+                    Block bAlt = css.Blocks[j];
+
+                    if (bAlt.StartLocation.CrewBase && css.AdjFull[bAlt.Index][b.Index] != null) {
+                        BlockArc arc = css.AdjFull[bAlt.Index][b.Index]!;
+                        int duration = bAlt.Duration + arc.TotalTime;
+                        double additionalCosts = (duration) / 3600.0 * Constants.CR_HOURLY_COST;
+                        if (additionalCosts < altStart.costs) {
+                            altStart = (additionalCosts, duration, bAlt, arc);
+                        }
+                    }
+
+                    if (bAlt.EndLocation.CrewBase && css.AdjFull[b.Index][bAlt.Index] != null) {
+                        BlockArc arc = css.AdjFull[b.Index][bAlt.Index]!;
+                        int duration = bAlt.Duration + arc.TotalTime;
+                        double additionalCosts = (duration) / 3600.0 * Constants.CR_HOURLY_COST;
+                        if (additionalCosts < altEnd.costs) {
+                            altEnd = (additionalCosts, duration, bAlt, arc);
+                        }
+                    }
+                }
+
                 CrewDutyElement cde = new CDEBlock(b);
-                CSPLSNode head = new CSPLSNode() { CDE = cde };
+                CSPLSNode head = new CSPLSNode() {
+                    CDE = cde,
+                    altEnd = altEnd,
+                    altStart = altStart,
+                };
 
                 duties.Add(new() {
                     head = head,
@@ -762,7 +936,7 @@ namespace E_VCSP.Solver.ColumnGenerators {
 
             //Console.WriteLine("Op results: " + string.Join('\t', resCounts.Select(x => x.ToString())));
             //Console.WriteLine($"Total duties/css.instance.Blocks covered: {duties.Count} / {duties.Sum(x => x.CoveredBlocks().Count)}");
-            var fs = duties.Select(x => (-1.0, x.ToCrewDuty(blockDualCosts))).Where(x => x.Item2 != null).ToList();
+            var fs = duties.SelectMany(x => x.ToCrewDuty(blockDualCosts).Select(y => (-1.0, y))).ToList();
             //Console.WriteLine($"Feasible duties/css.instance.Blocks covered: {fs.Count} / {fs.Sum(x => x.Item2!.Covers.Count)}");
             return fs;
         }
