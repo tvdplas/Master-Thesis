@@ -257,7 +257,8 @@ namespace E_VCSP_Backend {
         }
 
         void expCSPGlobalLS() {
-            Reload("CSP Secondary Columns");
+            Reload("CSP Global LS");
+            Directory.CreateDirectory(Constants.RUN_LOG_FOLDER + "rosters");
             Console.WriteLine($"{Config.CNSL_OVERRIDE}# attempts;# subdivs;value;#unique cols;mipgap;mip runtime;total runtime");
 
             // Get vsp solution
@@ -266,7 +267,6 @@ namespace E_VCSP_Backend {
             Config.VSP_LB_SEC_COL_COUNT = 4;
 
             // Unfair testing for CSP
-            Config.CR_SINGLE_SHIFT_COST = 10_000;
             Config.CR_MAX_SHORT_IDLE_TIME = 4 * 60 * 60;
             Config.CR_MAX_BREAK_TIME = 4 * 60 * 60;
 
@@ -277,6 +277,7 @@ namespace E_VCSP_Backend {
             int attempts = 5;
             Config.CSP_INSTANCES_PER_IT = 20;
             Config.CSP_LS_GLOBAL_WEIGHT = 1;
+            Config.CR_SINGLE_SHIFT_COST = 100_000;
             List<int> rounds = [100 / Config.CSP_INSTANCES_PER_IT, 200 / Config.CSP_INSTANCES_PER_IT, 500 / Config.CSP_INSTANCES_PER_IT, 1000 / Config.CSP_INSTANCES_PER_IT];
             List<int> maxIts = [10_000, 50_000, 100_000, 500_000, 1_000_000, 5_000_000];
 
@@ -296,6 +297,14 @@ namespace E_VCSP_Backend {
                         Console.WriteLine($"{Config.CNSL_OVERRIDE}{r};{i};" +
                             $"{css.Costs()};{css.CostFactors()};{css.Duties.Count};{css.SelectedDuties.Count};{css.SelectedDuties.Count(x => x.duty.Type == DutyType.Single)};" +
                             $"{css.SelectedDuties.Where(x => x.duty.Type == DutyType.Single).Sum(x => x.duty.PaidDuration / 3600.0 * Constants.CR_HOURLY_COST)};{CSPSolver.model!.MIPGap};{CSPSolver.model.Runtime};{sw.Elapsed.TotalSeconds};");
+
+                        Roster crRoster = new() {
+                            Comment = css.CostFactors().ToString(),
+                            RosterNodes = SolutionGraph.GenerateCrewDutyGraph(css.SelectedDuties),
+                            Type = 2
+                        };
+                        string instanceName = $"leiden-1-2-r{r}-i{i}-a{x}";
+                        crRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/{instanceName}");
                     }
                 }
             }
@@ -820,7 +829,6 @@ namespace E_VCSP_Backend {
                     vhRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/int/{instanceName}");
                     blockRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/int/{instanceName}");
                     crRoster.Dump(Constants.RUN_LOG_FOLDER + $"rosters/int/{instanceName}");
-
                 }
             }
         }
